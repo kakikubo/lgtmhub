@@ -4,7 +4,7 @@
 
 - 開発環境: devcontainer
 - Node.js v24.11.0
-- TypeScript 5.x
+- TypeScript 6.x
 - パッケージマネージャー: npm
 
 ## スペック駆動開発の基本原則
