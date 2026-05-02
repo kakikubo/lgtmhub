@@ -33,15 +33,7 @@ graph TB
 
 ## 技術スタック
 
-| 分類 | 技術 | 選定理由 |
-|------|------|----------|
-| フレームワーク | Next.js 15（App Router） | SSR・APIルートを一体化、Vercelと親和性が高い |
-| 言語 | TypeScript | 型安全性、エディタサポート |
-| DB・認証 | Supabase（PostgreSQL + Auth） | GitHub OAuthが標準対応、RLSでセキュアなアクセス制御、無料枠あり |
-| ストレージ | Vercel Blob | Vercelと統合済み、CDN配信が自動、無料枠あり |
-| 画像処理 | Sharp | Node.js上でLGTM文字合成・WebP変換・リサイズを高速処理 |
-| スタイリング | Tailwind CSS | ユーティリティクラスで高速にUI構築 |
-| パッケージ管理 | npm | CLAUDE.mdで指定済み |
+技術選定の詳細（バージョン・選定理由）は [`docs/architecture.md`](./architecture.md) の「テクノロジースタック」を正とする。本ドキュメントでは各コンポーネントの機能設計上の役割（システム構成図参照）のみ扱う。
 
 ---
 
@@ -96,6 +88,13 @@ interface LgtmImage {
 - `status = 'deleted'` の場合は一覧に表示しない（論理削除）
 - `uploaderId` は `user_profiles.id` への外部キー
 
+**`status` のライフサイクルとUI表示ルール**:
+- `processing`: API でレコードを先行作成し、合成・Blob 保存中の中間状態。DB登録は同一トランザクション内で完結するため理論上は短時間だが、合成失敗時のロールバック判別に利用する
+- `active`: 公開可能な状態。**画像一覧 / お気に入り一覧APIは `active` のみを返す**（RLSポリシーで担保）
+- `deleted`: 論理削除済み。一覧・詳細APIともに 404 として扱う
+
+UI 側ではAPI 登録レスポンス（201）= `active` 確定とみなして遷移する。`processing` 状態の画像が一覧に現れることはない（ユーザーがポーリングする必要なし）。
+
 ---
 
 ### エンティティ: Favorite
@@ -122,15 +121,17 @@ interface Favorite {
 
 ```typescript
 interface DailyUploadCount {
-  userId: string;   // UserProfile.id
-  date: string;     // 'YYYY-MM-DD' 形式
+  userId: string;   // UserProfile.id（複合主キーの一部）
+  date: string;     // 'YYYY-MM-DD' 形式（複合主キーの一部）
   count: number;    // その日の登録数
 }
 ```
 
 **制約**:
-- `(userId, date)` にUNIQUE制約
+- 主キー: `(userId, date)` の複合主キー（独立した `id` カラムは持たない）
+- `userId` は `user_profiles.id` への外部キー
 - `count` の上限は10（アプリケーションレベルで制御）
+- UPSERT による atomic な INCREMENT を行う（マイグレーションで `ON CONFLICT (user_id, date) DO UPDATE` を利用）
 
 ---
 
@@ -177,8 +178,8 @@ erDiagram
     }
 
     DAILY_UPLOAD_COUNTS {
-        uuid user_id FK
-        date date
+        uuid user_id PK,FK
+        date date PK
         int count
     }
 ```
@@ -236,6 +237,11 @@ GET /api/images
 }
 ```
 
+**フィールド絞り込み方針**:
+- 一覧 API は CDN 経由の画像表示と「コピー / お気に入り」操作だけを満たせばよいため、`imageUrl` と `id` を中心に最小フィールドのみ返す
+- `pHash` / `width` / `height` / `fileSizeBytes` は内部用途専用で公開しない
+- 投稿者の表示名・アバターは MVP の一覧UIでは表示しない方針（PRD「画像一覧画面」受け入れ条件参照）。将来的に必要になった場合は `GET /api/users/:id` を別途追加するか、本APIのレスポンスに `uploader: { displayName, avatarUrl }` を拡張する
+
 **エラーレスポンス**:
 - 400 Bad Request: limitが不正な値
 
@@ -256,7 +262,17 @@ POST /api/images
 }
 ```
 
-**処理フロー**（後述のシーケンス図を参照）
+**処理フロー**:
+
+1. セッション確認（未ログインなら 401）
+2. 当日の登録枚数チェック（10枚以上なら 429）
+3. 外部URL取得・SSRF検証・フォーマット/サイズ検証（失敗なら 400）
+4. pHash計算 → DB全件と比較し重複検出（重複なら 409・`existingImageId`を返却）
+5. LGTM文字合成 + WebP変換 + 幅1200px以内へリサイズ
+6. Vercel Blob にアップロード
+7. `lgtm_images` レコード作成 + `daily_upload_counts` を atomic にインクリメント
+
+詳細は本ドキュメント末尾の「ユースケース: 画像登録フロー」シーケンス図を参照。
 
 **レスポンス**:
 ```json
@@ -332,6 +348,12 @@ DELETE /api/favorites/:lgtmImageId
 
 **レスポンス**: `204 No Content`
 
+**エラーレスポンス**:
+- 401 Unauthorized: 未ログイン
+- 404 Not Found: 当該ユーザーの該当お気に入りが存在しない（既に解除済みも含む）
+
+**冪等性**: 同一URLへの DELETE は冪等として扱う。「すでに解除済み」のケースは 404 を返却し、UIはこれをエラー扱いせずに「解除済み」と表示する。
+
 ---
 
 ### お気に入り一覧取得（PRD機能 4-B）
@@ -342,6 +364,12 @@ GET /api/favorites
 
 **認証**: 必須（自分のお気に入りのみ）
 
+**クエリパラメータ**:
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|----|-----------|----|
+| `cursor` | string | - | ページネーション用カーソル（`favorites.created_at` ISO文字列） |
+| `limit` | number | 20 | 取得件数（最大50） |
+
 **レスポンス**:
 ```json
 {
@@ -351,9 +379,16 @@ GET /api/favorites
       "imageUrl": "https://...",
       "createdAt": "2026-05-02T00:00:00Z"
     }
-  ]
+  ],
+  "nextCursor": "2026-05-01T23:59:59Z"
 }
 ```
+
+`createdAt` は **お気に入り登録日時**（`favorites.created_at`）を返す。画像の登録日時ではない点に注意（一覧の並び順がお気に入り追加順となるため）。
+
+**エラーレスポンス**:
+- 400 Bad Request: `limit` が不正な値
+- 401 Unauthorized: 未ログイン
 
 ---
 
@@ -582,8 +617,11 @@ class ImageService {
 
 ```typescript
 class FavoriteService {
-  // お気に入り一覧を取得
-  listFavorites(userId: string): Promise<LgtmImage[]>;
+  // お気に入り一覧を取得（カーソルページネーション、お気に入り追加日時の降順）
+  listFavorites(userId: string, cursor?: string, limit?: number): Promise<{
+    images: LgtmImage[];
+    nextCursor: string | null;
+  }>;
 
   // お気に入りに追加
   addFavorite(userId: string, lgtmImageId: string): Promise<Favorite>;

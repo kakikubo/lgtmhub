@@ -380,10 +380,11 @@ async function safeImageFetch(url: string): Promise<Response> {
   - 対応: 本ドキュメントは概要に留め、「詳細は `docs/development-guidelines.md` を参照」と明示
   - 該当箇所: 「デプロイ・実行環境 > CI/CD」
 
-- [ ] **Vercel Blob 物理削除ジョブのスコープ明示**
+- [x] **Vercel Blob 物理削除ジョブのスコープ明示**
   - 問題: 「MVP後に検討」とあるが、実行主体・タイミング・失敗時挙動が未定義
   - 対応: 「MVP期間中は物理削除しない / P1フェーズで日次クリーンアップジョブ実装」と明示する
   - 該当箇所: 「データ永続化戦略 > バックアップ戦略 > Vercel Blob」
+  - 解消: PRD に P1 機能「9. 削除画像の物理クリーンアップ」を追加し、MVP の機能2 受け入れ条件を論理削除のみに修正。実行主体（GitHub Actions 日次ジョブ）・タイミング（`deleted_at` から30日経過後）・失敗時挙動（3回リトライで運用者通知）を PRD で定義（2026-05-02）
 
 - [x] **`src/lib/errors.ts` をリポジトリ構造に追記**
   - 問題: 本ドキュメントのSSRFコードが参照する `BadRequestError` のソースが `repository-structure.md` に未記載
