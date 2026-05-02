@@ -345,3 +345,57 @@ async function safeImageFetch(url: string): Promise<Response> {
 | Tailwind CSS | MIT | ✅ |
 
 すべてMIT/Apache-2.0で商用利用可能。
+
+---
+
+## 未解決の改善項目（レビュー指摘事項）
+
+`/review-docs docs/architecture.md`（2026-05-02実施）で指摘された改善項目を以下に記録する。
+解消したらチェックを入れ、すべて解消されたら本セクションを削除する。
+
+### 優先度: 高（即時対応）
+
+- [ ] **TypeScript バージョンの統一**
+  - 問題: CLAUDE.md は `6.x`、本ドキュメントのテクスタックテーブルは `5.x`、依存関係JSONは `~5.6.0` で三者不整合
+  - 対応: CLAUDE.md・本ドキュメント（2箇所）・`development-guidelines.md` で同一バージョンに統一する
+  - 該当箇所: 「テクノロジースタック > 言語・ランタイム」テーブル / 「依存関係管理 > バージョン管理方針」JSON
+
+- [ ] **カバレッジ目標の数値整合**
+  - 問題: 本ドキュメント「主要パス 80% 以上」 vs `development-guidelines.md`「services 90% / lib 80%」で不一致
+  - 対応: レイヤー別（services 90% / lib 80%）に揃え、詳細設定は `development-guidelines.md` の `vitest.config.ts` 参照とする
+  - 該当箇所: 「テスト戦略 > ユニットテスト > カバレッジ目標」
+
+### 優先度: 中（近日対応）
+
+- [ ] **API応答・画像詳細LCPがPRDに存在しない**
+  - 問題: 「API応答 500ms/p95」「画像詳細LCP 2秒」が本ドキュメントにのみ存在し、PRDの非機能要件と乖離。「PRDと両方更新」の注記と矛盾
+  - 対応: PRDに同項目を追加するか、本ドキュメント側で「サーバー内部指標のため本ドキュメント単独管理」と意図的乖離を明示する
+  - 該当箇所: 「パフォーマンス要件 > レスポンスタイム」テーブル
+
+- [ ] **CI/CD記述の重複解消**
+  - 問題: 本ドキュメント（2行の概要） vs `development-guidelines.md`（GitHub Actions yaml全体）で記述が分散
+  - 対応: 本ドキュメントは概要に留め、「詳細は `docs/development-guidelines.md` を参照」と明示
+  - 該当箇所: 「デプロイ・実行環境 > CI/CD」
+
+- [ ] **Vercel Blob 物理削除ジョブのスコープ明示**
+  - 問題: 「MVP後に検討」とあるが、実行主体・タイミング・失敗時挙動が未定義
+  - 対応: 「MVP期間中は物理削除しない / P1フェーズで日次クリーンアップジョブ実装」と明示する
+  - 該当箇所: 「データ永続化戦略 > バックアップ戦略 > Vercel Blob」
+
+- [ ] **`src/lib/errors.ts` をリポジトリ構造に追記**
+  - 問題: 本ドキュメントのSSRFコードが参照する `BadRequestError` のソースが `repository-structure.md` に未記載
+  - 対応: `repository-structure.md` の `src/lib/` ツリーに `errors.ts` を追記（隣接ドキュメントの修正）
+  - 該当箇所: `repository-structure.md` 側の修正だが、本ドキュメントで顕在化
+
+### 優先度: 低（将来対応）
+
+- [ ] **モニタリング/可観測性セクションの追加**
+  - 問題: エラー追跡・ログ集約・容量アラートの設計が未定義
+  - 対応: 「モニタリング」セクションを新設し、Vercel Logs / Vercel Analytics / Supabase・Vercel ダッシュボードでの監視対象とアラート条件を記述する
+
+- [ ] **論理削除とCDNキャッシュ無効化の関係を文書化**
+  - 問題: `Cache-Control: immutable` キャッシュと論理削除の組み合わせで、削除済み画像がブラウザキャッシュから読み込まれる可能性が未定義
+  - 対応: 「UIフィルタのみで制御し、CDN無効化は行わない」等の設計選択を「キャッシュ戦略」に追記
+  - 該当箇所: 「スケーラビリティ設計 > キャッシュ戦略」
+
+> 出典: `/review-docs docs/architecture.md` 実施結果（doc-reviewer サブエージェント、総合スコア 3.9/5）
