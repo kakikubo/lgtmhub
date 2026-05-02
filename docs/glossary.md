@@ -104,9 +104,9 @@ lgtmoon.comの「白文字一択で背景によっては読めない」という
 - ログイン必須
 - 1ユーザーあたり1日10枚まで
 - 同じ画像（pHashが類似）は重複登録不可
-- 処理は非同期（処理中表示→完了通知）
+- 処理は同期完結（API 呼び出し中に合成・Blob保存・DB登録まで完了し、201 応答で `active` 確定）。Vercel Function のタイムアウト10秒以内を前提とする
 
-**関連用語**: [pHash](#phash-perceptual-hash), [日次登録上限](#日次登録上限)
+**関連用語**: [pHash](#phash-perceptual-hash), [日次登録上限](#日次登録上限), [画像ステータス](#画像ステータス-image-status)
 
 **実装箇所**: `src/services/image-service.ts` の `createImage` メソッド
 
@@ -144,6 +144,24 @@ P1機能。**5件以上の通報** を受けた画像は自動的に非表示（
 P1機能。`user_profiles.is_admin = true` のユーザーのみ実行可能。RLSとアプリケーションレベルの両方で権限チェックする。
 
 **関連用語**: [通報機能](#通報機能p1), [RLS](#rls-row-level-security)
+
+---
+
+### 論理削除
+
+**定義**: レコードを物理削除せず、`status = 'deleted'` への更新と `deletedAt` の記録によって「削除された」状態を表す削除方式。
+
+**説明**:
+本サービスでは画像の削除（PRD 機能2 / 6）は論理削除のみで完結する。Vercel Blob 上の画像実体は MVP 期間中は残置し、`deletedAt` から30日経過後に P1 機能9（削除画像の物理クリーンアップ）で物理削除する。
+
+**運用上の前提**:
+- 一覧 API・お気に入り一覧 API は `status = 'active'` のみを返す（RLSポリシーで担保）
+- 削除済み画像の Blob URL は MVP 期間中は直アクセス可能（ユーザー導線からは到達不能）
+- 物理削除（GitHub Actions 日次ジョブ）は3回までリトライ、失敗時は運用者に通知
+
+**関連用語**: [画像ステータス](#画像ステータス-image-status), [管理者削除](#管理者削除p1)
+
+**参考**: [PRD 機能9](./product-requirements.md), [architecture.md バックアップ戦略](./architecture.md#バックアップ戦略)
 
 ---
 
@@ -249,9 +267,12 @@ lgtmoon.comで実際に起きている問題。「ポケットモンスターの
 
 **バージョン**: 3.x
 
+**実装配置**: `src/lib/validation/` 配下にドメイン単位（`image.ts` / `favorite.ts` 等）でスキーマを集約する。Route Handler から import して利用し、同一ドメインの複数エンドポイント間でスキーマを再利用する。
+
 **例**:
 ```typescript
-const createImageSchema = z.object({
+// src/lib/validation/image.ts
+export const createImageSchema = z.object({
   imageUrl: z.string().url().startsWith('https://').max(2048),
 });
 ```
@@ -484,19 +505,25 @@ export async function POST(request: NextRequest) { /* ... */ }
 
 | ステータス | 意味 | 遷移条件 | 次の状態 |
 |----------|------|---------|---------|
-| `processing` | 登録処理中（合成・保存中） | 画像登録APIを受け付けた直後 | `active`, `deleted` |
-| `active` | 公開中（一覧に表示される） | 合成・保存が完了 | `deleted` |
-| `deleted` | 論理削除済み（一覧に表示されない） | ユーザーまたは管理者が削除 | （終端） |
+| `processing` | DB先行作成〜Blob保存完了までの内部中間状態（ユーザー可視にはならない） | 画像登録APIを受け付けた直後 | `active`, `deleted`（失敗時） |
+| `active` | 公開中（一覧・お気に入り一覧に表示される） | 合成・Blob保存・DBレコード確定が完了 | `deleted` |
+| `deleted` | 論理削除済み（一覧・詳細APIともに 404 として扱う） | ユーザーまたは管理者が削除 | （終端、30日後にBlob物理削除：PRD機能9） |
 
 **状態遷移図**:
 ```mermaid
 stateDiagram-v2
-    [*] --> processing: 登録APIを受付
-    processing --> active: 合成・保存完了
-    processing --> deleted: 処理失敗
+    [*] --> processing: 登録APIを受付（内部状態）
+    processing --> active: 合成・Blob保存・DB確定が完了
+    processing --> deleted: Blob保存失敗時のロールバック（内部遷移、ユーザーには 400/500 を返却）
     active --> deleted: ユーザー/管理者が削除
-    deleted --> [*]
+    deleted --> [*]: 30日後に物理削除（P1機能9）
 ```
+
+**重要**:
+- `processing` はサーバー内部の中間状態で、API レスポンス（201）が返った時点で `active` 確定。**ユーザー側でポーリングする必要はない**
+- 一覧 API・お気に入り一覧 API は `active` のみを返す（RLSポリシーで担保）
+
+**関連用語**: [論理削除](#論理削除)
 
 **実装**:
 ```typescript
@@ -518,7 +545,11 @@ export type ImageStatus = 'processing' | 'active' | 'deleted';
 - `originalUrl`: 元画像のURL
 - `imageUrl`: Vercel Blob上の合成済み画像URL
 - `pHash`: 知覚ハッシュ（重複検出用）
+- `width` / `height` / `fileSizeBytes`: 合成後の画像メタデータ
+- `mimeType`: 常に `'image/webp'`
 - `status`: `processing` / `active` / `deleted`
+- `deletedAt`: 論理削除日時（`null` = 削除されていない）。30日経過後の物理クリーンアップ（PRD機能9）の判定基準
+- `createdAt` / `updatedAt`: 作成・更新日時
 
 **関連エンティティ**: [UserProfile](#userprofile), [Favorite](#favorite-お気に入りエンティティ)
 
@@ -577,6 +608,32 @@ export type ImageStatus = 'processing' | 'active' | 'deleted';
 ---
 
 ## エラー・例外
+
+すべてのドメインエラーは `src/lib/errors.ts` に集約する（[development-guidelines.md](./development-guidelines.md) のエラーハンドリング規約参照）。
+
+### AppError
+
+**クラス名**: `AppError`
+
+**継承元**: `Error`（標準ライブラリ）
+
+**役割**: 本サービス内のすべてのドメインエラーの基底クラス。`message` と `code`（識別子）を持つ。
+
+**HTTPマッピング**: 子クラスごとに決定（直接スローされた場合は 500 で扱う）
+
+**実装箇所**: `src/lib/errors.ts`
+
+**例**:
+```typescript
+export class AppError extends Error {
+  constructor(message: string, public readonly code: string) {
+    super(message);
+    this.name = 'AppError';
+  }
+}
+```
+
+---
 
 ### NotFoundError
 
@@ -644,6 +701,26 @@ if (count >= MAX_DAILY_UPLOADS) {
 - SSRF対策でブロックされたURL（プライベートIP等）
 
 **HTTPマッピング**: 400 Bad Request
+
+---
+
+### DatabaseError
+
+**クラス名**: `DatabaseError`
+
+**継承元**: `AppError`
+
+**発生条件**: Supabase Client の応答に `error` が含まれる場合（DB接続失敗・制約違反・予期しないSQLエラー等）。Repository / Service 境界で Supabase 固有エラーをラップしてアプリ層に伝播させる。
+
+**HTTPマッピング**: 500 Internal Server Error（クライアントには汎用メッセージのみ返却。詳細はサーバーログに記録）
+
+**例**:
+```typescript
+const { data, error } = await supabase.from('lgtm_images').select('*');
+if (error) throw new DatabaseError(error.message);
+```
+
+**設計意図**: Supabase 固有の型を Service Layer 以上に漏らさないことで、将来 DB 抽象化やマイグレーション戦略の変更に対する耐性を持たせる。
 
 ---
 
@@ -724,8 +801,9 @@ HammingDistance(a, b) = count(i for i in 0..len(a) if a[i] != b[i])
 
 ## 索引
 
+日本語表記の用語は五十音順、英語表記（および略語）の用語は A-Z 順に一本化する。`Sharp` のように原語が英語の用語は A-Z 索引から引く。
+
 ### あ行
-- [アーカイブ](#画像ステータス-image-status) - 画像ステータス
 - [お気に入り](#お気に入り) - ドメイン用語
 
 ### か行
@@ -734,20 +812,15 @@ HammingDistance(a, b) = count(i for i in 0..len(a) if a[i] != b[i])
 - [管理者削除](#管理者削除p1) - ドメイン用語
 
 ### さ行
-- [Sharp](#sharp) - 技術用語
-- [Server Component](#server-component) - アーキテクチャ
-- [Supabase](#supabase) - 技術用語
 - [ステアリングファイル](#ステアリングファイル) - ドキュメント用語
 
 ### た行
 - [通報機能](#通報機能p1) - ドメイン用語
 
 ### な行
-- [Next.js](#nextjs) - 技術用語
 - [日次登録上限](#日次登録上限) - ドメイン用語
 
 ### は行
-- [Playwright](#playwright) - 技術用語
 - [pHash](#phash-perceptual-hash) - アルゴリズム
 - [ハミング距離](#ハミング距離-hamming-distance) - アルゴリズム
 - [ホゲータ問題](#ホゲータ問題) - ドメイン用語
@@ -756,25 +829,41 @@ HammingDistance(a, b) = count(i for i in 0..len(a) if a[i] != b[i])
 - [マークダウンリンク](#マークダウンリンク) - ドメイン用語
 
 ### ら行
-- [LGTM画像](#lgtm画像) - ドメイン用語
-- [LGTM文字合成](#lgtm文字合成) - ドメイン用語
-- [Route Handler](#route-handler) - アーキテクチャ
 - [レイヤードアーキテクチャ](#レイヤードアーキテクチャ) - アーキテクチャ
+- [論理削除](#論理削除) - ドメイン用語
 
 ### A-Z
+- [AppError](#apperror) - エラー
+- [BadRequestError](#badrequesterror) - エラー
 - [CDN](#cdn) - 略語
 - [CI/CD](#cicd) - 略語
 - [Client Component](#client-component) - アーキテクチャ
+- [DailyLimitExceededError](#dailylimitexceedederror) - エラー
+- [DailyUploadCount](#dailyuploadcount) - データモデル
+- [DatabaseError](#databaseerror) - エラー
+- [DuplicateImageError](#duplicateimageerror) - エラー
+- [Favorite](#favorite-お気に入りエンティティ) - データモデル
 - [LCP](#lcp) - 略語
 - [LGTM](#lgtm-looks-good-to-me) - 略語
+- [LGTM画像](#lgtm画像) - ドメイン用語
+- [LGTM文字合成](#lgtm文字合成) - ドメイン用語
+- [LgtmImage](#lgtmimage) - データモデル
 - [MAU](#mau) - 略語
 - [MVP](#mvp) - 略語
+- [Next.js](#nextjs) - 技術用語
+- [NotFoundError](#notfounderror) - エラー
 - [OAuth](#oauth) - 略語
+- [Playwright](#playwright) - 技術用語
 - [PRD](#prd) - 略語
 - [React](#react) - 技術用語
 - [RLS](#rls-row-level-security) - 略語
+- [Route Handler](#route-handler) - アーキテクチャ
+- [Server Component](#server-component) - アーキテクチャ
+- [Sharp](#sharp) - 技術用語
 - [SSRF](#ssrf) - 略語
+- [Supabase](#supabase) - 技術用語
 - [Tailwind CSS](#tailwind-css) - 技術用語
+- [UserProfile](#userprofile) - データモデル
 - [Vercel Blob](#vercel-blob) - 技術用語
 - [Vitest](#vitest) - 技術用語
 - [zod](#zod) - 技術用語

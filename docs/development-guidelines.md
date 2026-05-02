@@ -190,6 +190,12 @@ export class BadRequestError extends AppError {
     super(message, 'BAD_REQUEST');
   }
 }
+
+export class DatabaseError extends AppError {
+  constructor(message: string) {
+    super(message, 'DATABASE_ERROR');
+  }
+}
 ```
 
 **エラーは上位へ伝播させ、API Layerで変換する**:

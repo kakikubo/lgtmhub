@@ -40,6 +40,9 @@ lgtmhub/
 │   │   │   └── validate-image.ts   # フォーマット・サイズ検証
 │   │   ├── http/
 │   │   │   └── safe-fetch.ts       # SSRF対策付きfetch
+│   │   ├── validation/             # zod スキーマ集約（API入力検証）
+│   │   │   ├── image.ts            # 画像登録・削除リクエスト
+│   │   │   └── favorite.ts         # お気に入り追加・解除リクエスト
 │   │   └── supabase/
 │   │       ├── client.ts           # クライアントサイドSupabase
 │   │       └── server.ts           # サーバーサイドSupabase
@@ -199,6 +202,7 @@ src/services/
 | `errors.ts` | ドメインエラークラス（`AppError` / `NotFoundError` 等）の集約。新規エラーは必ずここに追加する |
 | `image/` | Sharp を使った画像合成・pHash計算・フォーマット検証 |
 | `http/` | SSRF対策付きfetch、プライベートIP検証 |
+| `validation/` | zod スキーマの集約。Route Handler から import して入力検証に利用する。スキーマはエンドポイント単位ではなくドメイン単位で配置する |
 | `supabase/` | Server / Client 向けSupabaseクライアント初期化 |
 
 **命名規則**:
