@@ -33,6 +33,7 @@ lgtmhub/
 │   │   ├── favorite-repository.ts
 │   │   └── daily-upload-count-repository.ts
 │   ├── lib/                    # 技術ユーティリティ（フレームワーク非依存）
+│   │   ├── errors.ts               # ドメインエラークラス集約
 │   │   ├── image/
 │   │   │   ├── compose-lgtm.ts     # LGTM文字合成
 │   │   │   ├── calculate-phash.ts  # pHash計算
@@ -191,10 +192,11 @@ src/services/
 
 **役割**: フレームワーク非依存の技術ライブラリ。画像処理・SSRF対策・Supabaseクライアントなど、他のレイヤーから横断的に利用される処理を配置。
 
-**サブディレクトリ**:
+**サブディレクトリ・主要ファイル**:
 
-| ディレクトリ | 役割 |
-|------------|------|
+| パス | 役割 |
+|------|------|
+| `errors.ts` | ドメインエラークラス（`AppError` / `NotFoundError` 等）の集約。新規エラーは必ずここに追加する |
 | `image/` | Sharp を使った画像合成・pHash計算・フォーマット検証 |
 | `http/` | SSRF対策付きfetch、プライベートIP検証 |
 | `supabase/` | Server / Client 向けSupabaseクライアント初期化 |

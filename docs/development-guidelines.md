@@ -1,5 +1,17 @@
 # 開発ガイドライン (Development Guidelines)
 
+## 前提環境
+
+| ツール | バージョン | 備考 |
+|--------|-----------|------|
+| Node.js | v24.11.0 | CLAUDE.mdで指定 |
+| TypeScript | 6.x | バージョン詳細は `docs/architecture.md`「依存関係管理 > バージョン管理方針」を参照 |
+| npm | 11.x | Node.js v24に同梱 |
+
+開発環境は devcontainer での起動を前提とする（CLAUDE.md 参照）。
+
+---
+
 ## コーディング規約
 
 ### TypeScript基本規約
@@ -24,7 +36,7 @@ interface CreateImageOptions {
 type ImageStatus = 'processing' | 'active' | 'deleted';
 ```
 
-**`as` キャストの禁止**:
+**`as` キャストの禁止（原則）**:
 ```typescript
 // ❌ 型を握りつぶすキャスト
 const image = result as LgtmImage;
@@ -34,6 +46,20 @@ function isLgtmImage(value: unknown): value is LgtmImage {
   return typeof value === 'object' && value !== null && 'imageUrl' in value;
 }
 ```
+
+**例外として許容するケース**:
+
+以下の場合のみ `as` を許容する。それ以外で利用する場合は PR レビューでコメントによる理由説明を必須とする。
+
+1. **Supabase の型生成（`database.types.ts`）由来の型を狭める場合**
+   ```typescript
+   // ✅ Supabase が返す Json 型を、生成済み Row 型に絞り込む
+   const profile = data as Database['public']['Tables']['user_profiles']['Row'];
+   ```
+2. **テストコード内でモック値を渡す場合**（プロダクションコードでは禁止）
+3. **外部ライブラリの型定義不足を補う場合**（issue リンクをコメントに残すこと）
+
+`any` への退避は禁止。代わりに `unknown` で受けて型ガードで絞り込むこと。
 
 **`null` / `undefined` の扱い**:
 ```typescript
@@ -119,6 +145,17 @@ export async function POST(request: NextRequest) {
 ---
 
 ### エラーハンドリング規約
+
+**エラークラスの管理方針**:
+
+- すべてのドメインエラーは `src/lib/errors.ts` に集約する（`repository-structure.md` の `src/lib/` 直下に配置）
+- 新しいエラーを追加する場合も同ファイルに追記し、エラークラスを別ファイルに分散させない
+- API Layer / Service Layer では同ファイルからの import で参照する
+
+```typescript
+// ✅ 集約された一箇所から import
+import { DuplicateImageError, DailyLimitExceededError } from '@/src/lib/errors';
+```
 
 **カスタムエラークラスの定義** (`src/lib/errors.ts`):
 
@@ -220,6 +257,30 @@ const existing = await imageRepository.findAll();
 // 画像を取得する
 const image = await imageRepository.findById(id);
 ```
+
+---
+
+### フォーマット規約
+
+`.prettierrc` と `eslint.config.mjs` を正とする。リポジトリに設定が反映されている場合はそちらを優先する。
+
+**Prettier基本方針**:
+
+| 項目 | 値 | 理由 |
+|------|-----|------|
+| `semi` | `true` | TypeScript で ASI 由来の事故を避ける |
+| `singleQuote` | `true` | TypeScript / React 標準的な慣習 |
+| `printWidth` | `100` | レビュー時の横スクロールを抑制 |
+| `trailingComma` | `'all'` | git diff のノイズを最小化 |
+| `arrowParens` | `'always'` | 引数追加時の差分を最小化 |
+
+**ESLint基本方針**:
+
+- Next.js 公式設定（`next/core-web-vitals` 相当）を継承する
+- TypeScript の型未指定エラーは error レベルで運用する
+- 変更前に `npm run lint` をローカル実行する。`--fix` で自動修正できるルールはコミット前に修正する
+
+CI で `npm run lint` を実行し、警告以上で失敗扱いとする。
 
 ---
 
@@ -326,6 +387,24 @@ LGTM文字合成ロジックを実装
 **PRの大きさの目安**:
 - 変更ファイル数: 10ファイル以内を推奨
 - 変更行数: 300行以内を推奨
+
+**計測対象**:
+- プロダクションコード（`app/`、`src/`、`components/`）の追加・変更行数で判定する
+- 以下は計測対象に含めない:
+  - テストコード（`tests/`）
+  - 自動生成ファイル（`src/types/database.types.ts` など）
+  - lockfile（`package-lock.json`）
+  - マイグレーションSQL（`supabase/migrations/`）
+
+確認方法:
+
+```bash
+# プロダクションコード変更行数の確認例
+git diff --stat main...HEAD -- 'app/' 'src/' 'components/' \
+  ':(exclude)src/types/database.types.ts'
+```
+
+300行を超える場合は分割を検討する。例外を認める場合はPR説明欄に理由を記載する。
 
 ---
 
@@ -478,8 +557,11 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # 設計意図: CI 上では Supabase CLI（Docker）の起動コストを避け、
+    # 統合テストの DB 接続先として素の Postgres コンテナを使用する。
+    # RLS ポリシーの検証はローカル開発時の `npm run db:start`（Supabase Local）で行い、
+    # CI ではテーブル制約・トランザクション・SQL 互換性のみを検証する方針。
     services:
-      # Supabase Localのシミュレーション（統合テスト用）
       postgres:
         image: postgres:16
         env:
@@ -570,6 +652,40 @@ npm run db:types
 npm run dev
 ```
 
+### 日常的な開発コマンド
+
+```bash
+# 型エラーをウォッチ（別ターミナルで起動）
+npm run typecheck -- --watch
+
+# Vitest ウォッチモード（保存時に対象テストのみ再実行）
+npm run test -- --watch
+
+# Playwright UI モード（E2Eテストをブラウザで対話的に実行）
+npx playwright test --ui
+
+# Supabase スキーマ差分の確認（マイグレーション作成前）
+supabase db diff
+
+# Supabase Local の起動状態を確認
+supabase status
+
+# DBの初期化（マイグレーションを最初から再適用）
+npm run db:reset
+
+# 型定義の再生成（マイグレーション変更後に必須）
+npm run db:types
+```
+
+開発フロー上の用途:
+
+| シーン | 推奨コマンド |
+|--------|-------------|
+| ロジック修正中 | `npm run test -- --watch` で対象テストを常時実行 |
+| API実装中 | `npm run dev` + `npm run typecheck -- --watch` を別ターミナルで併用 |
+| E2Eシナリオ検証 | `npx playwright test --ui` でステップを目視確認 |
+| マイグレーション追加後 | `npm run db:reset` → `npm run db:types` → 型エラー解消 |
+
 ### 環境変数一覧
 
 `.env.example` に全変数のテンプレートを配置する。
@@ -580,6 +696,8 @@ npm run dev
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase匿名キー | クライアント公開 |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabaseサービスロール | **サーバーサイドのみ** |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob書き込みトークン | **サーバーサイドのみ** |
+| `GITHUB_OAUTH_CLIENT_ID` | GitHub OAuth アプリの Client ID（Supabase Auth 経由で利用） | **サーバーサイドのみ** |
+| `GITHUB_OAUTH_CLIENT_SECRET` | GitHub OAuth アプリの Client Secret（Supabase Auth 経由で利用） | **サーバーサイドのみ** |
 
 **`NEXT_PUBLIC_` プレフィックスなしの変数はクライアントに絶対に渡さない。**
 

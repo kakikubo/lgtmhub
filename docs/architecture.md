@@ -7,7 +7,7 @@
 | 技術 | バージョン | 選定理由 |
 |------|-----------|----------|
 | Node.js | v24.11.0 | CLAUDE.mdで指定。Next.js 15のサポート対象、非同期I/Oに優れSharpの画像処理を高速に実行可能 |
-| TypeScript | 5.x | 静的型付けでバグを早期検出、Supabase / Next.jsの型生成が充実 |
+| TypeScript | 6.x | CLAUDE.mdで指定。静的型付けでバグを早期検出、Supabase / Next.jsの型生成が充実 |
 | npm | 11.x | CLAUDE.mdで指定。Node.js v24に標準搭載で追加インストール不要 |
 
 ### フレームワーク・ライブラリ
@@ -252,7 +252,8 @@ async function safeImageFetch(url: string): Promise<Response> {
   - `src/services/**` のビジネスロジック
   - `src/lib/image/**` のpHash計算・LGTM合成・SSRF検証
   - `src/lib/validation/**` のzodスキーマ
-- **カバレッジ目標**: 主要パス 80% 以上
+- **カバレッジ目標**: `src/services/**` 90% / `src/lib/**` 80%
+  - 詳細な閾値設定は `docs/development-guidelines.md` の `vitest.config.ts` を参照
 
 ### 統合テスト
 
@@ -318,7 +319,7 @@ async function safeImageFetch(url: string): Promise<Response> {
     "tailwindcss": "^4.0.0"
   },
   "devDependencies": {
-    "typescript": "~5.6.0",
+    "typescript": "~6.0.0",
     "vitest": "^3.0.0",
     "@playwright/test": "^1.50.0",
     "eslint": "^9.0.0",
@@ -355,15 +356,17 @@ async function safeImageFetch(url: string): Promise<Response> {
 
 ### 優先度: 高（即時対応）
 
-- [ ] **TypeScript バージョンの統一**
+- [x] **TypeScript バージョンの統一**
   - 問題: CLAUDE.md は `6.x`、本ドキュメントのテクスタックテーブルは `5.x`、依存関係JSONは `~5.6.0` で三者不整合
   - 対応: CLAUDE.md・本ドキュメント（2箇所）・`development-guidelines.md` で同一バージョンに統一する
   - 該当箇所: 「テクノロジースタック > 言語・ランタイム」テーブル / 「依存関係管理 > バージョン管理方針」JSON
+  - 解消: 本ドキュメントを `6.x` / `~6.0.0` に更新、`development-guidelines.md` 冒頭に「前提環境」セクションを新設して `6.x` を明記（2026-05-02）
 
-- [ ] **カバレッジ目標の数値整合**
+- [x] **カバレッジ目標の数値整合**
   - 問題: 本ドキュメント「主要パス 80% 以上」 vs `development-guidelines.md`「services 90% / lib 80%」で不一致
   - 対応: レイヤー別（services 90% / lib 80%）に揃え、詳細設定は `development-guidelines.md` の `vitest.config.ts` 参照とする
   - 該当箇所: 「テスト戦略 > ユニットテスト > カバレッジ目標」
+  - 解消: 本ドキュメントを「services 90% / lib 80%」に更新し、詳細閾値の参照先を `development-guidelines.md` に集約（2026-05-02）
 
 ### 優先度: 中（近日対応）
 
@@ -382,10 +385,11 @@ async function safeImageFetch(url: string): Promise<Response> {
   - 対応: 「MVP期間中は物理削除しない / P1フェーズで日次クリーンアップジョブ実装」と明示する
   - 該当箇所: 「データ永続化戦略 > バックアップ戦略 > Vercel Blob」
 
-- [ ] **`src/lib/errors.ts` をリポジトリ構造に追記**
+- [x] **`src/lib/errors.ts` をリポジトリ構造に追記**
   - 問題: 本ドキュメントのSSRFコードが参照する `BadRequestError` のソースが `repository-structure.md` に未記載
   - 対応: `repository-structure.md` の `src/lib/` ツリーに `errors.ts` を追記（隣接ドキュメントの修正）
   - 該当箇所: `repository-structure.md` 側の修正だが、本ドキュメントで顕在化
+  - 解消: `repository-structure.md` に `errors.ts` を追加し、`development-guidelines.md` のエラーハンドリング規約に集約方針を明記（2026-05-02）
 
 ### 優先度: 低（将来対応）
 
