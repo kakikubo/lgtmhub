@@ -592,19 +592,27 @@ async function composeLgtmImage(imageBuffer: Buffer): Promise<Buffer> {
 
 ```
 app/
-├── page.tsx                    # 画像一覧（トップページ）
-├── images/
-│   ├── [id]/page.tsx           # 画像詳細
-│   └── new/page.tsx            # 画像登録フォーム
-├── favorites/page.tsx          # お気に入り一覧
-└── api/
-    ├── images/
-    │   ├── route.ts            # GET（一覧）/ POST（登録）
-    │   └── [id]/route.ts       # DELETE（削除）
-    └── favorites/
-        ├── route.ts            # GET（一覧）/ POST（追加）
-        └── [lgtmImageId]/route.ts  # DELETE（解除）
+├── (site)/                     # 画面ルートグループ（共通レイアウト）
+│   ├── layout.tsx              # ヘッダー等の共通レイアウト
+│   ├── page.tsx                # 画像一覧（トップページ）
+│   ├── images/
+│   │   ├── new/page.tsx        # 画像登録フォーム
+│   │   └── [id]/page.tsx       # 画像詳細
+│   └── favorites/
+│       └── page.tsx            # お気に入り一覧
+├── api/
+│   ├── auth/
+│   │   └── callback/route.ts   # GitHub OAuth コールバック
+│   ├── images/
+│   │   ├── route.ts            # GET（一覧）/ POST（登録）
+│   │   └── [id]/route.ts       # DELETE（削除）
+│   └── favorites/
+│       ├── route.ts            # GET（一覧）/ POST（追加）
+│       └── [lgtmImageId]/route.ts  # DELETE（解除）
+└── layout.tsx                  # ルートレイアウト
 ```
+
+詳細なディレクトリ構造は [`docs/repository-structure.md`](./repository-structure.md) を正典とする。
 
 ### サーバーサイドサービス
 

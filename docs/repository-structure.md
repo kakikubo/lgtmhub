@@ -49,7 +49,8 @@ lgtmhub/
 │   └── types/                  # 共通型定義
 │       ├── image.ts
 │       ├── favorite.ts
-│       └── user.ts
+│       ├── user.ts
+│       └── database.types.ts   # Supabaseスキーマから自動生成（npm run db:types）
 ├── components/                 # 再利用可能なReactコンポーネント
 │   ├── ui/                     # 汎用UIプリミティブ
 │   │   ├── button.tsx
@@ -75,8 +76,11 @@ lgtmhub/
 │   │   │   ├── image/
 │   │   │   │   ├── compose-lgtm.test.ts
 │   │   │   │   └── calculate-phash.test.ts
-│   │   │   └── http/
-│   │   │       └── safe-fetch.test.ts
+│   │   │   ├── http/
+│   │   │   │   └── safe-fetch.test.ts
+│   │   │   └── validation/
+│   │   │       ├── image.test.ts
+│   │   │       └── favorite.test.ts
 │   │   └── services/
 │   │       ├── image-service.test.ts
 │   │       └── favorite-service.test.ts
@@ -100,6 +104,9 @@ lgtmhub/
 │   ├── repository-structure.md
 │   ├── development-guidelines.md
 │   └── glossary.md
+├── .github/                    # GitHub設定
+│   └── workflows/
+│       └── ci.yml              # Lint/型チェック/テスト/E2E（development-guidelines.md参照）
 ├── .claude/                    # Claude Code設定
 ├── .steering/                  # 作業単位のタスク管理
 ├── .env.local                  # ローカル環境変数（gitignore）
@@ -137,13 +144,18 @@ lgtmhub/
 - 動的ルートは `[param]` 形式
 
 **依存関係**:
-- 依存可能: `src/services/`（Server Components・Route Handlersから直接）、`components/`、`src/types/`、`src/lib/supabase/`
+- 依存可能: `src/services/`（Server Components・Route Handlersから直接）、`components/`、`src/types/`、`src/lib/`
 - 依存禁止: `src/repositories/`（Service Layerを経由する）
 
 **例**:
 ```
 app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositories/image-repository.ts
 ```
+
+**例外: `app/api/auth/callback/route.ts`**:
+- GitHub OAuth のコールバック処理のみを担い、Supabase Auth のセッション確立に必要な `src/lib/supabase/server.ts` を直接利用する
+- ビジネスロジックを含まないため `src/services/` を経由しない（経由する必要のあるロジックも存在しない）
+- 認証コールバックは Next.js / Supabase の規約に従った実装が必要であり、本ルートのみ Service Layer 経由ルールから明示的に除外する
 
 ---
 
@@ -223,9 +235,15 @@ src/services/
 - `image.ts`: `LgtmImage` インターフェース、`ImageStatus` 型
 - `favorite.ts`: `Favorite` インターフェース
 - `user.ts`: `UserProfile` インターフェース
+- `database.types.ts`: Supabase スキーマから自動生成された型定義（`npm run db:types` で生成）
 
 **命名規則**:
 - ファイル名: `{エンティティ名}.ts`（kebab-case または単数形）
+- 自動生成ファイル: `database.types.ts`（生成器の出力名に合わせる）
+
+**自動生成ファイルの扱い**:
+- `database.types.ts` は **コミット対象**（マイグレーションと同期させ、CI で型チェックの対象にするため）
+- マイグレーション変更後は `npm run db:types` を実行し、再生成された型を必ずコミットに含める
 
 **依存関係**:
 - 依存可能: なし（型定義のみ）
@@ -374,7 +392,7 @@ src/repositories/ (Data)
 Supabase / Vercel Blob
 
 components/  →  src/types/（型のみ）
-src/lib/     →  外部npm のみ
+src/lib/     →  src/types/・外部npm
 src/types/   →  依存なし（末端）
 ```
 
@@ -399,6 +417,78 @@ src/types/   →  依存なし（末端）
 
 - `@/src/services/image-service` のように絶対パスで import する
 - 相対パス `../../` の多用を禁止
+
+**主な参照パターン**:
+
+```typescript
+// app/api/* から service / lib を参照
+import { imageService } from '@/src/services/image-service';
+import { createClient } from '@/src/lib/supabase/server';
+
+// app/(site)/* から components / types を参照
+import { ImageCard } from '@/components/image-card';
+import type { LgtmImage } from '@/src/types/image';
+
+// components/ から lib（クライアント専用）を参照
+import { createClient } from '@/src/lib/supabase/client';
+
+// service / repository から types / lib を参照
+import type { Database } from '@/src/types/database.types';
+import { DuplicateImageError } from '@/src/lib/errors';
+```
+
+---
+
+## P1フェーズで追加予定のファイル
+
+PRD で P1 と定義された機能（管理者削除・通報・物理クリーンアップ・ファイルアップロード）に必要なファイルを以下に列挙する。MVP のツリーには含めず、P1 着手時に本リストに従って配置する。
+
+### 機能6: 管理者による画像削除（操作ログ）
+
+```
+src/repositories/admin-log-repository.ts        # 管理者操作ログ CRUD
+src/services/admin-service.ts                   # 管理者削除フロー（論理削除+即時Blob物理削除）
+src/lib/validation/admin.ts                     # 管理者操作APIのzodスキーマ
+app/api/admin/images/[id]/route.ts              # 管理者削除専用エンドポイント
+supabase/migrations/*_create_admin_logs.sql     # 管理者操作ログテーブル
+tests/unit/services/admin-service.test.ts
+tests/integration/admin/admin-delete.test.ts
+```
+
+### 機能7: ユーザー通報機能
+
+```
+src/types/report.ts                             # ImageReport インターフェース
+src/repositories/report-repository.ts           # 通報CRUD・閾値判定クエリ
+src/services/report-service.ts                  # 通報追加・5件超過時の自動非表示
+src/lib/validation/report.ts                    # 通報APIのzodスキーマ
+app/api/reports/route.ts                        # POST（通報送信）
+supabase/migrations/*_create_image_reports.sql  # image_reports テーブル
+tests/unit/services/report-service.test.ts
+tests/integration/reports/report-flow.test.ts
+```
+
+### 機能8: 削除画像の物理クリーンアップ
+
+```
+src/services/cleanup-service.ts                 # deleted_at から30日経過した画像のBlob/DB削除
+.github/workflows/cleanup.yml                   # 日次クリーンアップジョブ
+tests/unit/services/cleanup-service.test.ts
+```
+
+### 機能9: ファイルアップロード対応
+
+```
+components/image-upload-form.tsx                # ドラッグ&ドロップ + ファイル選択UI
+src/lib/image/validate-upload.ts                # アップロードファイルのMIME/サイズ検証
+# 既存の app/api/images/route.ts を multipart/form-data 対応に拡張
+# 既存の src/services/image-service.ts に createImageFromUpload() を追加
+tests/unit/lib/image/validate-upload.test.ts
+tests/e2e/image-upload.test.ts
+```
+
+> P1 着手時にこのリストを参照しつつ、不要になったファイルや追加が必要なファイルを順次更新する。
+> 上記の配置先は MVP の命名規則・依存ルール（本ドキュメント前段で定義済み）に従う。
 
 ---
 
