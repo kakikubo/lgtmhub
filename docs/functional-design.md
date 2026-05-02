@@ -299,12 +299,22 @@ DELETE /api/images/:id
 
 **認証**: 必須（自分が登録した画像 or 管理者）
 
+**処理フロー**:
+
+| 操作者 | 削除種別 | 挙動 |
+|--------|---------|------|
+| 自分の画像のオーナー（PRD機能2） | 論理削除のみ | `status = 'deleted'`・`deletedAt` 更新。Blob は残置（30日後にPRD機能8で物理削除） |
+| 管理者（PRD機能6 / P1） | 論理削除 + 即時物理削除 | `status = 'deleted'`・`deletedAt` 更新後、Vercel Blob `del()` を即時実行。30日待機ルールの例外。管理者操作ログを記録 |
+
+管理者削除のフラグは `user_profiles.is_admin` で判定し、Service 層内で分岐する。
+
 **レスポンス**: `204 No Content`
 
 **エラーレスポンス**:
 - 401 Unauthorized: 未ログイン
 - 403 Forbidden: 自分の画像でない（管理者以外）
 - 404 Not Found: 画像が存在しない
+- 500 Internal Server Error: 管理者削除時のBlob物理削除に失敗（DBの論理削除はロールバックする）
 
 ---
 

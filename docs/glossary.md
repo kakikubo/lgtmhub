@@ -159,9 +159,13 @@ P1機能。`user_profiles.is_admin = true` のユーザーのみ実行可能。R
 - 削除済み画像の Blob URL は MVP 期間中は直アクセス可能（ユーザー導線からは到達不能）
 - 物理削除（GitHub Actions 日次ジョブ）は3回までリトライ、失敗時は運用者に通知
 
+**例外: 管理者削除（PRD機能6 / P1）**:
+- 不適切コンテンツの即時排除を優先するため、管理者操作による削除は論理削除と同時に Vercel Blob を即時物理削除する（30日待機ルールの例外）
+- 操作ログ（操作者ID・対象画像ID・実行日時）を記録する
+
 **関連用語**: [画像ステータス](#画像ステータス-image-status), [管理者削除](#管理者削除p1)
 
-**参考**: [PRD 機能9](./product-requirements.md), [architecture.md バックアップ戦略](./architecture.md#バックアップ戦略)
+**参考**: [PRD 機能8](./product-requirements.md), [architecture.md バックアップ戦略](./architecture.md#バックアップ戦略)
 
 ---
 
