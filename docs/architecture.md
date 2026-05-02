@@ -101,6 +101,8 @@ Presentation → API → Service → Data
 - **GitHub → Vercel自動連携**: `main` ブランチへのpushで本番デプロイ、PR作成でプレビューデプロイ
 - **マイグレーション**: `supabase db push` をGitHub Actionsで `main` マージ時に実行
 
+> CI/CD の詳細設定（GitHub Actions の jobs / steps、npm scripts、テスト戦略）は [`docs/development-guidelines.md`](./development-guidelines.md)「CI/CDパイプライン」を正典とする。本セクションはデプロイフローの概要のみを扱う。
+
 ---
 
 ## データ永続化戦略
@@ -241,6 +243,27 @@ async function safeImageFetch(url: string): Promise<Response> {
 - **画像本体（Vercel Blob）**: Cache-Control: `public, max-age=31536000, immutable`（URL変更時は再生成）
 - **画像一覧API**: `Cache-Control: s-maxage=60, stale-while-revalidate=300`（60秒キャッシュ＋5分リバリデート）
 
+#### 論理削除とキャッシュの関係
+
+`Cache-Control: immutable` を採用しているため、論理削除（`status = 'deleted'`）後もブラウザ・CDN キャッシュ期間中は Blob URL への直アクセスで画像が表示されうる。
+
+**設計選択**:
+- 一覧 API・お気に入り一覧 API は `active` のみを返す（RLS ポリシーで担保）ため、ユーザー導線上は削除済み画像へ到達できない
+- CDN キャッシュの能動的な無効化は実装しない（Blob URL 単位のパージは Vercel 側でコストが高く、MVP の運用範囲には過剰）
+- 不適切コンテンツの即時排除が必要な場合は管理者削除（PRD機能6）が Blob を即時物理削除するため、キャッシュ期間中であっても URL 自体が 404 となり実害は限定される
+
+> TODO（将来対応）: 一般ユーザー削除でも即時の CDN 無効化が必要になった場合は、Vercel Blob の `del()` を即時実行する選択肢を再評価する。
+
+### モニタリング・可観測性
+
+> TODO（将来対応）: エラー追跡・ログ集約・容量アラートの設計を以下の方針で具体化する。MVP 期間中はダッシュボード手動確認で運用する。
+>
+> - **エラー追跡**: Vercel Logs で Route Handler の例外を確認。重大度フィルタとアラート条件は P1 で定義
+> - **アクセス計測**: Vercel Analytics（PV / Web Vitals / カスタムイベント）。KPI 計測の正本（PRD KPI セクション参照）
+> - **DB 監視**: Supabase ダッシュボードで容量（500MB 上限）・接続数・スロークエリを定期確認
+> - **Blob 容量**: Vercel Blob ダッシュボードで 1GB 上限の80% 到達時にアラートを設定
+> - **アラート連携**: P1 で Slack または GitHub Issue 自動起票への配線を検討
+
 ---
 
 ## テスト戦略
@@ -346,62 +369,3 @@ async function safeImageFetch(url: string): Promise<Response> {
 | Tailwind CSS | MIT | ✅ |
 
 すべてMIT/Apache-2.0で商用利用可能。
-
----
-
-## 未解決の改善項目（レビュー指摘事項）
-
-`/review-docs docs/architecture.md`（2026-05-02実施）で指摘された改善項目を以下に記録する。
-解消したらチェックを入れ、すべて解消されたら本セクションを削除する。
-
-### 優先度: 高（即時対応）
-
-- [x] **TypeScript バージョンの統一**
-  - 問題: CLAUDE.md は `6.x`、本ドキュメントのテクスタックテーブルは `5.x`、依存関係JSONは `~5.6.0` で三者不整合
-  - 対応: CLAUDE.md・本ドキュメント（2箇所）・`development-guidelines.md` で同一バージョンに統一する
-  - 該当箇所: 「テクノロジースタック > 言語・ランタイム」テーブル / 「依存関係管理 > バージョン管理方針」JSON
-  - 解消: 本ドキュメントを `6.x` / `~6.0.0` に更新、`development-guidelines.md` 冒頭に「前提環境」セクションを新設して `6.x` を明記（2026-05-02）
-
-- [x] **カバレッジ目標の数値整合**
-  - 問題: 本ドキュメント「主要パス 80% 以上」 vs `development-guidelines.md`「services 90% / lib 80%」で不一致
-  - 対応: レイヤー別（services 90% / lib 80%）に揃え、詳細設定は `development-guidelines.md` の `vitest.config.ts` 参照とする
-  - 該当箇所: 「テスト戦略 > ユニットテスト > カバレッジ目標」
-  - 解消: 本ドキュメントを「services 90% / lib 80%」に更新し、詳細閾値の参照先を `development-guidelines.md` に集約（2026-05-02）
-
-### 優先度: 中（近日対応）
-
-- [x] **API応答・画像詳細LCPがPRDに存在しない**
-  - 問題: 「API応答 500ms/p95」「画像詳細LCP 2秒」が本ドキュメントにのみ存在し、PRDの非機能要件と乖離。「PRDと両方更新」の注記と矛盾
-  - 対応: PRDに同項目を追加するか、本ドキュメント側で「サーバー内部指標のため本ドキュメント単独管理」と意図的乖離を明示する
-  - 該当箇所: 「パフォーマンス要件 > レスポンスタイム」テーブル
-  - 解消: PRD のパフォーマンステーブルに「画像詳細ページの初期表示 2秒以内」「API応答（一覧取得） 500ms以内（p95）」を追加し、両ドキュメントを同期させる注記も PRD 側に追記（2026-05-02）
-
-- [ ] **CI/CD記述の重複解消**
-  - 問題: 本ドキュメント（2行の概要） vs `development-guidelines.md`（GitHub Actions yaml全体）で記述が分散
-  - 対応: 本ドキュメントは概要に留め、「詳細は `docs/development-guidelines.md` を参照」と明示
-  - 該当箇所: 「デプロイ・実行環境 > CI/CD」
-
-- [x] **Vercel Blob 物理削除ジョブのスコープ明示**
-  - 問題: 「MVP後に検討」とあるが、実行主体・タイミング・失敗時挙動が未定義
-  - 対応: 「MVP期間中は物理削除しない / P1フェーズで日次クリーンアップジョブ実装」と明示する
-  - 該当箇所: 「データ永続化戦略 > バックアップ戦略 > Vercel Blob」
-  - 解消: PRD に P1 機能「9. 削除画像の物理クリーンアップ」を追加し、MVP の機能2 受け入れ条件を論理削除のみに修正。実行主体（GitHub Actions 日次ジョブ）・タイミング（`deleted_at` から30日経過後）・失敗時挙動（3回リトライで運用者通知）を PRD で定義（2026-05-02）
-
-- [x] **`src/lib/errors.ts` をリポジトリ構造に追記**
-  - 問題: 本ドキュメントのSSRFコードが参照する `BadRequestError` のソースが `repository-structure.md` に未記載
-  - 対応: `repository-structure.md` の `src/lib/` ツリーに `errors.ts` を追記（隣接ドキュメントの修正）
-  - 該当箇所: `repository-structure.md` 側の修正だが、本ドキュメントで顕在化
-  - 解消: `repository-structure.md` に `errors.ts` を追加し、`development-guidelines.md` のエラーハンドリング規約に集約方針を明記（2026-05-02）
-
-### 優先度: 低（将来対応）
-
-- [ ] **モニタリング/可観測性セクションの追加**
-  - 問題: エラー追跡・ログ集約・容量アラートの設計が未定義
-  - 対応: 「モニタリング」セクションを新設し、Vercel Logs / Vercel Analytics / Supabase・Vercel ダッシュボードでの監視対象とアラート条件を記述する
-
-- [ ] **論理削除とCDNキャッシュ無効化の関係を文書化**
-  - 問題: `Cache-Control: immutable` キャッシュと論理削除の組み合わせで、削除済み画像がブラウザキャッシュから読み込まれる可能性が未定義
-  - 対応: 「UIフィルタのみで制御し、CDN無効化は行わない」等の設計選択を「キャッシュ戦略」に追記
-  - 該当箇所: 「スケーラビリティ設計 > キャッシュ戦略」
-
-> 出典: `/review-docs docs/architecture.md` 実施結果（doc-reviewer サブエージェント、総合スコア 3.9/5）
