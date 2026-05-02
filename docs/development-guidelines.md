@@ -1,0 +1,635 @@
+# 開発ガイドライン (Development Guidelines)
+
+## コーディング規約
+
+### TypeScript基本規約
+
+**厳格な型付け**:
+```typescript
+// ✅ 明示的な型注釈
+async function fetchImages(cursor?: string): Promise<LgtmImage[]> {
+  // ...
+}
+
+// ❌ any型の使用禁止
+async function fetchImages(cursor?: any): Promise<any[]> { }
+
+// ✅ インターフェースでオブジェクト型を定義
+interface CreateImageOptions {
+  uploaderId: string;
+  imageUrl: string;
+}
+
+// ✅ ユニオン型でリテラルを表現
+type ImageStatus = 'processing' | 'active' | 'deleted';
+```
+
+**`as` キャストの禁止**:
+```typescript
+// ❌ 型を握りつぶすキャスト
+const image = result as LgtmImage;
+
+// ✅ 型ガードで安全に絞り込む
+function isLgtmImage(value: unknown): value is LgtmImage {
+  return typeof value === 'object' && value !== null && 'imageUrl' in value;
+}
+```
+
+**`null` / `undefined` の扱い**:
+```typescript
+// ✅ Optional chaining + Nullish coalescing
+const name = user?.displayName ?? '名無し';
+
+// ✅ 早期リターンで型を絞り込む
+if (!image) {
+  throw new NotFoundError('LgtmImage', id);
+}
+// 以降は image が確定
+```
+
+---
+
+### Next.js App Router 規約
+
+**Server Component / Client Component の使い分け**:
+
+```typescript
+// ✅ デフォルトはServer Component
+// app/(site)/page.tsx
+export default async function ImageListPage() {
+  const images = await imageService.listImages(); // 直接呼び出しOK
+  return <ImageGrid images={images} />;
+}
+
+// ✅ ユーザーインタラクションが必要な場合のみ 'use client'
+// components/copy-markdown-button.tsx
+'use client';
+
+import { useState } from 'react';
+
+export function CopyMarkdownButton({ imageUrl }: { imageUrl: string }) {
+  const [copied, setCopied] = useState(false);
+  // ...
+}
+```
+
+**Route Handler のパターン**:
+
+```typescript
+// app/api/images/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/src/lib/supabase/server';
+import { imageService } from '@/src/services/image-service';
+import { z } from 'zod';
+
+const createImageSchema = z.object({
+  imageUrl: z.string().url().startsWith('https://').max(2048),
+});
+
+export async function POST(request: NextRequest) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const parsed = createImageSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: '入力値が不正です' }, { status: 400 });
+  }
+
+  try {
+    const image = await imageService.createImage(user.id, parsed.data.imageUrl);
+    return NextResponse.json(image, { status: 201 });
+  } catch (error) {
+    if (error instanceof DuplicateImageError) {
+      return NextResponse.json(
+        { error: '同じ画像がすでに登録されています', existingImageId: error.existingImageId },
+        { status: 409 }
+      );
+    }
+    // 予期しないエラーは内部情報を隠す
+    return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });
+  }
+}
+```
+
+---
+
+### エラーハンドリング規約
+
+**カスタムエラークラスの定義** (`src/lib/errors.ts`):
+
+```typescript
+export class AppError extends Error {
+  constructor(message: string, public readonly code: string) {
+    super(message);
+    this.name = 'AppError';
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(resource: string, id: string) {
+    super(`${resource} が見つかりません: ${id}`, 'NOT_FOUND');
+  }
+}
+
+export class DuplicateImageError extends AppError {
+  constructor(public readonly existingImageId: string) {
+    super('同じ画像がすでに登録されています', 'DUPLICATE_IMAGE');
+  }
+}
+
+export class DailyLimitExceededError extends AppError {
+  constructor() {
+    super('本日の登録上限（10枚）に達しました', 'DAILY_LIMIT_EXCEEDED');
+  }
+}
+
+export class BadRequestError extends AppError {
+  constructor(message: string) {
+    super(message, 'BAD_REQUEST');
+  }
+}
+```
+
+**エラーは上位へ伝播させ、API Layerで変換する**:
+
+```typescript
+// ✅ Service: ビジネスエラーをthrow
+class ImageService {
+  async createImage(uploaderId: string, imageUrl: string): Promise<LgtmImage> {
+    const count = await this.dailyCountRepo.getCount(uploaderId);
+    if (count >= MAX_DAILY_UPLOADS) {
+      throw new DailyLimitExceededError();
+    }
+    // ...
+  }
+}
+
+// ✅ API Layer: エラーをHTTPレスポンスに変換
+catch (error) {
+  if (error instanceof DailyLimitExceededError) {
+    return NextResponse.json({ error: error.message }, { status: 429 });
+  }
+  // 予期しないエラーはログに記録し、詳細を隠す
+  console.error('[POST /api/images]', error);
+  return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });
+}
+```
+
+---
+
+### 非同期処理
+
+```typescript
+// ✅ async/await を使用
+async function compositeAndUpload(buffer: Buffer): Promise<string> {
+  const composed = await composeLgtmImage(buffer);
+  const { url } = await put(`lgtm/${crypto.randomUUID()}.webp`, composed, {
+    access: 'public',
+  });
+  return url;
+}
+
+// ✅ 独立した処理は並列化
+const [pHash, metadata] = await Promise.all([
+  calculatePHash(buffer),
+  sharp(buffer).metadata(),
+]);
+```
+
+---
+
+### コメント規約
+
+CLAUDE.mdの方針に従い、コメントは最小限に留める。
+
+```typescript
+// ✅ WHYが非自明な場合のみコメントを書く
+
+// redirect: 'error' でSSRF経由のリダイレクトを防止
+const response = await fetch(url, { redirect: 'error' });
+
+// pHash比較は全件走査。10万件超えたらpgvector移行を検討
+const existing = await imageRepository.findAll();
+
+// ❌ コードを読めばわかることは書かない
+// 画像を取得する
+const image = await imageRepository.findById(id);
+```
+
+---
+
+### Supabase利用規約
+
+**RLSを前提とした設計**:
+
+```typescript
+// ✅ サーバーサイド（Route Handler / Server Component）ではサービスロールを使わない
+// 通常のsupbaseクライアント（anonキー）でRLSに委ねる
+const supabase = createClient(); // src/lib/supabase/server.ts
+
+// ✅ 管理者操作のみ service_role を使用（慎重に）
+// サーバーサイドのみ、クライアントには絶対に渡さない
+const adminClient = createAdminClient();
+```
+
+**型安全なクエリ**:
+
+```typescript
+// ✅ Supabaseの型生成を活用
+import type { Database } from '@/src/types/database.types';
+
+const { data, error } = await supabase
+  .from('lgtm_images')
+  .select('*')
+  .eq('status', 'active')
+  .order('created_at', { ascending: false })
+  .limit(20);
+
+if (error) throw new DatabaseError(error.message);
+return data;
+```
+
+---
+
+## Git運用ルール
+
+### ブランチ戦略
+
+```
+main（本番環境）
+├── feature/{機能名}  → 新機能開発
+├── fix/{修正名}      → バグ修正
+└── docs/{ドキュメント名} → ドキュメント更新
+```
+
+- `main` へは直接コミットしない。必ずPRを経由する
+- PRはセルフレビュー後に作成する（個人開発のためレビュアーは任意）
+- マージ後は速やかにブランチを削除する
+
+### コミットメッセージ規約
+
+グローバル設定（`~/.claude/rules/commit-style.md`）に従う。
+
+```
+<1行目: 日本語で変更内容を簡潔に>
+
+- <変更点1>
+- <変更点2>
+- <変更点3>
+```
+
+**例**:
+
+```
+画像登録APIを実装
+
+- POST /api/images のRoute Handlerを作成
+- pHashによる重複チェックを追加
+- 1日10枚の登録制限をDailyUploadCountRepositoryで管理
+```
+
+```
+LGTM文字合成ロジックを実装
+
+- Sharp SVGオーバーレイで白文字+黒縁のLGTM文字を合成
+- WebP変換と幅1200px以内のリサイズを実施
+- 合成後の画像バッファをunit testで検証
+```
+
+**注意**:
+- `Co-Authored-By` 行は含めない（グローバル設定）
+- コミットは作業の最小単位ごとに行う
+- 1コミットで複数の関心事を混ぜない
+
+### PRの原則
+
+グローバル設定（`~/.claude/rules/pr-principle.md`）に従う。
+
+**1PR = 1つの関心事**。「このPRは何をするPRか？」を一言で説明できること。
+
+```
+✅ 良いPR例
+- 「画像登録APIを実装」
+- 「お気に入り追加・解除機能を実装」
+- 「pHash重複チェックのユニットテストを追加」
+
+❌ 混在している例
+- 「画像登録APIと管理者削除機能とお気に入りを実装」
+  → 3つの機能を分割すること
+```
+
+**PRの大きさの目安**:
+- 変更ファイル数: 10ファイル以内を推奨
+- 変更行数: 300行以内を推奨
+
+---
+
+## テスト戦略
+
+### テストピラミッド
+
+```
+     /E2E\      少（Playwright、ブラウザ起動）
+    /------\
+   /  統合  \   中（Vitest + Supabase Local）
+  /----------\
+ / ユニット   \  多（Vitest、高速）
+/--------------\
+```
+
+**比率目標**: ユニット 70% / 統合 20% / E2E 10%
+
+### ユニットテスト (Vitest)
+
+**対象**: `src/lib/` と `src/services/` のビジネスロジック
+
+```typescript
+// tests/unit/lib/image/calculate-phash.test.ts
+import { describe, it, expect } from 'vitest';
+import { calculatePHash, hammingDistance } from '@/src/lib/image/calculate-phash';
+
+describe('calculatePHash', () => {
+  it('同じ画像から同じpHashが生成される', async () => {
+    const buffer = await readTestImage('sample.jpg');
+    const hash1 = await calculatePHash(buffer);
+    const hash2 = await calculatePHash(buffer);
+    expect(hash1).toBe(hash2);
+  });
+
+  it('異なる画像では十分に異なるpHashが生成される', async () => {
+    const buffer1 = await readTestImage('cat.jpg');
+    const buffer2 = await readTestImage('dog.jpg');
+    const hash1 = await calculatePHash(buffer1);
+    const hash2 = await calculatePHash(buffer2);
+    expect(hammingDistance(hash1, hash2)).toBeGreaterThan(10);
+  });
+});
+```
+
+**Given-When-Then パターン**を使用:
+
+```typescript
+describe('ImageService.createImage', () => {
+  it('1日の登録上限を超えた場合DailyLimitExceededErrorをthrowする', async () => {
+    // Given
+    const mockCountRepo = { getCount: vi.fn().mockResolvedValue(10), increment: vi.fn() };
+    const service = new ImageService(mockImageRepo, mockCountRepo, mockBlobClient);
+
+    // When/Then
+    await expect(
+      service.createImage('user-id', 'https://example.com/image.jpg')
+    ).rejects.toThrow(DailyLimitExceededError);
+  });
+});
+```
+
+**カバレッジ目標**:
+```typescript
+// vitest.config.ts
+coverage: {
+  thresholds: {
+    'src/services/**': { branches: 90, functions: 90, lines: 90 },
+    'src/lib/**': { branches: 80, functions: 80, lines: 80 },
+  }
+}
+```
+
+### 統合テスト (Vitest + Supabase Local)
+
+**対象**: API Routeの正常系・異常系、RLSポリシーの検証
+
+```typescript
+// tests/integration/images/image-crud.test.ts
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createTestClient, createAdminClient } from '../helpers/supabase';
+
+describe('POST /api/images', () => {
+  it('ログイン済みユーザーが画像を登録できる', async () => {
+    const res = await fetch('/api/images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({ imageUrl: 'https://example.com/test.jpg' }),
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.imageUrl).toMatch(/^https:\/\//);
+  });
+
+  it('未ログインでは401が返る', async () => {
+    const res = await fetch('/api/images', {
+      method: 'POST',
+      body: JSON.stringify({ imageUrl: 'https://example.com/test.jpg' }),
+    });
+    expect(res.status).toBe(401);
+  });
+});
+```
+
+### E2Eテスト (Playwright)
+
+**対象**: ユーザーが実際に行う主要フロー
+
+```typescript
+// tests/e2e/image-list.test.ts
+import { test, expect } from '@playwright/test';
+
+test('未ログインユーザーが画像一覧を閲覧しマークダウンをコピーできる', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-testid="image-grid"]')).toBeVisible();
+
+  // マークダウンコピーボタンをクリック
+  await page.locator('[data-testid="copy-markdown-button"]').first().click();
+  await expect(page.locator('[data-testid="copy-feedback"]')).toContainText('コピーしました');
+});
+```
+
+---
+
+## CI/CDパイプライン
+
+### GitHub Actions
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      # Supabase Localのシミュレーション（統合テスト用）
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:unit
+      - run: npm run test:integration
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run test:e2e
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm audit --audit-level=high
+```
+
+### npm scripts
+
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "playwright test",
+    "test:coverage": "vitest run --coverage",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:push": "supabase db push",
+    "db:types": "supabase gen types typescript --local > src/types/database.types.ts"
+  }
+}
+```
+
+---
+
+## 開発環境セットアップ
+
+### 初回セットアップ
+
+```bash
+# 1. 依存パッケージのインストール
+npm install
+
+# 2. 環境変数の設定
+cp .env.example .env.local
+# .env.local を編集（Supabase / Vercel Blob / GitHub OAuth の設定を記入）
+
+# 3. Supabase Localの起動
+npm run db:start
+
+# 4. マイグレーションの適用
+npm run db:reset
+
+# 5. 型定義の生成
+npm run db:types
+
+# 6. 開発サーバーの起動
+npm run dev
+```
+
+### 環境変数一覧
+
+`.env.example` に全変数のテンプレートを配置する。
+
+| 変数名 | 用途 | 公開範囲 |
+|--------|------|---------|
+| `NEXT_PUBLIC_SUPABASE_URL` | SupabaseプロジェクトURL | クライアント公開 |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase匿名キー | クライアント公開 |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabaseサービスロール | **サーバーサイドのみ** |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob書き込みトークン | **サーバーサイドのみ** |
+
+**`NEXT_PUBLIC_` プレフィックスなしの変数はクライアントに絶対に渡さない。**
+
+---
+
+## コードレビュー
+
+### セルフレビューチェックリスト
+
+PRを作成する前に以下を確認する:
+
+**コード品質**:
+- [ ] 命名が明確で一貫しているか
+- [ ] 関数が単一の責務を持っているか（20行以内を目安）
+- [ ] マジックナンバーが定数に置き換えられているか
+- [ ] エラーハンドリングが適切に実装されているか
+
+**セキュリティ**:
+- [ ] 入力値をzodでバリデーションしているか
+- [ ] 機密情報がコードにハードコードされていないか
+- [ ] 認証チェックが API Layer で実施されているか
+- [ ] 他ユーザーのリソースにアクセスできないか（RLS / サービス層の権限チェック）
+
+**テスト**:
+- [ ] ビジネスロジックにユニットテストが追加されているか
+- [ ] 新規APIエンドポイントに統合テストが追加されているか
+- [ ] `npm run test` がパスするか
+- [ ] `npm run typecheck` がパスするか
+- [ ] `npm run lint` がパスするか
+
+**ドキュメント**:
+- [ ] WHYが非自明な箇所にコメントがあるか
+- [ ] 新しいAPIエンドポイントが `docs/functional-design.md` の設計と一致しているか
+
+---
+
+## 実装チェックリスト
+
+### 新機能実装時
+
+1. `docs/functional-design.md` の対応するAPI仕様を確認
+2. `docs/repository-structure.md` を参照してファイル配置を決定
+3. テストファイルを先に作成（Given-When-Thenを書く）
+4. 実装してテストを通す
+5. セルフレビューチェックリストを確認
+6. PRを作成
+
+### マイグレーション追加時
+
+1. `supabase db diff` で差分を確認してからマイグレーションファイルを作成
+2. ローカルで `npm run db:reset` して正常適用を確認
+3. RLSポリシーを必ず設定する
+4. `npm run db:types` で型定義を再生成してコミットに含める
