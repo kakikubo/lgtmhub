@@ -332,12 +332,15 @@ tests/
 
 | ファイル | 役割 |
 |---------|------|
-| `next.config.ts` | Next.js設定（画像ドメイン許可等） |
-| `tsconfig.json` | TypeScript設定（`@/*` パスエイリアス） |
+| `next.config.ts` | Next.js設定（画像ドメイン許可、`outputFileTracingRoot` 等） |
+| `next-env.d.ts` | Next.js が自動生成する型参照ファイル（編集禁止、コミット対象） |
+| `global.d.ts` | プロジェクト全体の型宣言（CSS module 等の side-effect import 用） |
+| `tsconfig.json` | TypeScript設定（`@/*` パスエイリアス、`strict`、`noUncheckedIndexedAccess`） |
 | `vitest.config.ts` | Vitestテスト設定 |
 | `playwright.config.ts` | Playwrightテスト設定 |
 | `eslint.config.mjs` | ESLint設定 |
 | `.prettierrc` | Prettier設定 |
+| `postcss.config.mjs` | Tailwind CSS 4.x の PostCSS プラグイン設定 |
 | `.env.example` | 環境変数テンプレート（git管理対象） |
 | `.env.local` | ローカル環境変数（**git管理対象外**） |
 

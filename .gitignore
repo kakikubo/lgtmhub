@@ -141,3 +141,14 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Playwright
+playwright-report/
+test-results/
+
+# Supabase
+supabase/.temp/
+supabase/.branches/
+
+# Generated database types(コミット対象だが、再生成中の中間状態は無視)
+src/types/database.types.ts.tmp

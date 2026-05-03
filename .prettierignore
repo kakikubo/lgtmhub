@@ -1,0 +1,9 @@
+node_modules/
+.next/
+supabase/migrations/
+coverage/
+playwright-report/
+test-results/
+
+# 自動生成ファイル(コミット対象だがフォーマット対象外)
+src/types/database.types.ts

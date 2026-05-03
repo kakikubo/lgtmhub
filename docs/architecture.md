@@ -331,18 +331,18 @@ async function safeImageFetch(url: string): Promise<Response> {
 ```json
 {
   "dependencies": {
-    "next": "15.x.x",                  // 完全固定（メジャーアップは慎重に）
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "next": "~15.5.15",                // パッチ固定（マイナー以上は手動アップデート）
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "@supabase/supabase-js": "^2.45.0",
-    "@supabase/ssr": "^0.5.0",
-    "@vercel/blob": "^0.27.0",
+    "@supabase/ssr": "^0.10.0",
+    "@vercel/blob": "^2.3.0",
     "sharp": "^0.34.0",
-    "zod": "^3.23.0",
-    "tailwindcss": "^4.0.0"
+    "zod": "^4.4.0",
+    "tailwindcss": "^4.2.0"
   },
   "devDependencies": {
-    "typescript": "~6.0.0",
+    "typescript": "~6.0.3",
     "vitest": "^3.0.0",
     "@playwright/test": "^1.50.0",
     "eslint": "^9.0.0",
@@ -353,10 +353,15 @@ async function safeImageFetch(url: string): Promise<Response> {
 ```
 
 **方針**:
-- ランタイム依存は `^` でマイナーアップを許容、Next.jsのみメジャー固定
+- ランタイム依存は `^` でマイナーアップを許容、Next.jsのみパッチ固定（`~15.5.15`）
 - TypeScript はパッチのみ自動更新（`~`）
 - セキュリティアップデートは Dependabot で週次チェック
 - npm audit を CI で実行し、High 以上の脆弱性検出時は失敗扱い
+
+**注意事項（メジャーバージョンが古いドキュメント想定から更新されたパッケージ）**:
+- `@supabase/ssr` v0.10 系: Cookie ハンドラが `getAll/setAll` ベース（旧 `get/set/remove` から変更）
+- `@vercel/blob` v2 系: `put()` のシグネチャが v0.x から変更。実装時に [公式ドキュメント](https://vercel.com/docs/storage/vercel-blob) を確認
+- `zod` v4 系: `z.string().url()` の挙動など一部の API が v3 から変更。`development-guidelines.md` のサンプルは v4 互換
 
 ### 主要ライブラリのライセンス
 
