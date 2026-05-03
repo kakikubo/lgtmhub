@@ -43,6 +43,15 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    # NEXT_PUBLIC_SUPABASE_* は middleware / Server Component が createServerClient で
+    # 構築時に要求するため、ビルド時 (Next.js が NEXT_PUBLIC_* をインライン化) と
+    # ランタイム (npm run start) の両方で必要。CI では実 Supabase に接続しないため
+    # 非空の placeholder を使う (createServerClient は文字列の空チェックしかしない。
+    # auth.getUser() はネットワーク失敗を error として返すだけで例外を投げないため、
+    # 未ログイン UI を検証する E2E は継続して動作する)。
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-not-a-real-key
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
