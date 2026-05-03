@@ -1,3 +1,5 @@
+import { Header } from '@/components/header';
+
 export default function SiteLayout({
   children,
 }: Readonly<{
@@ -5,11 +7,7 @@ export default function SiteLayout({
 }>) {
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b">
-        <div className="mx-auto max-w-6xl px-4 py-3">
-          <h1 className="text-lg font-semibold">LGTMHub</h1>
-        </div>
-      </header>
+      <Header />
       <main className="flex-1">{children}</main>
     </div>
   );

@@ -728,6 +728,52 @@ if (error) throw new DatabaseError(error.message);
 
 ---
 
+### UnauthorizedError
+
+**クラス名**: `UnauthorizedError`
+
+**継承元**: `AppError`
+
+**発生条件**: 認証されていないユーザーが認証必須のリソース（画像登録・お気に入り操作等）にアクセスしようとした場合。
+
+**HTTPマッピング**: 401 Unauthorized
+
+**デフォルトメッセージ**: 「認証が必要です」（任意のメッセージで上書き可能）
+
+**例**:
+```typescript
+if (!user) {
+  throw new UnauthorizedError();
+}
+```
+
+**設計意図**: `development-guidelines.md` の「認証エラーは401で統一」に対応。GitHub OAuth フェーズで導入し、後続の書き込み API で利用する。
+
+---
+
+### ForbiddenError
+
+**クラス名**: `ForbiddenError`
+
+**継承元**: `AppError`
+
+**発生条件**: 認証は通過したが、対象リソースへの操作権限がない場合（他ユーザーの画像削除・管理者専用操作等）。
+
+**HTTPマッピング**: 403 Forbidden
+
+**デフォルトメッセージ**: 「この操作を実行する権限がありません」（任意のメッセージで上書き可能）
+
+**例**:
+```typescript
+if (image.uploaderId !== requesterId && !requester.isAdmin) {
+  throw new ForbiddenError();
+}
+```
+
+**設計意図**: `development-guidelines.md` の「認可エラーは403で統一」に対応。RLS ポリシーをアプリケーション層からも明示的に表現するため、Service Layer から throw する。
+
+---
+
 ## アルゴリズム用語
 
 ### pHash (Perceptual Hash)
@@ -847,6 +893,7 @@ HammingDistance(a, b) = count(i for i in 0..len(a) if a[i] != b[i])
 - [DatabaseError](#databaseerror) - エラー
 - [DuplicateImageError](#duplicateimageerror) - エラー
 - [Favorite](#favorite-お気に入りエンティティ) - データモデル
+- [ForbiddenError](#forbiddenerror) - エラー
 - [LCP](#lcp) - 略語
 - [LGTM](#lgtm-looks-good-to-me) - 略語
 - [LGTM画像](#lgtm画像) - ドメイン用語
@@ -867,6 +914,7 @@ HammingDistance(a, b) = count(i for i in 0..len(a) if a[i] != b[i])
 - [SSRF](#ssrf) - 略語
 - [Supabase](#supabase) - 技術用語
 - [Tailwind CSS](#tailwind-css) - 技術用語
+- [UnauthorizedError](#unauthorizederror) - エラー
 - [UserProfile](#userprofile) - データモデル
 - [Vercel Blob](#vercel-blob) - 技術用語
 - [Vitest](#vitest) - 技術用語

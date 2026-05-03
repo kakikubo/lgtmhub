@@ -46,6 +46,30 @@ npm run db:types
 npm run dev
 ```
 
+### GitHub OAuth セットアップ
+
+GitHub OAuth でログインを動かすには、ローカル用の OAuth App を 1 つ用意します。
+
+1. https://github.com/settings/developers → **New OAuth App**
+2. 各項目を以下で入力:
+   - **Application name**: 任意(例: `lgtmhub-local`)
+   - **Homepage URL**: `http://localhost:3000`
+   - **Authorization callback URL**: `http://localhost:54321/auth/v1/callback`
+3. 作成後に表示される Client ID / Client Secret を `.env.local` に貼り付け:
+   ```
+   GITHUB_OAUTH_CLIENT_ID=<your_client_id>
+   GITHUB_OAUTH_CLIENT_SECRET=<your_client_secret>
+   ```
+4. Supabase CLI に env を渡してから再起動する。**CLI は `.env.local` を読まない**(Next.js の規約のためで、Supabase は別物)ので、以下のいずれかで env を渡す必要がある:
+   - 推奨: `cp .env.local supabase/.env` (CLI が自動で読む。`supabase/.env` は `.gitignore` 済み)
+   - または: シェルに `set -a && source .env.local && set +a` してから `npm run db:start`
+
+   反映確認: 起動ログに `WARN: environment variable is unset: GITHUB_OAUTH_*` が出ないこと。
+5. `npm run db:stop && npm run db:start` で再起動(`supabase/config.toml` の `[auth.external.github]` がこれらの env を参照する)
+6. `npm run dev` でトップページを開き、**GitHub でログイン** ボタンから動作確認
+
+> 本番(Vercel)へのデプロイ時は別途 OAuth App を用意し、Authorization callback URL を Supabase プロジェクトの URL(`https://<project-ref>.supabase.co/auth/v1/callback`)に設定したうえで、Supabase Dashboard の Auth > Providers > GitHub に Client ID / Secret を登録します。
+
 ### 日常的な開発コマンド
 
 ```bash
