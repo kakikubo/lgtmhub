@@ -31,9 +31,12 @@ lgtmhub/
 │   ├── repositories/           # Data Layer（DB・Blob アクセス）
 │   │   ├── image-repository.ts
 │   │   ├── favorite-repository.ts
-│   │   └── daily-upload-count-repository.ts
+│   │   ├── daily-upload-count-repository.ts
+│   │   └── user-profile-repository.ts
 │   ├── lib/                    # 技術ユーティリティ（フレームワーク非依存）
 │   │   ├── errors.ts               # ドメインエラークラス集約
+│   │   ├── auth/
+│   │   │   └── actions.ts          # GitHub OAuth サインイン/アウト Server Action
 │   │   ├── image/
 │   │   │   ├── compose-lgtm.ts     # LGTM文字合成
 │   │   │   ├── calculate-phash.ts  # pHash計算
@@ -114,6 +117,7 @@ lgtmhub/
 ├── .gitignore
 ├── .prettierrc
 ├── eslint.config.mjs
+├── middleware.ts               # Supabase セッションリフレッシュ（cookies 伝播）
 ├── next.config.ts
 ├── package.json
 ├── playwright.config.ts
@@ -156,6 +160,12 @@ app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositori
 - GitHub OAuth のコールバック処理のみを担い、Supabase Auth のセッション確立に必要な `src/lib/supabase/server.ts` を直接利用する
 - ビジネスロジックを含まないため `src/services/` を経由しない（経由する必要のあるロジックも存在しない）
 - 認証コールバックは Next.js / Supabase の規約に従った実装が必要であり、本ルートのみ Service Layer 経由ルールから明示的に除外する
+
+**例外: 認証済みユーザーのプロフィール表示用に Server Component から `UserProfileRepository` を直接呼ぶこと**:
+- 対象ファイル: `app/(site)/layout.tsx` 配下のヘッダー (`components/header.tsx`)、`app/(site)/page.tsx` などの Server Component
+- 理由: `UserProfileRepository.findById` は「現在のセッションユーザーの公開プロフィールを 1 件取得するだけ」のリードオペレーションで、ビジネスロジックを伴わない
+- 制約: 書き込み (insert / update) や複数リポジトリにまたがる操作が必要になった時点で `UserProfileService` を新設し、Service Layer 経由に切り替えること
+- 同等のリードを Service 化する判断基準: 取得後の整形や複数データソースの結合、権限分岐などのロジックが入る場合は Service 経由を必須とする
 
 ---
 
@@ -212,6 +222,7 @@ src/services/
 | パス | 役割 |
 |------|------|
 | `errors.ts` | ドメインエラークラス（`AppError` / `NotFoundError` 等）の集約。新規エラーは必ずここに追加する |
+| `auth/` | GitHub OAuth のサインイン / サインアウト Server Action |
 | `image/` | Sharp を使った画像合成・pHash計算・フォーマット検証 |
 | `http/` | SSRF対策付きfetch、プライベートIP検証 |
 | `validation/` | zod スキーマの集約。Route Handler から import して入力検証に利用する。スキーマはエンドポイント単位ではなくドメイン単位で配置する |

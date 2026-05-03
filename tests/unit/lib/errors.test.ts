@@ -5,7 +5,9 @@ import {
   DailyLimitExceededError,
   DatabaseError,
   DuplicateImageError,
+  ForbiddenError,
   NotFoundError,
+  UnauthorizedError,
 } from '@/src/lib/errors';
 
 describe('errors', () => {
@@ -47,5 +49,33 @@ describe('errors', () => {
     const err = new DatabaseError('connection failed');
     expect(err.code).toBe('DATABASE_ERROR');
     expect(err.message).toBe('connection failed');
+  });
+
+  it('UnauthorizedError は UNAUTHORIZED コードを返し、デフォルトメッセージは「認証が必要です」', () => {
+    const err = new UnauthorizedError();
+    expect(err.code).toBe('UNAUTHORIZED');
+    expect(err.message).toBe('認証が必要です');
+    expect(err.name).toBe('UnauthorizedError');
+    expect(err).toBeInstanceOf(AppError);
+  });
+
+  it('UnauthorizedError は任意のメッセージを受け取れる', () => {
+    const err = new UnauthorizedError('セッションが切れました');
+    expect(err.message).toBe('セッションが切れました');
+    expect(err.code).toBe('UNAUTHORIZED');
+  });
+
+  it('ForbiddenError は FORBIDDEN コードを返し、デフォルトメッセージを持つ', () => {
+    const err = new ForbiddenError();
+    expect(err.code).toBe('FORBIDDEN');
+    expect(err.message).toBe('この操作を実行する権限がありません');
+    expect(err.name).toBe('ForbiddenError');
+    expect(err).toBeInstanceOf(AppError);
+  });
+
+  it('ForbiddenError は任意のメッセージを受け取れる', () => {
+    const err = new ForbiddenError('管理者のみ実行できます');
+    expect(err.message).toBe('管理者のみ実行できます');
+    expect(err.code).toBe('FORBIDDEN');
   });
 });

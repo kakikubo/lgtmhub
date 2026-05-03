@@ -42,3 +42,17 @@ export class DatabaseError extends AppError {
     this.name = 'DatabaseError';
   }
 }
+
+export class UnauthorizedError extends AppError {
+  constructor(message = '認証が必要です') {
+    super(message, 'UNAUTHORIZED');
+    this.name = 'UnauthorizedError';
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = 'この操作を実行する権限がありません') {
+    super(message, 'FORBIDDEN');
+    this.name = 'ForbiddenError';
+  }
+}
