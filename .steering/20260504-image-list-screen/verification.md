@@ -94,13 +94,39 @@ npm run dev
 
 実画像が無いとグリッドが見えないので、以下のいずれかでデータを作る。
 
-### 5-A. Supabase Studio から直接 INSERT (Vercel Blob 不要)
+`5-A` (ローカル完結・推奨) と `5-B` (登録 API 経由・任意) を用意。
 
-1. ブラウザで Supabase Studio (`http://127.0.0.1:54323`) を開く
-2. SQL Editor で以下を実行:
+### 5-A. ローカル fixture を生成して DB にシードする (推奨・外部依存なし)
 
-```sql
--- auth.users にテストユーザーを直接 insert (Supabase Local では可能)
+外部 URL を一切使わず、`public/test-fixtures/` に Sharp で生成した WebP を置き、DB の `image_url` には相対パス (`/test-fixtures/...`) を入れる。
+
+`<Image src="/test-fixtures/...">` は同一オリジン扱いなので `next.config.ts` の `remotePatterns` 変更不要。
+
+#### ① サンプル画像を生成
+
+プロジェクトルートで:
+
+```bash
+mkdir -p public/test-fixtures
+node -e "
+const sharp = require('sharp');
+const colors = ['#5b8def', '#e57373', '#81c784'];
+const labels = ['a', 'b', 'c'];
+Promise.all(colors.map((c, i) => {
+  const svg = \`<svg width='800' height='600' xmlns='http://www.w3.org/2000/svg'><rect width='800' height='600' fill='\${c}'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='200' font-weight='900' fill='white' stroke='black' stroke-width='10' paint-order='stroke'>LGTM</text></svg>\`;
+  return sharp(Buffer.from(svg)).webp({ quality: 85 }).toFile('public/test-fixtures/sample-' + labels[i] + '.webp');
+})).then(() => console.log('generated'));
+"
+```
+
+→ `public/test-fixtures/sample-{a,b,c}.webp` (各 7〜8KB) が生成される。
+
+#### ② DB にシード
+
+Supabase Studio (`http://127.0.0.1:54323`) の SQL Editor から、または Docker exec で psql に流し込む:
+
+```bash
+docker exec -i supabase_db_lgtmhub psql -U postgres -d postgres <<'SQL'
 insert into auth.users (id, email)
 values ('00000000-0000-0000-0000-000000000001', 'local-dev@example.com')
 on conflict (id) do nothing;
@@ -108,59 +134,59 @@ on conflict (id) do nothing;
 insert into public.user_profiles (id, github_login, display_name, avatar_url)
 values (
   '00000000-0000-0000-0000-000000000001',
-  'localdev',
-  'Local Dev',
-  'https://avatars.githubusercontent.com/u/0'
+  'localdev', 'Local Dev', 'https://avatars.githubusercontent.com/u/0'
 ) on conflict (id) do nothing;
 
--- 適当な webp URL で 3 件 insert (画像本体は 404 になるが、UI 構造とコピー機能は試せる)
 insert into public.lgtm_images
   (uploader_id, original_url, image_url, p_hash, width, height, file_size_bytes)
 values
-  ('00000000-0000-0000-0000-000000000001',
-   'https://example.com/a.jpg',
-   'https://lgtm-sample.public.blob.vercel-storage.com/lgtm/sample-a.webp',
-   repeat('0', 1024), 800, 600, 12345),
-  ('00000000-0000-0000-0000-000000000001',
-   'https://example.com/b.jpg',
-   'https://lgtm-sample.public.blob.vercel-storage.com/lgtm/sample-b.webp',
-   repeat('1', 1024), 800, 600, 12345),
-  ('00000000-0000-0000-0000-000000000001',
-   'https://example.com/c.jpg',
-   'https://lgtm-sample.public.blob.vercel-storage.com/lgtm/sample-c.webp',
-   repeat('2', 1024), 800, 600, 12345);
+  ('00000000-0000-0000-0000-000000000001', '/test-fixtures/sample-a.webp', '/test-fixtures/sample-a.webp', repeat('0', 1024), 800, 600, 7838),
+  ('00000000-0000-0000-0000-000000000001', '/test-fixtures/sample-b.webp', '/test-fixtures/sample-b.webp', repeat('1', 1024), 800, 600, 7676),
+  ('00000000-0000-0000-0000-000000000001', '/test-fixtures/sample-c.webp', '/test-fixtures/sample-c.webp', repeat('2', 1024), 800, 600, 7474);
+SQL
 ```
 
-3. `http://localhost:3000/` をリロード
+> `avatar_url` は未ログイン時に表示されないので外部 URL のままで OK。完全 local にしたければ `/test-fixtures/avatar.webp` を生成して差し替える。
+
+#### ③ ブラウザで確認
+
+`http://localhost:3000/` をリロード。
 
 確認できること:
 
-- 3 列のグリッド (画像本体は 404 で空白だが、`<Image>` の placeholder と `aspect-[4/3]` の枠は出る)
+- **青 / 赤 / 緑の LGTM 文字付きカードが 3 列グリッド** で表示される (実画像が見える)
 - 各カードに「マークダウンをコピー」ボタン
 - ボタンを押下 → 「コピーしました ✓」に変わり 2 秒で戻る
-- テキストエディタに貼り付け → `![LGTM](https://lgtm-sample.public.blob.vercel-storage.com/lgtm/sample-a.webp)` が貼れる
+- テキストエディタに貼り付け → `![LGTM](/test-fixtures/sample-a.webp)` が貼れる
+- HTTP レベルでも検証可能:
+  ```bash
+  curl -s 'http://localhost:3000/api/images?limit=10' | jq '.images | map({id, imageUrl})'
+  curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/test-fixtures/sample-a.webp   # → 200
+  ```
 
 レスポンシブ確認: DevTools の device toolbar (Cmd+Shift+M) で幅を変えて 2 / 3 / 4 カラムが切り替わること。
 
-### 5-B. 「もっと読み込む」を確認したい場合
+#### ④ 「もっと読み込む」も確認したい場合
 
-21 件以上必要。`generate_series` で増やす:
+21 件以上必要。同じ fixture を流用して水増しする:
 
-```sql
+```bash
+docker exec -i supabase_db_lgtmhub psql -U postgres -d postgres <<'SQL'
 insert into public.lgtm_images
   (uploader_id, original_url, image_url, p_hash, width, height, file_size_bytes)
 select
   '00000000-0000-0000-0000-000000000001',
-  'https://example.com/' || i || '.jpg',
-  'https://lgtm-sample.public.blob.vercel-storage.com/lgtm/seed-' || i || '.webp',
+  '/test-fixtures/sample-' || (array['a','b','c'])[1 + (i % 3)] || '.webp',
+  '/test-fixtures/sample-' || (array['a','b','c'])[1 + (i % 3)] || '.webp',
   lpad(i::text, 1024, '0'),
-  800, 600, 12345
+  800, 600, 7838
 from generate_series(1, 25) i;
+SQL
 ```
 
 → ページ末尾に「もっと読み込む」ボタンが出る → 押下で次ページ取得 → 画像が下に追記される。Network タブで `GET /api/images?cursor=...` 200 を確認。
 
-### 5-C. 本物の画像登録フロー (任意)
+### 5-B. 本物の画像登録フロー (任意・Vercel Blob 必須)
 
 ローカルで GitHub OAuth + 実画像登録まで試す場合:
 
@@ -184,14 +210,18 @@ preview デプロイが整えば不要。
 
 ## 後始末
 
-```sql
--- 5-A / 5-B のシードを消す
-delete from public.lgtm_images where image_url like 'https://lgtm-sample.public.blob.vercel-storage.com/%';
+```bash
+# シードデータ削除
+docker exec -i supabase_db_lgtmhub psql -U postgres -d postgres <<'SQL'
+delete from public.lgtm_images where image_url like '/test-fixtures/%';
 delete from public.user_profiles where id = '00000000-0000-0000-0000-000000000001';
 delete from auth.users where id = '00000000-0000-0000-0000-000000000001';
-```
+SQL
 
-```bash
+# fixture 画像削除 (commit に含めない)
+rm -rf public/test-fixtures/
+
+# Supabase Local 停止
 npm run db:stop
 ```
 
@@ -213,8 +243,8 @@ npm run db:stop
 
 | Test plan 項目 | カバーする手順 |
 |----------------|---------------|
-| `/` を開き、画像一覧 / empty state / 「もっと読み込む」が表示される | 手順 2 (empty), 5-A (一覧), 5-B (もっと読み込む) |
-| 「マークダウンをコピー」押下 → クリップボードコピー + 「コピーしました ✓」を 2 秒間表示 | 手順 5-A |
+| `/` を開き、画像一覧 / empty state / 「もっと読み込む」が表示される | 手順 2 (empty), 5-A ③ (一覧), 5-A ④ (もっと読み込む) |
+| 「マークダウンをコピー」押下 → クリップボードコピー + 「コピーしました ✓」を 2 秒間表示 | 手順 5-A ③ |
 
 ---
 
