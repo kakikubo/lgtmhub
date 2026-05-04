@@ -46,9 +46,96 @@ export interface Database {
           },
         ];
       };
+      lgtm_images: {
+        Row: {
+          id: string;
+          uploader_id: string;
+          original_url: string;
+          image_url: string;
+          p_hash: string;
+          width: number;
+          height: number;
+          file_size_bytes: number;
+          mime_type: string;
+          status: 'processing' | 'active' | 'deleted';
+          deleted_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          uploader_id: string;
+          original_url: string;
+          image_url: string;
+          p_hash: string;
+          width: number;
+          height: number;
+          file_size_bytes: number;
+          mime_type?: string;
+          status?: 'processing' | 'active' | 'deleted';
+          deleted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          uploader_id?: string;
+          original_url?: string;
+          image_url?: string;
+          p_hash?: string;
+          width?: number;
+          height?: number;
+          file_size_bytes?: number;
+          mime_type?: string;
+          status?: 'processing' | 'active' | 'deleted';
+          deleted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'lgtm_images_uploader_id_fkey';
+            columns: ['uploader_id'];
+            isOneToOne: false;
+            referencedRelation: 'user_profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      daily_upload_counts: {
+        Row: {
+          user_id: string;
+          date: string;
+          count: number;
+        };
+        Insert: {
+          user_id: string;
+          date: string;
+          count?: number;
+        };
+        Update: {
+          user_id?: string;
+          date?: string;
+          count?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'daily_upload_counts_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'user_profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      increment_daily_upload_count: {
+        Args: { p_user_id: string; p_date: string; p_max?: number };
+        Returns: number;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
