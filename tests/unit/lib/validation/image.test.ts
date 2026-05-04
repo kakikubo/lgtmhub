@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   LIST_IMAGES_DEFAULT_LIMIT,
   LIST_IMAGES_MAX_LIMIT,
+  createImageErrorResponseSchema,
   createImageRequestSchema,
+  createImageResponseSchema,
   listImagesQuerySchema,
   listImagesResponseSchema,
 } from '@/src/lib/validation/image';
@@ -136,6 +138,70 @@ describe('listImagesResponseSchema', () => {
       images: [{ id: 'x', imageUrl: 'https://blob.example/x.webp' }],
       nextCursor: null,
     });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('createImageResponseSchema', () => {
+  it('id と imageUrl が揃っていれば受理する', () => {
+    const result = createImageResponseSchema.safeParse({
+      id: 'image-1',
+      imageUrl: 'https://blob.example/lgtm/x.webp',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('id が欠けていれば拒否する', () => {
+    const result = createImageResponseSchema.safeParse({
+      imageUrl: 'https://blob.example/lgtm/x.webp',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('imageUrl が URL 形式でなければ拒否する', () => {
+    const result = createImageResponseSchema.safeParse({
+      id: 'image-1',
+      imageUrl: 'not-a-url',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('id が空文字なら拒否する', () => {
+    const result = createImageResponseSchema.safeParse({
+      id: '',
+      imageUrl: 'https://blob.example/lgtm/x.webp',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('createImageErrorResponseSchema', () => {
+  it('error のみのレスポンスを受理する', () => {
+    const result = createImageErrorResponseSchema.safeParse({ error: '入力値が不正です' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.existingImageId).toBeUndefined();
+    }
+  });
+
+  it('409 形式 (error + existingImageId) を受理する', () => {
+    const result = createImageErrorResponseSchema.safeParse({
+      error: '同じ画像がすでに登録されています',
+      existingImageId: 'image-1',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.existingImageId).toBe('image-1');
+    }
+  });
+
+  it('error が欠けていれば拒否する', () => {
+    const result = createImageErrorResponseSchema.safeParse({ existingImageId: 'image-1' });
+    expect(result.success).toBe(false);
+  });
+
+  it('error が空文字なら拒否する', () => {
+    const result = createImageErrorResponseSchema.safeParse({ error: '' });
     expect(result.success).toBe(false);
   });
 });
