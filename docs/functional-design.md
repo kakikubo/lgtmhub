@@ -89,11 +89,11 @@ interface LgtmImage {
 - `uploaderId` は `user_profiles.id` への外部キー
 
 **`status` のライフサイクルとUI表示ルール**:
-- `processing`: API でレコードを先行作成し、合成・Blob 保存中の中間状態。DB登録は同一トランザクション内で完結するため理論上は短時間だが、合成失敗時のロールバック判別に利用する
-- `active`: 公開可能な状態。**画像一覧 / お気に入り一覧APIは `active` のみを返す**（RLSポリシーで担保）
+- `active`: 公開可能な状態。**画像一覧 / お気に入り一覧APIは `active` のみを返す**（RLSポリシーで担保）。MVP の画像登録 API は合成・Blob 保存・DB INSERT を同期で完了させ、`active` で直接 INSERT する
+- `processing`: 将来の非同期アップロードパイプライン (例: ジョブキュー化・大容量ファイル対応) のために予約された中間状態。MVP では使用しない（CHECK 制約のみ存在）
 - `deleted`: 論理削除済み。一覧・詳細APIともに 404 として扱う
 
-UI 側ではAPI 登録レスポンス（201）= `active` 確定とみなして遷移する。`processing` 状態の画像が一覧に現れることはない（ユーザーがポーリングする必要なし）。
+UI 側ではAPI 登録レスポンス（201）= `active` 確定とみなして遷移する。`processing` を運用に組み込む際は、画像一覧 API のフィルタ・RLS ポリシー・本セクションの記述を併せて更新すること。
 
 ---
 
@@ -494,7 +494,7 @@ function isDuplicate(newHash: string, existingHash: string): boolean {
 
 #### ステップ3: DB検索との組み合わせ
 
-DBには全ての`pHash`を保存し、新規登録時に全件と比較する。
+DBには全ての`pHash`を保存し、新規登録時に **`status='active'` の全件** と比較する。論理削除済み (`status='deleted'`) 画像との重複は許容する（ユーザー導線上参照できないため、再登録できる方が UX として自然）。
 画像数が増えた場合はpgvector等への移行を検討する（現時点はスコープ外）。
 
 ---
