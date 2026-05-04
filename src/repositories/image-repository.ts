@@ -34,7 +34,9 @@ function toLgtmImage(row: LgtmImageRow): LgtmImage {
     height: row.height,
     fileSizeBytes: row.file_size_bytes,
     mimeType: row.mime_type,
-    status: row.status,
+    // DB 側の CHECK 制約 (status in ('processing','active','deleted')) で値域は保証済み。
+    // Supabase 自動生成の型は CHECK を反映しないため、ガイドライン許容例外として narrowing する。
+    status: row.status as ImageStatus,
     deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
