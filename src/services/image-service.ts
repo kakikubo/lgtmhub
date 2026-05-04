@@ -6,12 +6,32 @@ import { safeFetch } from '@/src/lib/http/safe-fetch';
 import { calculatePHash, isDuplicate } from '@/src/lib/image/calculate-phash';
 import { composeLgtmImage } from '@/src/lib/image/compose-lgtm';
 import { validateImage } from '@/src/lib/image/validate-image';
+import { LIST_IMAGES_DEFAULT_LIMIT } from '@/src/lib/validation/image';
 import { DailyUploadCountRepository } from '@/src/repositories/daily-upload-count-repository';
 import { ImageRepository } from '@/src/repositories/image-repository';
 import type { Database } from '@/src/types/database.types';
-import type { LgtmImage } from '@/src/types/image';
+import type { LgtmImage, PublicLgtmImage } from '@/src/types/image';
 
 export const MAX_DAILY_UPLOADS = 10;
+
+export interface ListImagesParams {
+  cursor?: string;
+  limit?: number;
+}
+
+export interface ListImagesResult {
+  images: PublicLgtmImage[];
+  nextCursor: string | null;
+}
+
+function toPublic(image: LgtmImage): PublicLgtmImage {
+  return {
+    id: image.id,
+    imageUrl: image.imageUrl,
+    uploaderId: image.uploaderId,
+    createdAt: image.createdAt,
+  };
+}
 
 export interface BlobClient {
   put(pathname: string, body: Buffer, contentType: string): Promise<{ url: string }>;
@@ -115,6 +135,23 @@ export class ImageService {
       await this.blob.del(url).catch(() => undefined);
       throw err;
     }
+  }
+
+  /**
+   * 画像一覧をカーソルページネーションで取得する。
+   *
+   * - `limit` ちょうどで返ってきた場合のみ `nextCursor` を返す
+   *   (= 次ページが存在する可能性がある)。最終ページでは `null`。
+   * - `nextCursor` は前ページ末尾の `createdAt.toISOString()`。次のリクエストで
+   *   `?cursor=<nextCursor>` を渡すと、Repository が `lt('created_at', cursor)` で次ページを取得する。
+   */
+  async listImages(params: ListImagesParams = {}): Promise<ListImagesResult> {
+    const limit = params.limit ?? LIST_IMAGES_DEFAULT_LIMIT;
+    const records = await this.imageRepo.list({ cursor: params.cursor, limit });
+    const images = records.map(toPublic);
+    const last = records[records.length - 1];
+    const nextCursor = records.length === limit && last ? last.createdAt.toISOString() : null;
+    return { images, nextCursor };
   }
 }
 

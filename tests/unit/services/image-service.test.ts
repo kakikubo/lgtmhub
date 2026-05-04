@@ -60,7 +60,11 @@ afterEach(() => {
 });
 
 interface Mocks {
-  imageRepo: { create: ReturnType<typeof vi.fn>; listActivePHashes: ReturnType<typeof vi.fn> };
+  imageRepo: {
+    create: ReturnType<typeof vi.fn>;
+    listActivePHashes: ReturnType<typeof vi.fn>;
+    list: ReturnType<typeof vi.fn>;
+  };
   countRepo: { getCount: ReturnType<typeof vi.fn>; increment: ReturnType<typeof vi.fn> };
   blob: { put: ReturnType<typeof vi.fn>; del: ReturnType<typeof vi.fn> };
   clock: () => Date;
@@ -71,6 +75,7 @@ function buildMocks(): Mocks {
     imageRepo: {
       create: vi.fn(),
       listActivePHashes: vi.fn().mockResolvedValue([]),
+      list: vi.fn().mockResolvedValue([]),
     },
     countRepo: {
       getCount: vi.fn().mockResolvedValue(0),
@@ -245,6 +250,91 @@ describe('buildImageService', () => {
     const { buildImageService, ImageService } = await import('@/src/services/image-service');
     const service = buildImageService(supabase);
     expect(service).toBeInstanceOf(ImageService);
+  });
+});
+
+describe('ImageService.listImages', () => {
+  it('limit 未指定なら 20 件で repository を呼び、PublicLgtmImage に絞り込んで返す', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.list.mockResolvedValue([
+      buildImage({ id: 'image-1', createdAt: new Date('2026-05-04T12:00:00.000Z') }),
+      buildImage({ id: 'image-2', createdAt: new Date('2026-05-04T11:00:00.000Z') }),
+    ]);
+
+    const service = await buildService(mocks);
+    const result = await service.listImages();
+
+    expect(mocks.imageRepo.list).toHaveBeenCalledWith({ cursor: undefined, limit: 20 });
+    expect(result.images).toEqual([
+      {
+        id: 'image-1',
+        imageUrl: 'https://blob.example/lgtm/x.webp',
+        uploaderId: 'user-1',
+        createdAt: new Date('2026-05-04T12:00:00.000Z'),
+      },
+      {
+        id: 'image-2',
+        imageUrl: 'https://blob.example/lgtm/x.webp',
+        uploaderId: 'user-1',
+        createdAt: new Date('2026-05-04T11:00:00.000Z'),
+      },
+    ]);
+    // limit (20) ちょうどでないので nextCursor は null
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('返却件数 = limit のとき、末尾 createdAt の ISO 文字列を nextCursor に設定する', async () => {
+    const mocks = buildMocks();
+    const records = Array.from({ length: 3 }, (_, i) =>
+      buildImage({
+        id: `image-${i + 1}`,
+        createdAt: new Date(Date.UTC(2026, 4, 4, 12, 0, i)),
+      }),
+    );
+    mocks.imageRepo.list.mockResolvedValue(records);
+
+    const service = await buildService(mocks);
+    const result = await service.listImages({ limit: 3 });
+
+    expect(mocks.imageRepo.list).toHaveBeenCalledWith({ cursor: undefined, limit: 3 });
+    expect(result.images).toHaveLength(3);
+    expect(result.nextCursor).toBe('2026-05-04T12:00:02.000Z');
+  });
+
+  it('返却件数 < limit のとき、nextCursor は null', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.list.mockResolvedValue([
+      buildImage({ id: 'image-1', createdAt: new Date('2026-05-04T12:00:00.000Z') }),
+    ]);
+
+    const service = await buildService(mocks);
+    const result = await service.listImages({ limit: 5 });
+
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('cursor を渡すと repository.list へ伝播する', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.list.mockResolvedValue([]);
+
+    const service = await buildService(mocks);
+    await service.listImages({ cursor: '2026-05-04T11:00:00.000Z', limit: 10 });
+
+    expect(mocks.imageRepo.list).toHaveBeenCalledWith({
+      cursor: '2026-05-04T11:00:00.000Z',
+      limit: 10,
+    });
+  });
+
+  it('1 件もないとき空配列と null を返す', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.list.mockResolvedValue([]);
+
+    const service = await buildService(mocks);
+    const result = await service.listImages();
+
+    expect(result.images).toEqual([]);
+    expect(result.nextCursor).toBeNull();
   });
 });
 
