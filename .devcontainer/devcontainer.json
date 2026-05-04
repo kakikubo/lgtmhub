@@ -8,11 +8,7 @@
   "postCreateCommand": "npm install",
   "customizations": {
     "vscode": {
-      "extensions": [
-        "biomejs.biome",
-        "bradlc.vscode-tailwindcss",
-        "denoland.vscode-deno"
-      ],
+      "extensions": ["biomejs.biome", "bradlc.vscode-tailwindcss", "denoland.vscode-deno"],
       "settings": {
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "biomejs.biome",
