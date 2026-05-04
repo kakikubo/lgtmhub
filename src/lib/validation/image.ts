@@ -44,3 +44,19 @@ export const listImagesResponseSchema = z.object({
 });
 
 export type ListImagesResponse = z.infer<typeof listImagesResponseSchema>;
+
+// POST /api/images の 201 レスポンス
+export const createImageResponseSchema = z.object({
+  id: z.string().min(1),
+  imageUrl: z.string().url(),
+});
+
+export type CreateImageResponse = z.infer<typeof createImageResponseSchema>;
+
+// POST /api/images のエラーレスポンス (4xx / 5xx)。409 のときだけ existingImageId が付く
+export const createImageErrorResponseSchema = z.object({
+  error: z.string().min(1),
+  existingImageId: z.string().min(1).optional(),
+});
+
+export type CreateImageErrorResponse = z.infer<typeof createImageErrorResponseSchema>;
