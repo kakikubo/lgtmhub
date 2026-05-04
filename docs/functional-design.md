@@ -619,9 +619,19 @@ app/
 **ImageService**（`src/services/image-service.ts`）
 
 ```typescript
+interface ListImagesParams {
+  cursor?: string;       // 前ページ末尾の createdAt (ISO 8601 / UTC)
+  limit?: number;        // デフォルト 20、最大 50
+}
+
+interface ListImagesResult {
+  images: PublicLgtmImage[];   // {id, imageUrl, uploaderId, createdAt} のみ公開
+  nextCursor: string | null;   // 次ページが無ければ null
+}
+
 class ImageService {
-  // 画像一覧を取得（カーソルページネーション）
-  listImages(cursor?: string, limit?: number): Promise<LgtmImage[]>;
+  // 画像一覧を取得（カーソルページネーション・公開フィールドのみ）
+  listImages(params?: ListImagesParams): Promise<ListImagesResult>;
 
   // 画像を登録（ダウンロード→合成→保存→DB登録）
   createImage(uploaderId: string, imageUrl: string): Promise<LgtmImage>;
