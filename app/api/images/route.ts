@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import {
   AppError,
   BadRequestError,
@@ -6,8 +6,8 @@ import {
   DuplicateImageError,
   UnauthorizedError,
 } from '@/src/lib/errors';
-import { createImageRequestSchema, listImagesQuerySchema } from '@/src/lib/validation/image';
 import { createClient } from '@/src/lib/supabase/server';
+import { createImageRequestSchema, listImagesQuerySchema } from '@/src/lib/validation/image';
 import { buildImageService } from '@/src/services/image-service';
 
 export async function GET(request: NextRequest) {

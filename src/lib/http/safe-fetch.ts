@@ -11,13 +11,7 @@ const PRIVATE_IPV4_RANGES: RegExp[] = [
   /^0\./,
 ];
 
-const PRIVATE_IPV6_PREFIXES: string[] = [
-  '::1',
-  'fc',
-  'fd',
-  'fe80',
-  '::ffff:',
-];
+const PRIVATE_IPV6_PREFIXES: string[] = ['::1', 'fc', 'fd', 'fe80', '::ffff:'];
 
 export const DEFAULT_MAX_FETCH_BYTES = 10 * 1024 * 1024;
 export const DEFAULT_FETCH_TIMEOUT_MS = 8_000;

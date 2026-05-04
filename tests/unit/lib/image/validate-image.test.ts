@@ -65,7 +65,9 @@ describe('assertSupportedImageMetadata', () => {
 
   it('アニメーション GIF (pages > 1) を拒否する', () => {
     expect(() =>
-      assertSupportedImageMetadata(fakeMetadata({ format: 'gif', width: 50, height: 50, pages: 3 })),
+      assertSupportedImageMetadata(
+        fakeMetadata({ format: 'gif', width: 50, height: 50, pages: 3 }),
+      ),
     ).toThrow('アニメーション');
   });
 
@@ -77,7 +79,9 @@ describe('assertSupportedImageMetadata', () => {
 
   it('正常な静止画 GIF metadata を受理する', () => {
     expect(
-      assertSupportedImageMetadata(fakeMetadata({ format: 'gif', width: 50, height: 50, pages: 1 })),
+      assertSupportedImageMetadata(
+        fakeMetadata({ format: 'gif', width: 50, height: 50, pages: 1 }),
+      ),
     ).toEqual({ format: 'gif', width: 50, height: 50 });
   });
 });

@@ -218,9 +218,9 @@ describe('ImageService.createImage', () => {
     mocks.countRepo.increment.mockRejectedValue(new DailyLimitExceededError());
 
     const service = await buildService(mocks);
-    await expect(
-      service.createImage('user-1', 'https://example.com/x.jpg'),
-    ).rejects.toBeInstanceOf(DailyLimitExceededError);
+    await expect(service.createImage('user-1', 'https://example.com/x.jpg')).rejects.toBeInstanceOf(
+      DailyLimitExceededError,
+    );
 
     expect(mocks.blob.put).not.toHaveBeenCalled();
     expect(mocks.imageRepo.create).not.toHaveBeenCalled();
@@ -234,9 +234,9 @@ describe('ImageService.createImage', () => {
 
     const service = await buildService(mocks);
 
-    await expect(
-      service.createImage('user-1', 'https://example.com/x.jpg'),
-    ).rejects.toBeInstanceOf(DatabaseError);
+    await expect(service.createImage('user-1', 'https://example.com/x.jpg')).rejects.toBeInstanceOf(
+      DatabaseError,
+    );
 
     expect(mocks.countRepo.increment).toHaveBeenCalled();
     expect(mocks.blob.put).toHaveBeenCalled();
@@ -377,9 +377,9 @@ describe('default BlobClient (@vercel/blob 委譲)', () => {
       clock: mocks.clock,
     });
 
-    await expect(
-      service.createImage('user-1', 'https://example.com/x.jpg'),
-    ).rejects.toBeInstanceOf(DatabaseError);
+    await expect(service.createImage('user-1', 'https://example.com/x.jpg')).rejects.toBeInstanceOf(
+      DatabaseError,
+    );
 
     expect(blobDel).toHaveBeenCalledWith('https://blob.example/lgtm/default.webp');
   });

@@ -122,10 +122,7 @@ describe('safeFetch', () => {
 
   it('ステータスコードが 4xx の場合は拒否する', async () => {
     mockedLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }]);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(buildResponse({ status: 404, ok: false })),
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(buildResponse({ status: 404, ok: false })));
     await expect(safeFetch('https://example.com/img.jpg')).rejects.toThrow('画像を取得');
   });
 
@@ -136,10 +133,7 @@ describe('safeFetch', () => {
 
   it('redirect が発生すると fetch がエラーを投げ、BadRequestError に変換される', async () => {
     mockedLookup.mockResolvedValue([{ address: '8.8.8.8', family: 4 }]);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockRejectedValue(new TypeError('Redirect not allowed')),
-    );
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Redirect not allowed')));
     await expect(safeFetch('https://example.com/img.jpg')).rejects.toBeInstanceOf(BadRequestError);
   });
 });

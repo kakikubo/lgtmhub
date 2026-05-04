@@ -1,11 +1,11 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import {
-  DUPLICATE_THRESHOLD,
-  PHASH_LENGTH,
   calculatePHash,
+  DUPLICATE_THRESHOLD,
   hammingDistance,
   isDuplicate,
+  PHASH_LENGTH,
 } from '@/src/lib/image/calculate-phash';
 
 async function svgImage(label: string): Promise<Buffer> {
