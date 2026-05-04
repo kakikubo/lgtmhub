@@ -20,21 +20,30 @@ export async function Header() {
         </Link>
         <div>
           {profile ? (
-            <form action={signOut} className="flex items-center gap-3">
-              {profile.avatarUrl ? (
-                <Image
-                  src={profile.avatarUrl}
-                  alt={profile.displayName}
-                  width={32}
-                  height={32}
-                  className="rounded-full"
-                />
-              ) : null}
-              <span className="text-sm">{profile.displayName}</span>
-              <button type="submit" className="text-sm text-gray-600 hover:text-gray-900">
-                ログアウト
-              </button>
-            </form>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/images/new"
+                data-testid="header-register-link"
+                className="text-sm text-gray-700 hover:text-gray-900"
+              >
+                画像を登録する
+              </Link>
+              <form action={signOut} className="flex items-center gap-3">
+                {profile.avatarUrl ? (
+                  <Image
+                    src={profile.avatarUrl}
+                    alt={profile.displayName}
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                  />
+                ) : null}
+                <span className="text-sm">{profile.displayName}</span>
+                <button type="submit" className="text-sm text-gray-600 hover:text-gray-900">
+                  ログアウト
+                </button>
+              </form>
+            </div>
           ) : (
             <form action={signInWithGithub}>
               <button
