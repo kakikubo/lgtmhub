@@ -225,7 +225,7 @@ src/services/
 | `auth/` | GitHub OAuth のサインイン / サインアウト Server Action |
 | `image/` | Sharp を使った画像合成・pHash計算・フォーマット検証 |
 | `http/` | SSRF対策付きfetch、プライベートIP検証 |
-| `validation/` | zod スキーマの集約。Route Handler から import して入力検証に利用する。スキーマはエンドポイント単位ではなくドメイン単位で配置する |
+| `validation/` | zod スキーマの集約。Route Handler から import して入力検証に利用する。スキーマはエンドポイント単位ではなくドメイン単位で配置する。スキーマに付随する入出力変換の純関数 (例: API エラーレスポンス → UI メッセージのマッピング) も同居して良い |
 | `supabase/` | Server / Client 向けSupabaseクライアント初期化 |
 
 **命名規則**:
