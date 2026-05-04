@@ -15,3 +15,10 @@ export interface LgtmImage {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface PublicLgtmImage {
+  id: string;
+  imageUrl: string;
+  uploaderId: string;
+  createdAt: Date;
+}
