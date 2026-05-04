@@ -6,9 +6,37 @@ import {
   DuplicateImageError,
   UnauthorizedError,
 } from '@/src/lib/errors';
-import { createImageRequestSchema } from '@/src/lib/validation/image';
+import { createImageRequestSchema, listImagesQuerySchema } from '@/src/lib/validation/image';
 import { createClient } from '@/src/lib/supabase/server';
 import { buildImageService } from '@/src/services/image-service';
+
+export async function GET(request: NextRequest) {
+  // 空文字クエリ (`?cursor=` など) は zod の .optional() で弾けないため、事前に undefined 化する
+  const cursorRaw = request.nextUrl.searchParams.get('cursor');
+  const limitRaw = request.nextUrl.searchParams.get('limit');
+  const params = {
+    cursor: cursorRaw && cursorRaw.length > 0 ? cursorRaw : undefined,
+    limit: limitRaw && limitRaw.length > 0 ? limitRaw : undefined,
+  };
+
+  const parsed = listImagesQuerySchema.safeParse(params);
+  if (!parsed.success) {
+    const message = parsed.error.issues[0]?.message ?? '入力値が不正です';
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+
+  try {
+    // ログインは不要だが、RLS ポリシー (anyone can view active images) を経由して
+    // SELECT するため anon key の Supabase クライアントを生成する
+    const supabase = await createClient();
+    const service = buildImageService(supabase);
+    const result = await service.listImages(parsed.data);
+    return NextResponse.json(result, { status: 200 });
+  } catch (err) {
+    console.error('[GET /api/images]', err);
+    return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });
+  }
+}
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
