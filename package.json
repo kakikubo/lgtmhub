@@ -23,30 +23,31 @@
     "db:types": "supabase gen types typescript --local > src/types/database.types.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.45.0",
+    "@vercel/blob": "^2.3.3",
     "next": "~15.5.15",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "@supabase/supabase-js": "^2.45.0",
-    "@supabase/ssr": "^0.10.2",
-    "@vercel/blob": "^2.3.3",
     "sharp": "^0.34.5",
-    "zod": "^4.4.2",
-    "tailwindcss": "^4.2.4"
+    "tailwindcss": "^4.2.4",
+    "zod": "^4.4.2"
   },
   "devDependencies": {
-    "typescript": "~6.0.3",
+    "@biomejs/biome": "^2.4.14",
+    "@playwright/test": "^1.50.0",
+    "@tailwindcss/postcss": "^4.2.4",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "vitest": "^3.0.0",
     "@vitest/coverage-v8": "^3.0.0",
-    "@playwright/test": "^1.50.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "~15.5.15",
+    "postcss": "^8.4.0",
     "prettier": "^3.3.0",
     "supabase": "^2.0.0",
-    "@tailwindcss/postcss": "^4.2.4",
-    "postcss": "^8.4.0",
-    "vite-tsconfig-paths": "^5.0.0"
+    "typescript": "~6.0.3",
+    "vite-tsconfig-paths": "^5.0.0",
+    "vitest": "^3.0.0"
   }
 }
