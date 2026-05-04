@@ -3,6 +3,7 @@ import { ImageGrid } from '@/components/image-grid';
 import { LoadMoreButton } from '@/components/load-more-button';
 import { createClient } from '@/src/lib/supabase/server';
 import { buildImageService } from '@/src/services/image-service';
+import type { PublicLgtmImage } from '@/src/types/image';
 
 function EmptyState({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
@@ -20,12 +21,37 @@ function EmptyState({ isLoggedIn }: { isLoggedIn: boolean }) {
   );
 }
 
+function LoadErrorState() {
+  return (
+    <div
+      data-testid="image-list-error"
+      className="rounded border border-dashed border-amber-300 bg-amber-50 px-6 py-12 text-center text-sm text-amber-800"
+    >
+      <p>現在画像を読み込めません。</p>
+      <p className="mt-2">時間をおいて再度お試しください。</p>
+    </div>
+  );
+}
+
 export default async function HomePage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const { images, nextCursor } = await buildImageService(supabase).listImages();
+
+  // 一覧取得失敗 (Supabase 障害 / CI placeholder env など) でページ全体を 500 にせず
+  // graceful degrade する。auth.getUser がネットワーク失敗を error として握りつぶすのと同じ方針
+  let images: PublicLgtmImage[] = [];
+  let nextCursor: string | null = null;
+  let loadError = false;
+  try {
+    const result = await buildImageService(supabase).listImages();
+    images = result.images;
+    nextCursor = result.nextCursor;
+  } catch (err) {
+    console.error('[HomePage] failed to list images', err);
+    loadError = true;
+  }
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 space-y-6">
@@ -39,7 +65,9 @@ export default async function HomePage() {
         )}
       </header>
 
-      {images.length === 0 ? (
+      {loadError ? (
+        <LoadErrorState />
+      ) : images.length === 0 ? (
         <EmptyState isLoggedIn={!!user} />
       ) : (
         <>
