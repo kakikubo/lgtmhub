@@ -139,3 +139,77 @@ describe('ImageRepository.listActivePHashes', () => {
     await expect(repo.listActivePHashes()).rejects.toBeInstanceOf(DatabaseError);
   });
 });
+
+interface ListResult {
+  data: Row[] | null;
+  error: { message: string } | null;
+}
+
+interface ListStub {
+  client: SupabaseClient<Database>;
+  spies: {
+    from: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+    order: ReturnType<typeof vi.fn>;
+    limit: ReturnType<typeof vi.fn>;
+    lt: ReturnType<typeof vi.fn>;
+  };
+}
+
+function createListStub(result: ListResult): ListStub {
+  const lt = vi.fn().mockResolvedValue(result);
+  // limit の戻り値は (cursor 無しの) await 解決値 と (cursor 有りの) 次の chain の両方を兼ねる:
+  // 1. await query (=limit の解決) → ListResult
+  // 2. query.lt(...) → ListResult
+  // PromiseLike を返しつつ lt メソッドを持つオブジェクトにすることで両対応する
+  const limitReturn: { lt: typeof lt; then: PromiseLike<ListResult>['then'] } = {
+    lt,
+    then: (onfulfilled, onrejected) => Promise.resolve(result).then(onfulfilled, onrejected),
+  };
+  const limit = vi.fn().mockReturnValue(limitReturn);
+  const order = vi.fn().mockReturnValue({ limit });
+  const eq = vi.fn().mockReturnValue({ order });
+  const select = vi.fn().mockReturnValue({ eq });
+  const from = vi.fn().mockReturnValue({ select });
+  const client = { from } as unknown as SupabaseClient<Database>;
+  return { client, spies: { from, select, eq, order, limit, lt } };
+}
+
+describe('ImageRepository.list', () => {
+  it('cursor 無し: status=active を created_at desc で limit 件取得する', async () => {
+    const stub = createListStub({ data: [buildRow({ id: 'image-1' })], error: null });
+    const repo = new ImageRepository(stub.client);
+    const results = await repo.list({ limit: 20 });
+
+    expect(stub.spies.from).toHaveBeenCalledWith('lgtm_images');
+    expect(stub.spies.select).toHaveBeenCalledWith('*');
+    expect(stub.spies.eq).toHaveBeenCalledWith('status', 'active');
+    expect(stub.spies.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(stub.spies.limit).toHaveBeenCalledWith(20);
+    expect(stub.spies.lt).not.toHaveBeenCalled();
+    expect(results).toHaveLength(1);
+    expect(results[0]?.id).toBe('image-1');
+    expect(results[0]?.createdAt).toEqual(new Date('2026-05-04T00:00:00.000Z'));
+  });
+
+  it('cursor 有り: lt("created_at", cursor) が呼ばれる', async () => {
+    const stub = createListStub({ data: [], error: null });
+    const repo = new ImageRepository(stub.client);
+    await repo.list({ limit: 5, cursor: '2026-05-04T00:00:00.000Z' });
+    expect(stub.spies.lt).toHaveBeenCalledWith('created_at', '2026-05-04T00:00:00.000Z');
+    expect(stub.spies.limit).toHaveBeenCalledWith(5);
+  });
+
+  it('行が空のときは空配列を返す', async () => {
+    const stub = createListStub({ data: [], error: null });
+    const repo = new ImageRepository(stub.client);
+    expect(await repo.list({ limit: 20 })).toEqual([]);
+  });
+
+  it('error 時は DatabaseError を throw する', async () => {
+    const stub = createListStub({ data: null, error: { message: 'oops' } });
+    const repo = new ImageRepository(stub.client);
+    await expect(repo.list({ limit: 20 })).rejects.toBeInstanceOf(DatabaseError);
+  });
+});

@@ -23,6 +23,11 @@ export interface ActivePHashEntry {
   pHash: string;
 }
 
+export interface ListImagesOptions {
+  cursor?: string;
+  limit: number;
+}
+
 function toLgtmImage(row: LgtmImageRow): LgtmImage {
   return {
     id: row.id,
@@ -84,5 +89,26 @@ export class ImageRepository {
 
     if (error) throw new DatabaseError(error.message);
     return (data ?? []).map((row) => ({ id: row.id, pHash: row.p_hash }));
+  }
+
+  /**
+   * 一覧表示用に閲覧可能な (status='active') 画像を新着順で取得する。
+   * cursor は前ページ末尾の created_at (ISO 8601) を渡し、`<` で次ページを取得する。
+   */
+  async list(options: ListImagesOptions): Promise<LgtmImage[]> {
+    let query = this.supabase
+      .from('lgtm_images')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(options.limit);
+
+    if (options.cursor) {
+      query = query.lt('created_at', options.cursor);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new DatabaseError(error.message);
+    return (data ?? []).map(toLgtmImage);
   }
 }
