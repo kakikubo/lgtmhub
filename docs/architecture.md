@@ -27,8 +27,7 @@
 
 | 技術 | バージョン | 用途 | 選定理由 |
 |------|-----------|------|----------|
-| ESLint | 9.x | リンター | Next.js標準のコード品質チェック |
-| Prettier | 3.x | フォーマッター | コードスタイルの統一 |
+| Biome | 2.x | リンター + フォーマッター | Rust 実装で高速、設定一元化(`biome.json` 1 ファイル)、ESLint + Prettier の責務を統合 |
 | Vitest | 3.x | ユニットテストフレームワーク | Viteベースで高速、Jestと互換APIで学習コスト低 |
 | Playwright | 1.5x | E2Eテスト | モダンなブラウザ自動化、Vercelプレビュー環境でも動作 |
 | supabase CLI | 2.x | ローカルDB・マイグレーション管理 | ローカルでSupabaseスタックをDocker起動、マイグレーションをコード管理 |
@@ -345,8 +344,7 @@ async function safeImageFetch(url: string): Promise<Response> {
     "typescript": "~6.0.3",
     "vitest": "^3.0.0",
     "@playwright/test": "^1.50.0",
-    "eslint": "^9.0.0",
-    "prettier": "^3.3.0",
+    "@biomejs/biome": "^2.4.0",
     "supabase": "^2.0.0"
   }
 }

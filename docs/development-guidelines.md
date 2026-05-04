@@ -268,25 +268,30 @@ const image = await imageRepository.findById(id);
 
 ### フォーマット規約
 
-`.prettierrc` と `eslint.config.mjs` を正とする。リポジトリに設定が反映されている場合はそちらを優先する。
+`biome.json` を正とする。Linter / Formatter は Biome 1 本に統一している（Prettier / ESLint からの移行は Issue #16 で実施済み）。
 
-**Prettier基本方針**:
+**Biome formatter 基本方針**(`biome.json` の `formatter` / `javascript.formatter`):
 
 | 項目 | 値 | 理由 |
 |------|-----|------|
-| `semi` | `true` | TypeScript で ASI 由来の事故を避ける |
-| `singleQuote` | `true` | TypeScript / React 標準的な慣習 |
-| `printWidth` | `100` | レビュー時の横スクロールを抑制 |
-| `trailingComma` | `'all'` | git diff のノイズを最小化 |
-| `arrowParens` | `'always'` | 引数追加時の差分を最小化 |
+| `formatter.indentStyle` | `'space'` | 既存コード(2 スペース) との互換性維持 |
+| `formatter.indentWidth` | `2` | 既存コードと統一 |
+| `formatter.lineWidth` | `100` | レビュー時の横スクロールを抑制 |
+| `javascript.formatter.semicolons` | `'always'` | TypeScript で ASI 由来の事故を避ける |
+| `javascript.formatter.quoteStyle` | `'single'` | TypeScript / React 標準的な慣習 |
+| `javascript.formatter.trailingCommas` | `'all'` | git diff のノイズを最小化 |
+| `javascript.formatter.arrowParentheses` | `'always'` | 引数追加時の差分を最小化 |
 
-**ESLint基本方針**:
+**Biome lint 基本方針**:
 
-- Next.js 公式設定（`next/core-web-vitals` 相当）を継承する
-- TypeScript の型未指定エラーは error レベルで運用する
-- 変更前に `npm run lint` をローカル実行する。`--fix` で自動修正できるルールはコミット前に修正する
+- `linter.rules.recommended: true` をベースに採用する
+- 既存コードに合わせて以下のルールを調整している(`biome.json` 参照):
+  - `style.noNonNullAssertion: "off"` — `process.env.X!` のような環境変数アクセスを許容
+  - `tests/**` 配下は `suspicious.noThenProperty: "off"` — Supabase クエリビルダーモックの thenable を許容
+- Next.js 固有の Web Vitals チェック(`next/core-web-vitals` 由来)は `next build` の警告と PR レビューで担保する
+- 変更前に `npm run lint` をローカル実行する。自動修正可能なルールは `npm run check` で一括適用できる
 
-CI で `npm run lint` を実行し、警告以上で失敗扱いとする。
+CI で `npm run lint` を実行し、エラー検出時は失敗扱いとする。
 
 ---
 
@@ -615,7 +620,9 @@ jobs:
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
