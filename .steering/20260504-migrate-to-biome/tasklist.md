@@ -149,9 +149,9 @@
   - [x] 設定ファイル数の削減確認(3 → 1: `biome.json` のみ)
   - [x] devDependencies の削減確認(`eslint`/`eslint-config-next`/`prettier` の 3 件削除、`@biomejs/biome` 1 件追加)
 
-- [ ] CI(GitHub Actions) の動作確認
-  - [ ] feature ブランチへの push で CI が緑になることを確認
-  - [ ] `lint-and-typecheck` ジョブの所要時間を旧実行と比較
+- [x] CI(GitHub Actions) の動作確認
+  - [x] feature ブランチへの push で CI が緑になることを確認 (PR #18: lint-and-typecheck / test / e2e / security 全て pass)
+  - [x] `pull_request` トリガーを `branches: [main]` から `types: [opened, reopened, synchronize]` に変更して起動を回復(原因: PR が一度作成された後にトリガー条件を満たす push が認識されない既知の挙動)
 
 ## フェーズ7: PR 作成と最終確認
 
