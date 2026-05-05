@@ -676,6 +676,13 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    # 設計意図: e2e ジョブは supabase/setup-cli + supabase start で本物の
+    # PostgreSQL + PostgREST + Auth + Storage を Docker で立ち上げ、Server Component
+    # / Route Handler が実 DB を叩けるようにする。NEXT_PUBLIC_* は build 時に
+    # インライン化されるため、必ず `npm run build` の前に `$GITHUB_ENV` 経由で注入する。
+    env:
+      GITHUB_OAUTH_CLIENT_ID: ''
+      GITHUB_OAUTH_CLIENT_SECRET: ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -683,9 +690,21 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.98.0
+      - run: supabase start
+      - name: Export Supabase env to GITHUB_ENV
+        run: |
+          set -euo pipefail
+          status=$(supabase status -o json)
+          echo "NEXT_PUBLIC_SUPABASE_URL=$(echo "$status" | jq -er '.API_URL')" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(echo "$status" | jq -er '.ANON_KEY')" >> "$GITHUB_ENV"
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npm run test:e2e
+      - if: always()
+        run: supabase stop --no-backup
 
   security:
     runs-on: ubuntu-latest
