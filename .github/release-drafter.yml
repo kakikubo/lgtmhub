@@ -76,9 +76,7 @@ autolabeler:
       - 'package.json'
       - 'package-lock.json'
       - 'tsconfig.json'
-      - 'eslint.config.mjs'
-      - '.prettierrc'
-      - '.prettierignore'
+      - 'biome.json'
       - 'postcss.config.mjs'
   - label: supabase
     files:

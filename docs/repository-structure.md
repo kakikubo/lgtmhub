@@ -115,8 +115,7 @@ lgtmhub/
 ├── .env.local                  # ローカル環境変数（gitignore）
 ├── .env.example                # 環境変数テンプレート（git管理）
 ├── .gitignore
-├── .prettierrc
-├── eslint.config.mjs
+├── biome.json                  # Biome (Linter + Formatter) 設定
 ├── middleware.ts               # Supabase セッションリフレッシュ（cookies 伝播）
 ├── next.config.ts
 ├── package.json
@@ -349,8 +348,7 @@ tests/
 | `tsconfig.json` | TypeScript設定（`@/*` パスエイリアス、`strict`、`noUncheckedIndexedAccess`） |
 | `vitest.config.ts` | Vitestテスト設定 |
 | `playwright.config.ts` | Playwrightテスト設定 |
-| `eslint.config.mjs` | ESLint設定 |
-| `.prettierrc` | Prettier設定 |
+| `biome.json` | Biome (Linter + Formatter) 設定 |
 | `postcss.config.mjs` | Tailwind CSS 4.x の PostCSS プラグイン設定 |
 | `.env.example` | 環境変数テンプレート（git管理対象） |
 | `.env.local` | ローカル環境変数（**git管理対象外**） |
@@ -539,12 +537,24 @@ playwright-report/
 test-results/
 ```
 
-### `.prettierignore` / `.eslintignore`
+### Biome の除外設定
 
-```
-node_modules/
-.next/
-supabase/migrations/    # 自動生成SQLはフォーマット対象外
-coverage/
-playwright-report/
+`biome.json` の `files.includes` (negation パターン) で指定する。
+
+```json
+{
+  "files": {
+    "includes": [
+      "**",
+      "!**/node_modules/",
+      "!**/.next/",
+      "!supabase/migrations/",
+      "!**/coverage/",
+      "!**/playwright-report/",
+      "!**/test-results/",
+      "!src/types/database.types.ts",
+      "!next-env.d.ts"
+    ]
+  }
+}
 ```
