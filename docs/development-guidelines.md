@@ -142,6 +142,93 @@ export async function POST(request: NextRequest) {
 }
 ```
 
+**Server Action のパターン**:
+
+Route Handler とは別に、フォーム送信から DB 更新 + `redirect()` で完結するフローでは Server Action を選ぶ。
+外部からの POST 受け口や、細かいステータスコード制御が必要なら Route Handler を選ぶ。
+
+```typescript
+// src/lib/auth/actions.ts
+'use server';
+
+import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/src/lib/supabase/server';
+
+// プロキシ経由（Vercel など）では origin ヘッダが落ちるので x-forwarded-* にフォールバック
+function buildOrigin(headerList: Headers): string {
+  const origin = headerList.get('origin');
+  if (origin) return origin;
+
+  const proto = headerList.get('x-forwarded-proto') ?? 'http';
+  const host = headerList.get('host') ?? 'localhost:3000';
+  return `${proto}://${host}`;
+}
+
+export async function signInWithGithub(): Promise<void> {
+  const supabase = await createClient();
+  const headerList = await headers();
+  const origin = buildOrigin(headerList);
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'github',
+    options: {
+      redirectTo: `${origin}/api/auth/callback`,
+    },
+  });
+
+  if (error || !data.url) {
+    redirect('/?auth_error=signin_failed');
+  }
+
+  redirect(data.url);
+}
+
+export async function signOut(): Promise<void> {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect('/');
+}
+```
+
+呼び出し側は Server Component から `<form action={...}>` に直接渡す:
+
+```tsx
+// components/header.tsx
+import { signInWithGithub, signOut } from '@/src/lib/auth/actions';
+
+export function HeaderActions({ isLoggedIn }: { isLoggedIn: boolean }) {
+  return isLoggedIn ? (
+    <form action={signOut}>
+      <button type="submit">ログアウト</button>
+    </form>
+  ) : (
+    <form action={signInWithGithub}>
+      <button type="submit">GitHub でログイン</button>
+    </form>
+  );
+}
+```
+
+**Server Action 利用上の注意**:
+
+- **`'use server'` は宣言必須**: ファイル先頭（または関数単位）で宣言する。これがないと普通のサーバ関数として扱われ、クライアントから呼べない
+- **`redirect()` は throw する**: 内部で例外を投げて以降のコードを実行させない仕様。`try/catch` で握り潰さない。テストでは `next/navigation` を `vi.mock` で差し替え、`redirect(url)` 内で `__REDIRECT__:${url}` のような sentinel error を throw させると、`await expect(action()).rejects.toThrow('__REDIRECT__:/expected/path')` で呼び出し引数まで含めて検証できる（参考: `tests/unit/lib/auth/actions.test.ts`）
+- **ユーザー入力由来の遷移先は必ずガードする**: `?next=...` など外部から渡された値を `redirect(value)` に直接渡すと open redirect になる。下記の `safeNext` のように相対パスのみ許可する
+
+```typescript
+// app/api/auth/callback/route.ts より抜粋
+// `next` を相対パス (/ で始まり // で始まらない) に限定し、open redirect を封じる
+function safeNext(value: string | null): string {
+  if (!value) return '/';
+  if (!value.startsWith('/')) return '/';
+  if (value.startsWith('//')) return '/';
+  return value;
+}
+```
+
+Server Action 内で `redirect(userProvidedPath)` する場合も、同等のガードを通すこと。
+
 ---
 
 ### エラーハンドリング規約
