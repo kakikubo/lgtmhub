@@ -117,12 +117,29 @@ describe('listImagesResponseSchema', () => {
           id: 'image-1',
           imageUrl: 'https://blob.example/lgtm/x.webp',
           uploaderId: 'user-1',
+          width: 800,
+          height: 600,
           createdAt: '2026-05-04T12:00:00.000Z',
         },
       ],
       nextCursor: '2026-05-04T11:00:00.000Z',
     });
     expect(result.success).toBe(true);
+  });
+
+  it('width / height が欠けていれば拒否する', () => {
+    const result = listImagesResponseSchema.safeParse({
+      images: [
+        {
+          id: 'image-1',
+          imageUrl: 'https://blob.example/lgtm/x.webp',
+          uploaderId: 'user-1',
+          createdAt: '2026-05-04T12:00:00.000Z',
+        },
+      ],
+      nextCursor: null,
+    });
+    expect(result.success).toBe(false);
   });
 
   it('nextCursor は null でも良い', () => {

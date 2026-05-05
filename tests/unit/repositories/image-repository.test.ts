@@ -110,6 +110,63 @@ describe('ImageRepository.create', () => {
   });
 });
 
+interface MaybeSingleResult {
+  data: Row | null;
+  error: { message: string } | null;
+}
+
+interface MaybeSingleStub {
+  client: SupabaseClient<Database>;
+  spies: {
+    from: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    eqId: ReturnType<typeof vi.fn>;
+    eqStatus: ReturnType<typeof vi.fn>;
+    maybeSingle: ReturnType<typeof vi.fn>;
+  };
+}
+
+function createMaybeSingleStub(result: MaybeSingleResult): MaybeSingleStub {
+  const maybeSingle = vi.fn().mockResolvedValue(result);
+  const eqStatus = vi.fn().mockReturnValue({ maybeSingle });
+  const eqId = vi.fn().mockReturnValue({ eq: eqStatus });
+  const select = vi.fn().mockReturnValue({ eq: eqId });
+  const from = vi.fn().mockReturnValue({ select });
+  const client = { from } as unknown as SupabaseClient<Database>;
+  return { client, spies: { from, select, eqId, eqStatus, maybeSingle } };
+}
+
+describe('ImageRepository.findActiveById', () => {
+  it('行が存在する場合は LgtmImage を camelCase で返す', async () => {
+    const stub = createMaybeSingleStub({ data: buildRow({ id: 'image-1' }), error: null });
+    const repo = new ImageRepository(stub.client);
+
+    const result = await repo.findActiveById('image-1');
+
+    expect(stub.spies.from).toHaveBeenCalledWith('lgtm_images');
+    expect(stub.spies.eqId).toHaveBeenCalledWith('id', 'image-1');
+    expect(stub.spies.eqStatus).toHaveBeenCalledWith('status', 'active');
+    expect(result?.id).toBe('image-1');
+    expect(result?.uploaderId).toBe('user-1');
+    expect(result?.imageUrl).toBe('https://blob.example/x.webp');
+    expect(result?.createdAt).toEqual(new Date('2026-05-04T00:00:00.000Z'));
+  });
+
+  it('行が存在しない (= 不正 ID / status=deleted) 場合は null を返す', async () => {
+    const stub = createMaybeSingleStub({ data: null, error: null });
+    const repo = new ImageRepository(stub.client);
+
+    expect(await repo.findActiveById('missing')).toBeNull();
+  });
+
+  it('error 時は DatabaseError を throw する', async () => {
+    const stub = createMaybeSingleStub({ data: null, error: { message: 'oops' } });
+    const repo = new ImageRepository(stub.client);
+
+    await expect(repo.findActiveById('image-1')).rejects.toBeInstanceOf(DatabaseError);
+  });
+});
+
 describe('ImageRepository.listActivePHashes', () => {
   it('id と pHash を camelCase で返す', async () => {
     const supabase = createSelectListStub({

@@ -29,6 +29,8 @@ function toPublic(image: LgtmImage): PublicLgtmImage {
     id: image.id,
     imageUrl: image.imageUrl,
     uploaderId: image.uploaderId,
+    width: image.width,
+    height: image.height,
     createdAt: image.createdAt,
   };
 }
@@ -135,6 +137,16 @@ export class ImageService {
       await this.blob.del(url).catch(() => undefined);
       throw err;
     }
+  }
+
+  /**
+   * 画像詳細表示用に閲覧可能 (status='active') な 1 件を取得する。
+   * 見つからない (= 不正な ID / 論理削除済み / 存在しない) ときは `null`。
+   * 404 への変換は呼び出し元 (Server Component) の `notFound()` で行う。
+   */
+  async getImage(id: string): Promise<PublicLgtmImage | null> {
+    const image = await this.imageRepo.findActiveById(id);
+    return image ? toPublic(image) : null;
   }
 
   /**

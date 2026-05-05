@@ -34,6 +34,8 @@ export const listImagesResponseSchema = z.object({
       id: z.string(),
       imageUrl: z.string(),
       uploaderId: z.string(),
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
       createdAt: z.string(),
     }),
   ),

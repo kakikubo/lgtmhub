@@ -20,5 +20,7 @@ export interface PublicLgtmImage {
   id: string;
   imageUrl: string;
   uploaderId: string;
+  width: number;
+  height: number;
   createdAt: Date;
 }
