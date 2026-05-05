@@ -93,6 +93,40 @@ npm run db:reset
 
 ---
 
+## トラブルシュート
+
+### colima で `npm run db:start` の `supabase_vector` 起動が失敗する
+
+エラー例:
+
+```
+failed to start docker container "supabase_vector_lgtmhub":
+Error response from daemon: error while creating mount source path
+'/Users/<user>/.config/colima/default/docker.sock': mkdir ...: operation not supported
+```
+
+原因: `supabase_vector`(analytics ログ収集コンテナ)が Docker socket をマウントしようとした際、colima のソケット実体パスが Docker 側から見えないため失敗します。
+
+> **注意**: 以下の変更はローカル限定です。`supabase/config.toml` の差分は必ずコミット前に戻してください。リポジトリのデフォルトは `enabled = true` のままにします(Docker Desktop / CI ではそのまま動作するため)。
+
+回避手順:
+
+1. `supabase/config.toml` の `[analytics]` ブロックを一時的に `enabled = false` に変更
+   ```toml
+   [analytics]
+   enabled = false
+   ```
+2. Supabase Local を再起動
+   ```bash
+   npm run db:stop && npm run db:start
+   ```
+3. 作業後は必ず差分を元に戻す
+   ```bash
+   git checkout -- supabase/config.toml
+   ```
+
+---
+
 ## ライセンス
 
 [MIT](./LICENSE)
