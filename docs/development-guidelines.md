@@ -380,6 +380,33 @@ const image = await imageRepository.findById(id);
 
 CI で `npm run lint` を実行し、エラー検出時は失敗扱いとする。
 
+**コミット時の自動実行 (lefthook)**:
+
+`lefthook` 経由で `git commit` 時にステージ済みファイルへ Biome の lint/format を自動実行する。設定は `lefthook.yml` を参照する。
+
+- `npm install` 直後に `prepare` スクリプト(`lefthook install`)が走り、`.git/hooks/pre-commit` がフレッシュリポジトリでは自動配置される
+- 対象拡張子: `*.{js,jsx,ts,tsx,json,jsonc,css}`(Biome がサポートする拡張子のみ)
+- 整形可能な差分は `biome check --write` により自動修正され、`stage_fixed: true` で再ステージされたうえでコミットに含まれる
+- 修正不能な lint エラーが残った場合、コミットは失敗する(`biome.json` のルール設定は CI の `npm run lint` と同一。CI 側は format チェックを行わないため、format 違反は pre-commit の自動修正でのみ解消される)
+- 上記対象外の拡張子のみのコミットでは、`biome-check` ジョブはスキップされコミットがそのまま成立する
+- 緊急回避が必要な場合のみ `git commit --no-verify` でフックをバイパスできる。通常運用では使用しない
+
+**既存フックとの競合**:
+
+ローカルですでに `core.hooksPath` を独自設定している(例: `git secrets --install` を別経路で導入している)場合、`lefthook install` は安全のためデフォルトで失敗する。状況に応じて以下のいずれかで解消する:
+
+```bash
+# 既存の core.hooksPath を残し、その配下に lefthook を上書き配置する
+# (既存の pre-commit は lefthook によって `pre-commit.old` にリネームされる。
+#  必要であれば `lefthook.yml` の jobs として `.old` を再呼び出しするように移行する)
+npx lefthook install --force
+
+# あるいは、不要になった core.hooksPath 設定を解除して lefthook 標準の場所に置く
+npx lefthook install --reset-hooks-path
+```
+
+`--force` を選んだ場合、保存された `pre-commit.old` を `lefthook.yml` の job として再呼び出しに移行することで既存ツール(git-secrets 等)との共存が可能。
+
 ---
 
 ### Supabase利用規約
