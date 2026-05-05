@@ -119,8 +119,8 @@
 
 ## フェーズ 11: PR 作成
 
-- [ ] T11-1 細かいコミットに分けて push する (CLAUDE.md コミットスタイル規約準拠、`Co-Authored-By` は付けない)
-- [ ] T11-2 `gh pr create` で PR を作成する (本文に Summary / Test plan / 関連 PRD・設計書リンク)
+- [x] T11-1 細かいコミットに分けて push する (CLAUDE.md コミットスタイル規約準拠、`Co-Authored-By` は付けない)
+- [x] T11-2 `gh pr create` で PR を作成する (本文に Summary / Test plan / 関連 PRD・設計書リンク) → PR #32
 
 ---
 
