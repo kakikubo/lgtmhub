@@ -24,7 +24,8 @@ test.describe('画像詳細ページ', () => {
   test('存在しない UUID では Next.js の 404 ページが表示される', async ({ page }) => {
     const response = await page.goto('/images/00000000-0000-0000-0000-000000000000');
     expect(response?.status()).toBe(404);
-    // Next.js 標準 404 (本ファイルでは not-found.tsx を追加しないため、デフォルト出力)
-    await expect(page.getByText(/404|This page could not be found|見つかりません/)).toBeVisible();
+    // Next.js 標準 404 ページの h1 (本ファイルでは not-found.tsx を追加しないためデフォルト出力)。
+    // h2 "This page could not be found." も同時に表示されるが、role+level 指定で h1 のみを狙う
+    await expect(page.getByRole('heading', { name: '404', level: 1 })).toBeVisible();
   });
 });
