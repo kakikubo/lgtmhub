@@ -72,10 +72,15 @@ jobs:
           status=$(supabase status -o json)
           api_url=$(echo "$status" | jq -er '.API_URL')
           anon_key=$(echo "$status" | jq -er '.ANON_KEY')
+          service_role_key=$(echo "$status" | jq -er '.SERVICE_ROLE_KEY')
           echo "NEXT_PUBLIC_SUPABASE_URL=$api_url" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon_key" >> "$GITHUB_ENV"
+          # globalSetup から admin API でテストユーザーを作るために必要
+          echo "SUPABASE_SERVICE_ROLE_KEY=$service_role_key" >> "$GITHUB_ENV"
       - run: npx playwright install --with-deps chromium
       - run: npm run build
+      # E2E_TEST_MODE は playwright.config.ts の webServer.env で webServer プロセスにのみ渡る。
+      # 本番デプロイ環境変数には絶対に追加しないこと
       - run: npm run test:e2e
       - name: Stop Supabase Local
         if: always()
