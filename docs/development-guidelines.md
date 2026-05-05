@@ -504,6 +504,14 @@ git diff --stat main...HEAD -- 'app/' 'src/' 'components/' \
 
 300行を超える場合は分割を検討する。例外を認める場合はPR説明欄に理由を記載する。
 
+**自動チェック（Danger）**:
+
+PR の作成・更新時に GitHub Actions（`.github/workflows/danger.yml`）が `dangerfile.ts` を実行し、上記閾値を超過した場合に PR コメントで warning を出す。
+
+- 行数閾値（300行）または ファイル数閾値（10ファイル）を超えた場合のみコメントが付く
+- ブロックではなく warning なので、例外運用（PR 説明欄に理由を記載してマージ）はそのまま継続できる
+- 計測対象・除外ルールは `dangerfile.ts` の `INCLUDE_PREFIXES` / `EXCLUDE_PATTERNS` に集約し、本ドキュメントと同期する
+
 ---
 
 ## テスト戦略
@@ -717,6 +725,10 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=high
 ```
+
+#### Danger（PR サイズ警告）
+
+`.github/workflows/danger.yml` で `pull_request` イベントごとに `npx danger ci` を実行する。判定ロジックは `dangerfile.ts` に集約しており、「PRの大きさの目安」セクションの閾値超過時に PR コメントで warning を出す。既存 `ci.yml` とは独立した workflow とし、API 書き込みの副作用が他ジョブに波及しないようにしている。
 
 ### npm scripts
 
