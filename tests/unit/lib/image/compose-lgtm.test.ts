@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { composeLgtmImage, MAX_OUTPUT_WIDTH } from '@/src/lib/image/compose-lgtm';
@@ -52,5 +54,11 @@ describe('composeLgtmImage', () => {
 
   it('破損した入力は BadRequestError を throw する', async () => {
     await expect(composeLgtmImage(Buffer.from('not an image'))).rejects.toThrow();
+  });
+
+  it('合成に使用するフォントファイル (Archivo Black) が同梱されている', () => {
+    const fontDir = path.join(process.cwd(), 'public/fonts');
+    expect(existsSync(path.join(fontDir, 'ArchivoBlack-Regular.ttf'))).toBe(true);
+    expect(existsSync(path.join(fontDir, 'Roboto-Black.ttf'))).toBe(false);
   });
 });
