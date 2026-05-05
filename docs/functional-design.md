@@ -524,7 +524,7 @@ async function composeLgtmImage(imageBuffer: Buffer): Promise<Buffer> {
         x="50%" y="50%"
         dominant-baseline="middle"
         text-anchor="middle"
-        font-family="Arial Black, sans-serif"
+        font-family="Archivo Black, sans-serif"
         font-size="${fontSize}"
         font-weight="900"
         fill="white"

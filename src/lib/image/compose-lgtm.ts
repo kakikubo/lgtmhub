@@ -6,8 +6,8 @@ export const MAX_OUTPUT_WIDTH = 1200;
 export const WEBP_QUALITY = 85;
 
 // Vercel サーバレスにシステムフォントが無いため、リポジトリ同梱の TTF を fontfile で明示する
-const FONT_PATH = path.join(process.cwd(), 'public/fonts/Roboto-Black.ttf');
-const FONT_FAMILY = 'Roboto Black';
+const FONT_PATH = path.join(process.cwd(), 'public/fonts/ArchivoBlack-Regular.ttf');
+const FONT_FAMILY = 'Archivo Black';
 
 export interface ComposedImage {
   buffer: Buffer;
