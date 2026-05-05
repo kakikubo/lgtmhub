@@ -28,6 +28,7 @@
 | 技術 | バージョン | 用途 | 選定理由 |
 |------|-----------|------|----------|
 | Biome | 2.x | リンター + フォーマッター | Rust 実装で高速、設定一元化(`biome.json` 1 ファイル)、ESLint + Prettier の責務を統合 |
+| lefthook | 2.x | Git hooks マネージャー | `npm install` 時の `prepare` スクリプトで自動配置、`pre-commit` で staged ファイルに Biome を自動実行(`lefthook.yml` で設定) |
 | Vitest | 3.x | ユニットテストフレームワーク | Viteベースで高速、Jestと互換APIで学習コスト低 |
 | Playwright | 1.5x | E2Eテスト | モダンなブラウザ自動化、Vercelプレビュー環境でも動作 |
 | supabase CLI | 2.x | ローカルDB・マイグレーション管理 | ローカルでSupabaseスタックをDocker起動、マイグレーションをコード管理 |
@@ -345,6 +346,7 @@ async function safeImageFetch(url: string): Promise<Response> {
     "vitest": "^3.0.0",
     "@playwright/test": "^1.50.0",
     "@biomejs/biome": "^2.4.0",
+    "lefthook": "^2.1.0",
     "supabase": "^2.0.0"
   }
 }
