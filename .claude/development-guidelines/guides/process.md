@@ -322,32 +322,26 @@ const result = ids.map(id => taskMap.get(id));
 
 **自動化項目と採用ツール**:
 
-1. **Lintチェック**
-   - **ESLint 9.x** + **@typescript-eslint**
-     - TypeScript専用ルールセットでコーディング規約を統一
-     - 潜在的なバグや非推奨パターンを自動検出
-     - 設定ファイル: `eslint.config.js` (Flat Config形式)
+1. **Lint / Format チェック**
+   - **Biome 2.x**
+     - Rust 実装で高速、Linter / Formatter を 1 ツールに統合
+     - ESLint / Prettier 由来のルールを単一バイナリで提供
+     - 設定ファイル: `biome.json` 1 ファイルのみ
 
-2. **コードフォーマット**
-   - **Prettier 3.x**
-     - コードスタイルを自動整形し、レビュー時の議論を削減
-     - ESLintと併用し、`eslint-config-prettier`で競合を回避
-     - 設定ファイル: `.prettierrc`
-
-3. **型チェック**
+2. **型チェック**
    - **TypeScript Compiler (tsc) 5.x**
      - `tsc --noEmit`で型エラーのみをチェック
      - ビルドとは独立して型安全性を検証
      - 設定ファイル: `tsconfig.json`
 
-4. **テスト実行**
+3. **テスト実行**
    - **Vitest 2.x**
      - Viteベースで高速起動・実行
      - TypeScript/ESMをネイティブサポートし、設定不要で動作
      - カバレッジ測定（@vitest/coverage-v8）が標準搭載
      - モダンな開発体験とHMR対応
 
-5. **ビルド確認**
+4. **ビルド確認**
    - **TypeScript Compiler (tsc)**
      - 標準コンパイラで型チェック付きビルドを保証
      - 追加ツール不要でシンプルな構成
@@ -381,16 +375,16 @@ jobs:
 {
   "scripts": {
     "prepare": "husky",
-    "lint": "eslint .",
-    "format": "prettier --write .",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "tsc"
   },
   "lint-staged": {
-    "*.{ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
+    "*.{ts,tsx,js,jsx,json}": [
+      "biome check --write --no-errors-on-unmatched"
     ]
   }
 }

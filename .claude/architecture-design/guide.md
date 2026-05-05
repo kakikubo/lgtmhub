@@ -164,7 +164,7 @@ class ArchiveService {
   },
   "devDependencies": {
     "typescript": "~5.3.0",  // パッチバージョンのみ自動
-    "eslint": "^9.0.0"
+    "@biomejs/biome": "^2.0.0"
   }
 }
 ```

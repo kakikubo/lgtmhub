@@ -297,7 +297,7 @@ src/
 - `*.log`
 - `.DS_Store`
 
-### .prettierignore, .eslintignore
+### biome.json (`files.includes` negation パターン)
 
 ツールで除外すべきファイル:
 - `dist/`
