@@ -91,6 +91,23 @@ npm run db:reset
 
 詳細は [`docs/development-guidelines.md`](./docs/development-guidelines.md) を参照してください。
 
+### E2E テスト (Playwright)
+
+`npm run test:e2e` 実行時には Playwright の `globalSetup` が「ログイン済み storageState」を生成するため、Supabase Local の `service_role` キーと、テスト専用 sign-in エンドポイント (`/api/auth/test-signin`) を有効化する `E2E_TEST_MODE=true` の 2 点を環境変数として渡す必要があります。
+
+1. `npm run db:start` で Supabase Local を起動
+2. キーを取得して `.env.local` に追記:
+   ```bash
+   supabase status -o json | jq -r '"SUPABASE_SERVICE_ROLE_KEY=\(.SERVICE_ROLE_KEY)"' >> .env.local
+   echo "E2E_TEST_MODE=true" >> .env.local
+   ```
+3. E2E 実行:
+   ```bash
+   npm run test:e2e
+   ```
+
+> **本番では `E2E_TEST_MODE` を絶対に設定しないでください**。`/api/auth/test-signin` は `E2E_TEST_MODE === 'true'` のときのみ email/password sign-in を許可します。未設定なら 403 を返すだけの無害なルートとして振る舞います。
+
 ---
 
 ## トラブルシュート
