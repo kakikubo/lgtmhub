@@ -1,0 +1,27 @@
+name: Danger
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  danger:
+    # 設計意図: 既存 ci.yml の lint/test/e2e と独立させ、Danger（GitHub API への
+    # コメント書き込み）が落ちても他のジョブの結果に影響しないようにする。
+    # 計測対象・除外ルール・閾値は docs/development-guidelines.md
+    # 「PRの大きさの目安」と dangerfile.ts に集約する。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - run: npx danger ci --failOnErrors
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
