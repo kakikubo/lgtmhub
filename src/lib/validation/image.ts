@@ -15,10 +15,7 @@ export const LIST_IMAGES_DEFAULT_LIMIT = 20;
 export const LIST_IMAGES_MAX_LIMIT = 50;
 
 export const listImagesQuerySchema = z.object({
-  cursor: z
-    .string()
-    .datetime({ message: 'cursor は ISO 8601 形式で指定してください' })
-    .optional(),
+  cursor: z.string().datetime({ message: 'cursor は ISO 8601 形式で指定してください' }).optional(),
   limit: z.coerce
     .number()
     .int('limit は整数で指定してください')

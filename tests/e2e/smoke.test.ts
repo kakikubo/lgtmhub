@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test('トップページにヘッダーとログインボタンが表示される(未ログイン)', async ({ page }) => {
   await page.goto('/');

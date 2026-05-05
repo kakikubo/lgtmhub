@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { MAX_OUTPUT_WIDTH, composeLgtmImage } from '@/src/lib/image/compose-lgtm';
+import { composeLgtmImage, MAX_OUTPUT_WIDTH } from '@/src/lib/image/compose-lgtm';
 
 async function makeImage(width: number, height: number): Promise<Buffer> {
   return sharp({

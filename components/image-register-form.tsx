@@ -7,10 +7,7 @@ import {
   CREATE_IMAGE_FALLBACK_MESSAGE,
   mapCreateImageError,
 } from '@/src/lib/validation/create-image-error';
-import {
-  createImageRequestSchema,
-  createImageResponseSchema,
-} from '@/src/lib/validation/image';
+import { createImageRequestSchema, createImageResponseSchema } from '@/src/lib/validation/image';
 
 type FormStatus = 'idle' | 'submitting';
 
@@ -100,19 +97,12 @@ export function ImageRegisterForm() {
       </div>
 
       {errorMessage ? (
-        <p
-          role="alert"
-          data-testid="image-register-error"
-          className="text-sm text-red-600"
-        >
+        <p role="alert" data-testid="image-register-error" className="text-sm text-red-600">
           {errorMessage}
           {showReloginLink ? (
             <>
               {' '}
-              <Link
-                href="/?auth_error=login_required"
-                className="underline hover:text-red-800"
-              >
+              <Link href="/?auth_error=login_required" className="underline hover:text-red-800">
                 トップへ戻る
               </Link>
             </>

@@ -4,11 +4,7 @@ export const PHASH_LENGTH = 32 * 32;
 export const DUPLICATE_THRESHOLD = 10;
 
 export async function calculatePHash(buffer: Buffer): Promise<string> {
-  const pixels = await sharp(buffer)
-    .resize(32, 32, { fit: 'fill' })
-    .grayscale()
-    .raw()
-    .toBuffer();
+  const pixels = await sharp(buffer).resize(32, 32, { fit: 'fill' }).grayscale().raw().toBuffer();
 
   let total = 0;
   for (const value of pixels) total += value;

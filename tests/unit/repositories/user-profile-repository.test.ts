@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DatabaseError, NotFoundError } from '@/src/lib/errors';
 import { UserProfileRepository } from '@/src/repositories/user-profile-repository';
 import type { Database } from '@/src/types/database.types';

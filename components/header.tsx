@@ -1,8 +1,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { signInWithGithub, signOut } from '@/src/lib/auth/actions';
-import { UserProfileRepository } from '@/src/repositories/user-profile-repository';
 import { createClient } from '@/src/lib/supabase/server';
+import { UserProfileRepository } from '@/src/repositories/user-profile-repository';
 
 export async function Header() {
   const supabase = await createClient();
@@ -39,10 +39,7 @@ export async function Header() {
                   />
                 ) : null}
                 <span className="text-sm">{profile.displayName}</span>
-                <button
-                  type="submit"
-                  className="text-sm text-gray-600 hover:text-gray-900"
-                >
+                <button type="submit" className="text-sm text-gray-600 hover:text-gray-900">
                   ログアウト
                 </button>
               </form>

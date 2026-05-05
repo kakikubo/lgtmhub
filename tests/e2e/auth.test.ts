@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test.describe('未ログイン時の認証 UI', () => {
   test('ヘッダーに GitHub ログインボタンが表示される', async ({ page }) => {

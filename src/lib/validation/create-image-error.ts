@@ -24,9 +24,7 @@ export function mapCreateImageError(status: number, body: unknown): CreateImageE
   switch (status) {
     case 400:
       return {
-        message: errorText
-          ? `入力値が正しくありません: ${errorText}`
-          : '入力値が正しくありません',
+        message: errorText ? `入力値が正しくありません: ${errorText}` : '入力値が正しくありません',
       };
     case 401:
       return {

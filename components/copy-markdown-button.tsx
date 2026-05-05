@@ -27,11 +27,7 @@ export function CopyMarkdownButton({ imageUrl }: { imageUrl: string }) {
       data-copy-state={copied ? 'copied' : 'idle'}
       className="w-full text-sm bg-gray-900 text-white px-3 py-1.5 rounded hover:bg-gray-700"
     >
-      {copied ? (
-        <span data-testid="copy-feedback">コピーしました ✓</span>
-      ) : (
-        'マークダウンをコピー'
-      )}
+      {copied ? <span data-testid="copy-feedback">コピーしました ✓</span> : 'マークダウンをコピー'}
     </button>
   );
 }

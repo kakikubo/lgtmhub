@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  LIST_IMAGES_DEFAULT_LIMIT,
-  LIST_IMAGES_MAX_LIMIT,
   createImageErrorResponseSchema,
   createImageRequestSchema,
   createImageResponseSchema,
+  LIST_IMAGES_DEFAULT_LIMIT,
+  LIST_IMAGES_MAX_LIMIT,
   listImagesQuerySchema,
   listImagesResponseSchema,
 } from '@/src/lib/validation/image';
@@ -35,7 +35,9 @@ describe('createImageRequestSchema', () => {
 
   it('2048 文字を超える URL を拒否する', () => {
     const longTail = 'a'.repeat(2048);
-    const result = createImageRequestSchema.safeParse({ imageUrl: `https://example.com/${longTail}` });
+    const result = createImageRequestSchema.safeParse({
+      imageUrl: `https://example.com/${longTail}`,
+    });
     expect(result.success).toBe(false);
   });
 

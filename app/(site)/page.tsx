@@ -1,6 +1,6 @@
-import { signInWithGithub } from '@/src/lib/auth/actions';
 import { ImageGrid } from '@/components/image-grid';
 import { LoadMoreButton } from '@/components/load-more-button';
+import { signInWithGithub } from '@/src/lib/auth/actions';
 import { createClient } from '@/src/lib/supabase/server';
 import { buildImageService } from '@/src/services/image-service';
 import type { PublicLgtmImage } from '@/src/types/image';

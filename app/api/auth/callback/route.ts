@@ -1,5 +1,5 @@
-import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { type NextRequest, NextResponse } from 'next/server';
 
 // `next` を相対パス (/ で始まり // で始まらない) に限定し、open redirect を封じる
 function safeNext(value: string | null): string {
