@@ -1,6 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DailyLimitExceededError, DatabaseError, DuplicateImageError } from '@/src/lib/errors';
+import {
+  DailyLimitExceededError,
+  DatabaseError,
+  DuplicateImageError,
+  ForbiddenError,
+  NotFoundError,
+} from '@/src/lib/errors';
 import type { DailyUploadCountRepository } from '@/src/repositories/daily-upload-count-repository';
 import type { ImageRepository } from '@/src/repositories/image-repository';
 import type { Database } from '@/src/types/database.types';
@@ -65,6 +71,7 @@ interface Mocks {
     listActivePHashes: ReturnType<typeof vi.fn>;
     list: ReturnType<typeof vi.fn>;
     findActiveById: ReturnType<typeof vi.fn>;
+    softDelete: ReturnType<typeof vi.fn>;
   };
   countRepo: { getCount: ReturnType<typeof vi.fn>; increment: ReturnType<typeof vi.fn> };
   blob: { put: ReturnType<typeof vi.fn>; del: ReturnType<typeof vi.fn> };
@@ -78,6 +85,7 @@ function buildMocks(): Mocks {
       listActivePHashes: vi.fn().mockResolvedValue([]),
       list: vi.fn().mockResolvedValue([]),
       findActiveById: vi.fn(),
+      softDelete: vi.fn(),
     },
     countRepo: {
       getCount: vi.fn().mockResolvedValue(0),
@@ -426,5 +434,47 @@ describe('ImageService.getImage', () => {
 
     const service = await buildService(mocks);
     await expect(service.getImage('image-1')).rejects.toBeInstanceOf(DatabaseError);
+  });
+});
+
+describe('ImageService.deleteImage', () => {
+  it('画像が存在しない (findActiveById = null) なら NotFoundError を throw し softDelete は呼ばない', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.findActiveById.mockResolvedValue(null);
+
+    const service = await buildService(mocks);
+    await expect(service.deleteImage('image-1', 'user-1')).rejects.toBeInstanceOf(NotFoundError);
+
+    expect(mocks.imageRepo.softDelete).not.toHaveBeenCalled();
+  });
+
+  it('uploaderId が requesterId と異なれば ForbiddenError を throw し softDelete は呼ばない', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.findActiveById.mockResolvedValue(buildImage({ uploaderId: 'user-1' }));
+
+    const service = await buildService(mocks);
+    await expect(service.deleteImage('image-1', 'user-2')).rejects.toBeInstanceOf(ForbiddenError);
+
+    expect(mocks.imageRepo.softDelete).not.toHaveBeenCalled();
+  });
+
+  it('正常系: findActiveById で所有者一致 → softDelete=1 で resolve する', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.findActiveById.mockResolvedValue(buildImage({ uploaderId: 'user-1' }));
+    mocks.imageRepo.softDelete.mockResolvedValue(1);
+
+    const service = await buildService(mocks);
+    await expect(service.deleteImage('image-1', 'user-1')).resolves.toBeUndefined();
+
+    expect(mocks.imageRepo.softDelete).toHaveBeenCalledWith('image-1', 'user-1');
+  });
+
+  it('TOCTOU: findActiveById 後に削除されて softDelete=0 なら NotFoundError', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.findActiveById.mockResolvedValue(buildImage({ uploaderId: 'user-1' }));
+    mocks.imageRepo.softDelete.mockResolvedValue(0);
+
+    const service = await buildService(mocks);
+    await expect(service.deleteImage('image-1', 'user-1')).rejects.toBeInstanceOf(NotFoundError);
   });
 });
