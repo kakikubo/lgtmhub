@@ -65,6 +65,23 @@ function toInsert(input: CreateLgtmImageInput): LgtmImageInsert {
 export class ImageRepository {
   constructor(private readonly supabase: SupabaseClient<Database>) {}
 
+  /**
+   * 詳細ページ用に閲覧可能 (status='active') な 1 件を取得する。
+   * 該当無し / 論理削除済み (status='deleted') は `null` を返す。
+   */
+  async findActiveById(id: string): Promise<LgtmImage | null> {
+    const { data, error } = await this.supabase
+      .from('lgtm_images')
+      .select('*')
+      .eq('id', id)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (error) throw new DatabaseError(error.message);
+    if (!data) return null;
+    return toLgtmImage(data);
+  }
+
   async create(input: CreateLgtmImageInput): Promise<LgtmImage> {
     const { data, error } = await this.supabase
       .from('lgtm_images')

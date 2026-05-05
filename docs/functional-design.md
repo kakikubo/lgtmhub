@@ -239,7 +239,8 @@ GET /api/images
 
 **フィールド絞り込み方針**:
 - 一覧 API は CDN 経由の画像表示と「コピー / お気に入り」操作だけを満たせばよいため、`imageUrl` と `id` を中心に最小フィールドのみ返す
-- `pHash` / `width` / `height` / `fileSizeBytes` は内部用途専用で公開しない
+- `width` / `height` は画像詳細ページ (`/images/[id]`) で `next/image` の `width` / `height` 属性に流し込み、実画像比率を保ちながら CLS を防ぐために公開する。一覧 API も詳細ページ用と整合させて同じフィールドを返す
+- `pHash` / `fileSizeBytes` は内部用途専用で公開しない
 - 投稿者の表示名・アバターは MVP の一覧UIでは表示しない方針（PRD「画像一覧画面」受け入れ条件参照）。将来的に必要になった場合は `GET /api/users/:id` を別途追加するか、本APIのレスポンスに `uploader: { displayName, avatarUrl }` を拡張する
 
 **エラーレスポンス**:

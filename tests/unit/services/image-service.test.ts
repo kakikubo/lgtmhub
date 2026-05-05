@@ -64,6 +64,7 @@ interface Mocks {
     create: ReturnType<typeof vi.fn>;
     listActivePHashes: ReturnType<typeof vi.fn>;
     list: ReturnType<typeof vi.fn>;
+    findActiveById: ReturnType<typeof vi.fn>;
   };
   countRepo: { getCount: ReturnType<typeof vi.fn>; increment: ReturnType<typeof vi.fn> };
   blob: { put: ReturnType<typeof vi.fn>; del: ReturnType<typeof vi.fn> };
@@ -76,6 +77,7 @@ function buildMocks(): Mocks {
       create: vi.fn(),
       listActivePHashes: vi.fn().mockResolvedValue([]),
       list: vi.fn().mockResolvedValue([]),
+      findActiveById: vi.fn(),
     },
     countRepo: {
       getCount: vi.fn().mockResolvedValue(0),
@@ -270,12 +272,16 @@ describe('ImageService.listImages', () => {
         id: 'image-1',
         imageUrl: 'https://blob.example/lgtm/x.webp',
         uploaderId: 'user-1',
+        width: 800,
+        height: 600,
         createdAt: new Date('2026-05-04T12:00:00.000Z'),
       },
       {
         id: 'image-2',
         imageUrl: 'https://blob.example/lgtm/x.webp',
         uploaderId: 'user-1',
+        width: 800,
+        height: 600,
         createdAt: new Date('2026-05-04T11:00:00.000Z'),
       },
     ]);
@@ -382,5 +388,43 @@ describe('default BlobClient (@vercel/blob 委譲)', () => {
     );
 
     expect(blobDel).toHaveBeenCalledWith('https://blob.example/lgtm/default.webp');
+  });
+});
+
+describe('ImageService.getImage', () => {
+  it('Repository が LgtmImage を返したら PublicLgtmImage に整形して返す', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.findActiveById.mockResolvedValue(
+      buildImage({ id: 'image-42', width: 1024, height: 768 }),
+    );
+
+    const service = await buildService(mocks);
+    const result = await service.getImage('image-42');
+
+    expect(mocks.imageRepo.findActiveById).toHaveBeenCalledWith('image-42');
+    expect(result).toEqual({
+      id: 'image-42',
+      imageUrl: 'https://blob.example/lgtm/x.webp',
+      uploaderId: 'user-1',
+      width: 1024,
+      height: 768,
+      createdAt: new Date('2026-05-04T12:00:00.000Z'),
+    });
+  });
+
+  it('Repository が null を返したら null を返す', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.findActiveById.mockResolvedValue(null);
+
+    const service = await buildService(mocks);
+    expect(await service.getImage('missing')).toBeNull();
+  });
+
+  it('Repository が throw したらそのまま伝播する (Page 側で notFound() に変換する責務)', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.findActiveById.mockRejectedValue(new DatabaseError('boom'));
+
+    const service = await buildService(mocks);
+    await expect(service.getImage('image-1')).rejects.toBeInstanceOf(DatabaseError);
   });
 });
