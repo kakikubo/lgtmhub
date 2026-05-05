@@ -197,6 +197,69 @@ describe('ImageRepository.listActivePHashes', () => {
   });
 });
 
+interface SoftDeleteResult {
+  data: { id: string }[] | null;
+  error: { message: string } | null;
+}
+
+interface SoftDeleteStub {
+  client: SupabaseClient<Database>;
+  spies: {
+    from: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    eqId: ReturnType<typeof vi.fn>;
+    eqUploader: ReturnType<typeof vi.fn>;
+    eqStatus: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+  };
+}
+
+function createSoftDeleteStub(result: SoftDeleteResult): SoftDeleteStub {
+  const select = vi.fn().mockResolvedValue(result);
+  const eqStatus = vi.fn().mockReturnValue({ select });
+  const eqUploader = vi.fn().mockReturnValue({ eq: eqStatus });
+  const eqId = vi.fn().mockReturnValue({ eq: eqUploader });
+  const update = vi.fn().mockReturnValue({ eq: eqId });
+  const from = vi.fn().mockReturnValue({ update });
+  const client = { from } as unknown as SupabaseClient<Database>;
+  return { client, spies: { from, update, eqId, eqUploader, eqStatus, select } };
+}
+
+describe('ImageRepository.softDelete', () => {
+  it('1 件更新できたら 1 を返し、status/deleted_at を更新する', async () => {
+    const stub = createSoftDeleteStub({ data: [{ id: 'image-1' }], error: null });
+    const repo = new ImageRepository(stub.client);
+
+    const updated = await repo.softDelete('image-1', 'user-1');
+
+    expect(updated).toBe(1);
+    expect(stub.spies.from).toHaveBeenCalledWith('lgtm_images');
+    const updateArg = stub.spies.update.mock.calls[0]?.[0] as {
+      status: string;
+      deleted_at: string;
+    };
+    expect(updateArg.status).toBe('deleted');
+    expect(typeof updateArg.deleted_at).toBe('string');
+    expect(stub.spies.eqId).toHaveBeenCalledWith('id', 'image-1');
+    expect(stub.spies.eqUploader).toHaveBeenCalledWith('uploader_id', 'user-1');
+    expect(stub.spies.eqStatus).toHaveBeenCalledWith('status', 'active');
+  });
+
+  it('該当行が無い (他人 / 既削除 / 不正 ID) なら 0 を返す', async () => {
+    const stub = createSoftDeleteStub({ data: [], error: null });
+    const repo = new ImageRepository(stub.client);
+
+    expect(await repo.softDelete('image-1', 'user-1')).toBe(0);
+  });
+
+  it('error 時は DatabaseError を throw する', async () => {
+    const stub = createSoftDeleteStub({ data: null, error: { message: 'rls violation' } });
+    const repo = new ImageRepository(stub.client);
+
+    await expect(repo.softDelete('image-1', 'user-1')).rejects.toBeInstanceOf(DatabaseError);
+  });
+});
+
 interface ListResult {
   data: Row[] | null;
   error: { message: string } | null;

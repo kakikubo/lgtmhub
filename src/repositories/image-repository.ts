@@ -95,6 +95,25 @@ export class ImageRepository {
   }
 
   /**
+   * 論理削除する。所有者・active 状態を WHERE 句で同時に強制し、
+   * RLS と二重で「他人の画像」「既削除」を弾く (多層防御)。
+   *
+   * @returns 更新行数 (0 = 該当なし: 存在しない/他人/既削除, 1 = 成功)
+   */
+  async softDelete(id: string, userId: string): Promise<number> {
+    const { data, error } = await this.supabase
+      .from('lgtm_images')
+      .update({ status: 'deleted', deleted_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('uploader_id', userId)
+      .eq('status', 'active')
+      .select('id');
+
+    if (error) throw new DatabaseError(error.message);
+    return (data ?? []).length;
+  }
+
+  /**
    * 重複検出用に閲覧可能な (status='active') 画像の pHash を一括取得する。
    * 件数増加時 (10 万件超) は pgvector への移行を検討する (architecture.md 参照)。
    */

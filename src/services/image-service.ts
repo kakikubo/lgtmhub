@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { del, put } from '@vercel/blob';
-import { DailyLimitExceededError, DuplicateImageError } from '@/src/lib/errors';
+import {
+  DailyLimitExceededError,
+  DuplicateImageError,
+  ForbiddenError,
+  NotFoundError,
+} from '@/src/lib/errors';
 import { safeFetch } from '@/src/lib/http/safe-fetch';
 import { calculatePHash, isDuplicate } from '@/src/lib/image/calculate-phash';
 import { composeLgtmImage } from '@/src/lib/image/compose-lgtm';
@@ -136,6 +141,37 @@ export class ImageService {
       // DB 登録失敗時は Blob をロールバックして孤児ファイルを残さない
       await this.blob.del(url).catch(() => undefined);
       throw err;
+    }
+  }
+
+  /**
+   * 画像を論理削除する (PRD P0 #2)。
+   *
+   * 順序の意図:
+   *   1. findActiveById で先に 404 と 403 を判別する (UI に正確なエラー理由を返すため)
+   *   2. softDelete は WHERE で本人 + active を強制 (RLS + アプリ層の多層防御)
+   *   3. 1 と 2 の間に他者 (将来の管理者削除など) が削除した場合 (TOCTOU) は
+   *      softDelete の更新行数が 0 になり、NotFoundError に倒す
+   *
+   * Vercel Blob からの物理削除は呼ばない (PRD 機能 8 の日次クリーンアップで処理)。
+   * 管理者による任意ユーザーの画像削除 (PRD 機能 6 / P1) はこの Service では扱わず、
+   * 別 PR で is_admin 判定と Blob 即時削除のロジックを追加する想定。
+   *
+   * @throws NotFoundError - 画像が存在しない / 既に削除済み
+   * @throws ForbiddenError - uploader_id が requesterId と異なる
+   */
+  async deleteImage(id: string, requesterId: string): Promise<void> {
+    const image = await this.imageRepo.findActiveById(id);
+    if (!image) {
+      throw new NotFoundError('画像', id);
+    }
+    if (image.uploaderId !== requesterId) {
+      throw new ForbiddenError();
+    }
+
+    const updated = await this.imageRepo.softDelete(id, requesterId);
+    if (updated === 0) {
+      throw new NotFoundError('画像', id);
     }
   }
 

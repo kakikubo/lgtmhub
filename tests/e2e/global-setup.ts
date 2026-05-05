@@ -15,10 +15,7 @@ const TEST_USER_METADATA = {
   avatar_url: 'https://avatars.githubusercontent.com/u/0?v=4',
 };
 
-const STORAGE_STATE_PATH = path.resolve(
-  process.cwd(),
-  'tests/e2e/.auth/authenticated-user.json',
-);
+const STORAGE_STATE_PATH = path.resolve(process.cwd(), 'tests/e2e/.auth/authenticated-user.json');
 
 function requireEnv(name: string): string {
   const value = process.env[name];
