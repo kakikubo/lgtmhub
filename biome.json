@@ -11,6 +11,7 @@
       "!**/coverage/",
       "!**/playwright-report/",
       "!**/test-results/",
+      "!**/.claude/worktrees",
       "!src/types/database.types.ts",
       "!next-env.d.ts"
     ]
@@ -47,6 +48,12 @@
           }
         }
       }
+    },
+    {
+      "includes": ["components/ui/**"],
+      "linter": { "enabled": false },
+      "formatter": { "enabled": false },
+      "assist": { "enabled": false }
     }
   ],
   "javascript": {
@@ -66,6 +73,11 @@
     "formatter": {
       "indentScriptAndStyle": false,
       "selfCloseVoidElements": "always"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
     }
   },
   "assist": {
