@@ -1,0 +1,76 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":dependencyDashboard",
+    ":timezone(Asia/Tokyo)"
+  ],
+  "schedule": ["before 9am on monday"],
+  "automergeStrategy": "squash",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "schedule": ["before 9am on monday"]
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "automerge": false
+  },
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "major"]
+    },
+    {
+      "groupName": "react",
+      "matchPackageNames": ["react", "react-dom", "@types/react", "@types/react-dom"]
+    },
+    {
+      "groupName": "next",
+      "matchPackageNames": ["next", "eslint-config-next", "@next/**"]
+    },
+    {
+      "groupName": "supabase",
+      "matchPackageNames": ["supabase", "@supabase/**"]
+    },
+    {
+      "groupName": "biome",
+      "matchPackageNames": ["@biomejs/**"]
+    },
+    {
+      "groupName": "vitest",
+      "matchPackageNames": ["vitest", "vite-tsconfig-paths", "@vitest/**"]
+    },
+    {
+      "groupName": "playwright",
+      "matchPackageNames": ["@playwright/**"]
+    },
+    {
+      "groupName": "tailwind",
+      "matchPackageNames": ["tailwindcss", "tw-animate-css", "@tailwindcss/**"]
+    },
+    {
+      "groupName": "types",
+      "matchPackageNames": ["@types/**", "!@types/react", "!@types/react-dom"]
+    },
+    {
+      "matchDepTypes": ["engines"],
+      "matchDepNames": ["node"],
+      "enabled": false
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions",
+      "automerge": true,
+      "platformAutomerge": true
+    }
+  ]
+}

@@ -865,6 +865,67 @@ jobs:
 
 ---
 
+## 依存関係管理 (Renovate)
+
+依存関係（npm パッケージ / GitHub Actions / devcontainer の base image）は [Renovate](https://docs.renovatebot.com/) で自動更新する。設定はリポジトリルートの `renovate.json` を正とし、変更は通常の PR フローで行う。
+
+### スケジュールと自動マージ方針
+
+| 種別 | 例 | 自動マージ | 備考 |
+|------|------|-----------|------|
+| minor / patch | `next 15.5.15 → 15.5.16` | ✅ (CI green 時) | `platformAutomerge` で GitHub の auto-merge を利用 |
+| GitHub Actions の更新 | `actions/checkout@v4 → v5` | ✅ (CI green 時) | `github-actions` グループにまとめる |
+| `lockFileMaintenance` | `package-lock.json` の週次更新 | ✅ | 月曜午前 |
+| major | `react 19 → 20` | ❌ (手動レビュー) | `dependencies` / `major` ラベル付き |
+| vulnerability alerts | GitHub Security Advisory 由来 | ❌ (手動レビュー) | スケジュールを無視して即時 PR |
+| `engines.node` | Node のメジャー更新 | 無効化 | devcontainer / `actions/setup-node` / `engines.node` を手動で同期 |
+
+PR は **月曜の朝（Asia/Tokyo 9 時前）** にまとめて立ち、`chore(deps): ...` の Conventional Commit スタイルとなる。Dependency Dashboard issue がリポジトリに常時 1 件存在し、保留中の更新と open PR が一覧できる。
+
+### グルーピング方針
+
+`packageRules` で以下のグループにまとめている。詳細は `renovate.json` を参照。
+
+| グループ | 対象 | 理由 |
+|---------|------|------|
+| `react` | `react`, `react-dom`, `@types/react*` | 本体と型定義を分けると型エラーになる |
+| `next` | `next`, `@next/*`, `eslint-config-next` (将来) | メジャー間で破壊的変更が出やすい |
+| `supabase` | `@supabase/*`, `supabase` (CLI) | クライアント / SSR / CLI の整合性 |
+| `biome` | `@biomejs/*` | フォーマッタとプラグイン |
+| `vitest` | `vitest`, `@vitest/*`, `vite-tsconfig-paths` | Vitest コアとプラグイン |
+| `playwright` | `@playwright/*` | Playwright モジュール群 |
+| `tailwind` | `tailwindcss`, `@tailwindcss/*`, `tw-animate-css` | Tailwind v4 と PostCSS プラグイン |
+| `types` | 上記以外の `@types/*` | 型定義のみのまとめ |
+| `github-actions` | `.github/workflows/*.yml` の actions | digest 更新を含む / CI green 時に自動マージ |
+| `devcontainer` (default manager) | `.devcontainer/devcontainer.json` の base image | グループ化はせず単独 PR・**手動レビュー** (Node.js メジャーと一緒に揃えるため) |
+
+### 初回セットアップ手順 (リポジトリ管理者向け)
+
+`renovate.json` のコミットだけでは Renovate は動かない。GitHub App 側の有効化が必要。
+
+1. [Mend Renovate App](https://github.com/apps/renovate) を `kakikubo/lgtmhub` にインストール
+2. リポジトリ Settings > General > Pull Requests で **Allow auto-merge** を有効化（`automerge: true` の前提）
+3. 初回 Onboarding PR が立つので、`renovate.json` の内容に変更がなければそのままマージ
+4. Dependency Dashboard issue が作成されたことを確認
+
+`renovate.json` の妥当性は以下のコマンドでローカル検証できる:
+
+```bash
+npx --yes --package renovate -- renovate-config-validator renovate.json
+```
+
+### major / vulnerability の運用
+
+- Dependency Dashboard issue を週 1 確認し、major アップデートはチェックボックスで個別にトリガー
+- vulnerability alerts は Slack / GitHub 通知が来たら **その日のうちに** レビュー & マージする
+- メジャー更新で破壊的変更が含まれる場合は、追従 PR とは別ブランチでアプリ側の修正を入れてから merge する
+
+### `engines.node` を Renovate で更新しない理由
+
+Node.js のメジャーは、`package.json` の `engines.node`、`actions/setup-node` の `node-version`、`.devcontainer/devcontainer.json` の base image (`mcr.microsoft.com/devcontainers/typescript-node:1-24`) を **同時に** 整合させる必要がある。Renovate は manager 単位で別 PR を作るため、ここだけ手動運用にしている (`renovate.json` の `matchDepTypes: ["engines"], matchDepNames: ["node"], enabled: false`)。
+
+---
+
 ## 開発環境セットアップ
 
 ### 初回セットアップ
