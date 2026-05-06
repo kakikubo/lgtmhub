@@ -442,6 +442,48 @@ return data;
 
 ---
 
+### Vercel Preview 環境での認証設定
+
+#### 症状
+
+Vercel Preview 環境（例: `https://lgtmhub-git-<branch>-kakikubos-projects.vercel.app/`）でログインボタンを押すと、認証フロー完了後に本番ドメインに着地してしまい、Preview のログイン状態を確認できない。
+
+#### 原因
+
+Supabase Auth は `signInWithOAuth` に渡された `redirectTo` を以下の規則で解決する:
+
+1. `redirectTo` が **Site URL** または **Additional Redirect URLs** のパターンにマッチする → そこへ戻す
+2. いずれにもマッチしない → **Site URL にフォールバック**する
+
+Preview のサブドメインは PR ごとに動的に変わるため、Additional Redirect URLs にワイルドカードで登録しておかないとフォールバックして本番（= Site URL）に流れる。
+
+#### Supabase Dashboard 設定
+
+Auth > URL Configuration の **Additional Redirect URLs** に以下を追加する:
+
+```
+https://lgtmhub-git-*-kakikubos-projects.vercel.app/**
+```
+
+個別デプロイ URL（`lgtmhub-<hash>-kakikubos-projects.vercel.app`）も使う場合は、合わせて以下も登録する:
+
+```
+https://lgtmhub-*-kakikubos-projects.vercel.app/**
+```
+
+- `*` は単一サブドメインセグメント、`**` は複数セグメント（パス含む）にマッチする
+- **Site URL は本番ドメインのまま変更しない**（変更すると本番のフォールバックが Preview 側に流れて事故になる）
+
+#### GitHub OAuth App 側
+
+GitHub OAuth App の Authorization callback URL は Supabase の固定 URL（`https://<project-ref>.supabase.co/auth/v1/callback`）を維持する。Preview ごとに変える必要はなく、Supabase が `redirectTo` への最終遷移を担う。
+
+#### アプリ側の origin 解決
+
+`src/lib/auth/actions.ts` の `buildOrigin` が、`Origin` ヘッダ → `x-forwarded-proto` / `host` の順に Preview の origin を動的算出する。Server Action は POST のため `Origin` が付き、Vercel が `x-forwarded-*` を付与するため Preview 環境でも正しい `redirectTo` が組み立てられる。**コード側の追加対応は不要**で、Supabase 側に Preview ワイルドカードが登録されていれば動作する。
+
+---
+
 ## Git運用ルール
 
 ### ブランチ戦略
