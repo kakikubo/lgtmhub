@@ -19,4 +19,22 @@ test.describe('画像一覧画面 (未ログイン)', () => {
     await page.goto('/');
     await expect(page.getByRole('button', { name: 'ログインして登録' })).toBeVisible();
   });
+
+  // LCP 改善のため先頭カードには next/image の priority を付与している (image-grid.tsx)。
+  // この属性が将来のリファクタで剥がれてもユーザー体験は壊れないが LCP が悪化するため、
+  // DOM レベルで検出できるようにしておく
+  test('画像がある場合、先頭カードの img に fetchpriority=high と loading=eager が付く', async ({
+    page,
+  }) => {
+    await page.goto('/');
+
+    const grid = page.getByTestId('image-grid');
+    if (!(await grid.isVisible().catch(() => false))) {
+      test.skip(true, 'グリッド未表示 (empty / error state) のため検証をスキップ');
+    }
+
+    const firstImg = grid.locator('img').first();
+    await expect(firstImg).toHaveAttribute('fetchpriority', 'high');
+    await expect(firstImg).toHaveAttribute('loading', 'eager');
+  });
 });
