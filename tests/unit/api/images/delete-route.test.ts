@@ -3,6 +3,15 @@ import { DatabaseError, ForbiddenError, NotFoundError } from '@/src/lib/errors';
 
 const createClient = vi.fn();
 const buildImageService = vi.fn();
+const revalidateTag = vi.fn();
+
+vi.mock('next/cache', () => ({
+  revalidateTag: (tag: string) => revalidateTag(tag),
+  // 本テストでは getHomeImagesInitial を呼ばないが、
+  // route が `@/src/lib/cache/list-home-images` 経由で unstable_cache を初期化するため、
+  // パススルー実装を提供する
+  unstable_cache: <T extends (...args: unknown[]) => unknown>(fn: T) => fn,
+}));
 
 vi.mock('@/src/lib/supabase/server', () => ({
   createClient: () => createClient(),
@@ -30,6 +39,7 @@ const VALID_UUID = '00000000-0000-4000-8000-000000000001';
 beforeEach(() => {
   createClient.mockReset();
   buildImageService.mockReset();
+  revalidateTag.mockReset();
 });
 
 afterEach(() => {
@@ -62,7 +72,7 @@ describe('DELETE /api/images/[id]', () => {
     expect(buildImageService).not.toHaveBeenCalled();
   });
 
-  it('成功時は 204 を返し Service.deleteImage(id, userId) を呼ぶ', async () => {
+  it('成功時は 204 を返し Service.deleteImage(id, userId) を呼んだ後 revalidateTag を呼ぶ', async () => {
     createClient.mockResolvedValue(buildSupabase({ user: { id: 'user-1' } }));
     const deleteImage = vi.fn().mockResolvedValue(undefined);
     buildImageService.mockReturnValue({ deleteImage });
@@ -71,6 +81,7 @@ describe('DELETE /api/images/[id]', () => {
 
     expect(res.status).toBe(204);
     expect(deleteImage).toHaveBeenCalledWith(VALID_UUID, 'user-1');
+    expect(revalidateTag).toHaveBeenCalledWith('lgtm-images:list');
   });
 
   it('Service が NotFoundError を投げたら 404', async () => {
