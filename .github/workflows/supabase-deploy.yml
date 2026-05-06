@@ -1,0 +1,51 @@
+name: Supabase Migrations Deploy
+
+# main ブランチに supabase/migrations/ の変更がマージされたとき、
+# リモート Supabase (lgtmdb) に DDL を自動 push する。
+#
+# 背景: PR #35 で「ローカルで動くがリモートに未反映」の事故が発生した。
+#       手動 `supabase db push` の運用に依存していた箇所を CI に置換する。
+#
+# トリガー方針: pull_request では起動しない (フォーク PR からの secrets 露出回避)。
+#               main マージ後の push のみで動かし、失敗時は workflow_dispatch で再実行する。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 並走させると schema_migrations の部分適用が起きうるので直列化する。
+# 実行中を途中で殺すと中途半端に終わるため cancel-in-progress: false。
+concurrency:
+  group: supabase-db-push
+  cancel-in-progress: false
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    env:
+      # supabase CLI が認証に使う。--password フラグだとログ事故が起きうるので env で渡す。
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          # ローカル開発環境および ci.yml の e2e ジョブと揃える
+          version: 2.98.0
+
+      - name: Link to remote project
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+
+      # 何が pending かをログに残す (db push の前後比較用)
+      - name: Show pending migrations
+        run: supabase migration list --linked
+
+      - name: Push migrations
+        run: supabase db push --linked
