@@ -355,7 +355,7 @@ async function safeImageFetch(url: string): Promise<Response> {
 **方針**:
 - ランタイム依存は `^` でマイナーアップを許容、Next.jsのみパッチ固定（`~15.5.15`）
 - TypeScript はパッチのみ自動更新（`~`）
-- セキュリティアップデートは Dependabot で週次チェック
+- 依存関係の更新 PR は Renovate App が自動で作成する（`renovate.json` 参照、運用ポリシーは `docs/development-guidelines.md`「依存関係管理 (Renovate)」セクション）
 - npm audit を CI で実行し、High 以上の脆弱性検出時は失敗扱い
 
 **注意事項（メジャーバージョンが古いドキュメント想定から更新されたパッケージ）**:
