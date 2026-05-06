@@ -12,7 +12,7 @@
  */
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import opentype from 'opentype.js';
+import { type Font, parse as parseFont } from 'opentype.js';
 import sharp from 'sharp';
 
 interface FontCandidate {
@@ -37,7 +37,7 @@ const TEXT = 'LGTM';
 const OUTPUT_DIR = path.join(process.cwd(), 'tmp/lgtm-preview');
 
 async function renderTextToPng(
-  font: opentype.Font,
+  font: Font,
   text: string,
   color: string,
 ): Promise<{ buffer: Buffer; width: number; height: number }> {
@@ -74,7 +74,7 @@ async function renderForFont(candidate: FontCandidate): Promise<Buffer> {
     ttf.byteOffset,
     ttf.byteOffset + ttf.byteLength,
   ) as ArrayBuffer;
-  const font = opentype.parse(arrayBuffer);
+  const font = parseFont(arrayBuffer);
   const [black, white] = await Promise.all([
     renderTextToPng(font, TEXT, 'black'),
     renderTextToPng(font, TEXT, 'white'),
