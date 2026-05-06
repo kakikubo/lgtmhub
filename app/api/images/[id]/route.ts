@@ -1,5 +1,7 @@
+import { revalidateTag } from 'next/cache';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { HOME_IMAGES_CACHE_TAG } from '@/src/lib/cache/list-home-images';
 import { AppError, ForbiddenError, NotFoundError, UnauthorizedError } from '@/src/lib/errors';
 import { createClient } from '@/src/lib/supabase/server';
 import { buildImageService } from '@/src/services/image-service';
@@ -27,6 +29,7 @@ export async function DELETE(
   try {
     const service = buildImageService(supabase);
     await service.deleteImage(parsed.data.id, user.id);
+    revalidateTag(HOME_IMAGES_CACHE_TAG);
     return new NextResponse(null, { status: 204 });
   } catch (err) {
     if (err instanceof NotFoundError) {

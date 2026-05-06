@@ -1,4 +1,6 @@
+import { revalidateTag } from 'next/cache';
 import { type NextRequest, NextResponse } from 'next/server';
+import { HOME_IMAGES_CACHE_TAG } from '@/src/lib/cache/list-home-images';
 import {
   AppError,
   BadRequestError,
@@ -57,6 +59,7 @@ export async function POST(request: NextRequest) {
   try {
     const service = buildImageService(supabase);
     const image = await service.createImage(user.id, parsed.data.imageUrl);
+    revalidateTag(HOME_IMAGES_CACHE_TAG);
     return NextResponse.json({ id: image.id, imageUrl: image.imageUrl }, { status: 201 });
   } catch (err) {
     if (err instanceof DuplicateImageError) {

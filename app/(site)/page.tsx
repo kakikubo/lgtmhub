@@ -1,8 +1,8 @@
 import { ImageGrid } from '@/components/image-grid';
 import { LoadMoreButton } from '@/components/load-more-button';
 import { signInWithGithub } from '@/src/lib/auth/actions';
+import { getHomeImagesInitial } from '@/src/lib/cache/list-home-images';
 import { createClient } from '@/src/lib/supabase/server';
-import { buildImageService } from '@/src/services/image-service';
 import type { PublicLgtmImage } from '@/src/types/image';
 
 function EmptyState({ isLoggedIn }: { isLoggedIn: boolean }) {
@@ -45,7 +45,7 @@ export default async function HomePage() {
   let nextCursor: string | null = null;
   let loadError = false;
   try {
-    const result = await buildImageService(supabase).listImages();
+    const result = await getHomeImagesInitial();
     images = result.images;
     nextCursor = result.nextCursor;
   } catch (err) {
