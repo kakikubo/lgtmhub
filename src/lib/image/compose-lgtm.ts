@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import opentype from 'opentype.js';
+import { type Font, parse as parseFont } from 'opentype.js';
 import sharp from 'sharp';
 import { BadRequestError } from '@/src/lib/errors';
 
@@ -13,16 +13,16 @@ export const WEBP_QUALITY = 85;
 // レンダリングすることで、環境依存なく確実に Archivo Black を使えるようにする。
 const FONT_PATH = path.join(process.cwd(), 'public/fonts/ArchivoBlack-Regular.ttf');
 
-let cachedFont: opentype.Font | null = null;
+let cachedFont: Font | null = null;
 
-function loadFont(): opentype.Font {
+function loadFont(): Font {
   if (cachedFont) return cachedFont;
   const ttf = readFileSync(FONT_PATH);
   const arrayBuffer = ttf.buffer.slice(
     ttf.byteOffset,
     ttf.byteOffset + ttf.byteLength,
   ) as ArrayBuffer;
-  cachedFont = opentype.parse(arrayBuffer);
+  cachedFont = parseFont(arrayBuffer);
   return cachedFont;
 }
 
@@ -34,7 +34,7 @@ export interface ComposedImage {
 }
 
 async function renderText(
-  font: opentype.Font,
+  font: Font,
   text: string,
   color: string,
   fontSize: number,
