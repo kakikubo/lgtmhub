@@ -71,6 +71,7 @@
       "groupName": "github-actions",
       "automerge": true,
       "platformAutomerge": true
-    }
+    },
+    "config:recommended"
   ]
 }
