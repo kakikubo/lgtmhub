@@ -675,18 +675,35 @@ class FavoriteService {
 ### Supabase RLS ポリシー
 
 ```sql
--- lgtm_images: 閲覧は全員OK、登録は本人のみ、削除は本人または管理者
+-- lgtm_images: 閲覧は全員OK + 所有者・管理者は status を問わず可視、登録は本人のみ、更新 (論理削除含む) は本人または管理者
 CREATE POLICY "anyone can view active images"
   ON lgtm_images FOR SELECT
   USING (status = 'active');
 
-CREATE POLICY "authenticated users can insert"
+-- 所有者は自分が uploader の画像を status を問わず SELECT 可
+-- 目的: 論理削除 (status='active' → 'deleted') 時の post-update 可視性チェックを通すため
+-- 副作用: アプリ層は WHERE 句で status='active' を強制しているため、一覧/詳細 API に deleted 行は混入しない
+CREATE POLICY "owner can view own images"
+  ON lgtm_images FOR SELECT
+  USING (auth.uid() = uploader_id);
+
+-- 管理者は全ての画像を SELECT 可 (将来の管理者削除/モデレーションの前提)
+CREATE POLICY "admin can view all images"
+  ON lgtm_images FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND is_admin = true
+  ));
+
+CREATE POLICY "authenticated users can insert own images"
   ON lgtm_images FOR INSERT
   WITH CHECK (auth.uid() = uploader_id);
 
-CREATE POLICY "owner or admin can delete"
+CREATE POLICY "owner or admin can update images"
   ON lgtm_images FOR UPDATE
   USING (auth.uid() = uploader_id OR EXISTS (
+    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND is_admin = true
+  ))
+  WITH CHECK (auth.uid() = uploader_id OR EXISTS (
     SELECT 1 FROM user_profiles WHERE id = auth.uid() AND is_admin = true
   ));
 
