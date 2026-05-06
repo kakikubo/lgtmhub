@@ -153,3 +153,6 @@ src/types/database.types.ts.tmp
 
 # プレビュースクリプト等の作業用出力
 tmp/
+
+# Vercelのプロジェクトにリンクされた際に作成されるディレクトリ
+.vercel/*
