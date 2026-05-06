@@ -782,6 +782,19 @@ jobs:
 
 `.github/workflows/danger.yml` で `pull_request` イベントごとに `npx danger ci` を実行する。判定ロジックは `dangerfile.ts` に集約しており、「PRの大きさの目安」セクションの閾値超過時に PR コメントで warning を出す。既存 `ci.yml` とは独立した workflow とし、API 書き込みの副作用が他ジョブに波及しないようにしている。
 
+#### Supabase Migrations Auto Deploy
+
+`.github/workflows/supabase-deploy.yml` で main マージ時に `supabase/migrations/**` の差分をリモート Supabase (`lgtmdb`) に自動 push する。
+
+- トリガー: `push: branches: [main]` + `paths: ['supabase/migrations/**']`、および `workflow_dispatch`（手動再実行用）
+- 必要な GitHub Secrets:
+  - `SUPABASE_ACCESS_TOKEN`: Supabase アカウント個人アクセストークン (CLI 認証)
+  - `SUPABASE_DB_PASSWORD`: リモート DB 接続パスワード
+  - `SUPABASE_PROJECT_REF`: リンク先プロジェクト ref (`szjjdsagnitpmzbbtfoy`)
+- `concurrency: { group: supabase-db-push, cancel-in-progress: false }` で直列化（部分適用防止のため実行中を殺さず queue する）
+- `permissions: contents: read` のみ。フォーク PR からの secrets 露出を避けるため `pull_request` トリガーは持たない
+- 失敗時の手動リカバリ: ローカルから `npx supabase db push --linked`
+
 ### npm scripts
 
 ```json
@@ -933,4 +946,7 @@ PRを作成する前に以下を確認する:
 1. `supabase db diff` で差分を確認してからマイグレーションファイルを作成
 2. ローカルで `npm run db:reset` して正常適用を確認
 3. RLSポリシーを必ず設定する
+   - SELECT ポリシーが状態カラム (例: `lgtm_images.status`) に依存する場合、UPDATE で状態遷移する経路を必ず洗い出す
+   - 新状態が SELECT ポリシーの `USING` を満たさないと PostgreSQL の post-update visibility check で `new row violates row-level security policy` が発生する。所有者・管理者用の追加 SELECT ポリシーで救うのが定石（`supabase/migrations/20260506000000_extend_lgtm_images_select_policy.sql` を参照）
 4. `npm run db:types` で型定義を再生成してコミットに含める
+5. PR をマージするとリモート Supabase には `.github/workflows/supabase-deploy.yml` が自動で反映する。失敗時は Actions ログを確認し、ローカルから `npx supabase db push --linked` で手動リカバリ
