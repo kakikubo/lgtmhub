@@ -3,7 +3,13 @@ import Link from 'next/link';
 import { CopyMarkdownButton } from '@/components/copy-markdown-button';
 import type { PublicLgtmImage } from '@/src/types/image';
 
-export function ImageCard({ image }: { image: PublicLgtmImage }) {
+export function ImageCard({
+  image,
+  priority = false,
+}: {
+  image: PublicLgtmImage;
+  priority?: boolean;
+}) {
   return (
     <article className="space-y-2">
       <Link
@@ -18,6 +24,7 @@ export function ImageCard({ image }: { image: PublicLgtmImage }) {
             fill
             sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
             className="object-cover"
+            priority={priority}
           />
         </div>
       </Link>
