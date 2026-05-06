@@ -27,13 +27,16 @@ function DetailView({ image, isOwner }: DetailViewProps) {
         ← 一覧に戻る
       </Link>
 
-      <div data-testid="image-detail-image" className="overflow-hidden rounded border bg-gray-50">
+      <div
+        data-testid="image-detail-image"
+        className="mx-auto max-w-[266px] overflow-hidden rounded border bg-gray-50"
+      >
         <Image
           src={image.imageUrl}
           alt="LGTM"
           width={image.width}
           height={image.height}
-          sizes="(min-width: 768px) 768px, 100vw"
+          sizes="266px"
           priority
           className="h-auto w-full"
         />

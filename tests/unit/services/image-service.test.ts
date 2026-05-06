@@ -42,7 +42,8 @@ vi.mock('@/src/lib/image/calculate-phash', () => ({
 
 vi.mock('@/src/lib/image/compose-lgtm', () => ({
   composeLgtmImage: (...args: unknown[]) => composeLgtmImage(...args),
-  MAX_OUTPUT_WIDTH: 1200,
+  TARGET_WIDTH: 266,
+  TARGET_HEIGHT: 199,
   WEBP_QUALITY: 85,
 }));
 

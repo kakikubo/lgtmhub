@@ -4,7 +4,8 @@ import { type Font, parse as parseFont } from 'opentype.js';
 import sharp from 'sharp';
 import { BadRequestError } from '@/src/lib/errors';
 
-export const MAX_OUTPUT_WIDTH = 1200;
+export const TARGET_WIDTH = 266;
+export const TARGET_HEIGHT = 199;
 export const WEBP_QUALITY = 85;
 
 // Vercel サーバレスでは Pango+fontconfig 経由の family 解決が効かず、
@@ -126,13 +127,10 @@ export async function composeLgtmImage(buffer: Buffer): Promise<ComposedImage> {
     throw new BadRequestError('画像のサイズを判定できませんでした');
   }
 
-  const targetWidth = Math.min(originalWidth, MAX_OUTPUT_WIDTH);
-  const targetHeight = Math.round((originalHeight * targetWidth) / originalWidth);
-
-  const overlay = await buildLgtmOverlay(targetWidth, targetHeight, 'LGTM');
+  const overlay = await buildLgtmOverlay(TARGET_WIDTH, TARGET_HEIGHT, 'LGTM');
 
   const composed = await sharp(buffer)
-    .resize(targetWidth, targetHeight, { fit: 'fill' })
+    .resize(TARGET_WIDTH, TARGET_HEIGHT, { fit: 'cover', position: 'center' })
     .composite([{ input: overlay, blend: 'over' }])
     .webp({ quality: WEBP_QUALITY })
     .toBuffer({ resolveWithObject: true });
