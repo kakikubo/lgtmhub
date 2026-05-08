@@ -9,6 +9,7 @@ import {
 } from '@/src/lib/errors';
 import type { DailyUploadCountRepository } from '@/src/repositories/daily-upload-count-repository';
 import type { ImageRepository } from '@/src/repositories/image-repository';
+import { BLOB_CACHE_CONTROL_MAX_AGE_SECONDS } from '@/src/services/image-service';
 import type { Database } from '@/src/types/database.types';
 import type { LgtmImage } from '@/src/types/image';
 
@@ -374,7 +375,11 @@ describe('default BlobClient (@vercel/blob 委譲)', () => {
     expect(blobPut).toHaveBeenCalledWith(
       expect.stringMatching(/^lgtm\/[0-9a-f-]+\.webp$/),
       Buffer.from('webp'),
-      { access: 'public', contentType: 'image/webp' },
+      {
+        access: 'public',
+        contentType: 'image/webp',
+        cacheControlMaxAge: BLOB_CACHE_CONTROL_MAX_AGE_SECONDS,
+      },
     );
   });
 

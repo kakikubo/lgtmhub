@@ -19,6 +19,11 @@ import type { LgtmImage, PublicLgtmImage } from '@/src/types/image';
 
 export const MAX_DAILY_UPLOADS = 10;
 
+// Blob 上の LGTM 画像は UUID 単位で immutable (上書き発生しない) のため、
+// ブラウザ・CDN キャッシュを 1 年保持して Repeat View の LCP を最小化する。
+// docs/architecture.md「キャッシュ戦略」と整合。
+export const BLOB_CACHE_CONTROL_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
+
 export interface ListImagesParams {
   cursor?: string;
   limit?: number;
@@ -47,7 +52,11 @@ export interface BlobClient {
 
 const defaultBlobClient: BlobClient = {
   async put(pathname, body, contentType) {
-    const result = await put(pathname, body, { access: 'public', contentType });
+    const result = await put(pathname, body, {
+      access: 'public',
+      contentType,
+      cacheControlMaxAge: BLOB_CACHE_CONTROL_MAX_AGE_SECONDS,
+    });
     return { url: result.url };
   },
   async del(url) {
