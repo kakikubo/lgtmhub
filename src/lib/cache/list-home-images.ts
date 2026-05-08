@@ -21,6 +21,6 @@ export const getHomeImagesInitial = unstable_cache(
   ['home-images-initial'],
   {
     tags: [HOME_IMAGES_CACHE_TAG],
-    revalidate: 60,
+    revalidate: 3600,
   },
 );
