@@ -35,23 +35,22 @@ function LoadErrorState() {
 
 export async function HomeContent() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
+  // auth.getUser と画像取得は独立しているため Promise.all で並列化し TTFB を短縮する。
   // 一覧取得失敗 (Supabase 障害 / CI placeholder env など) でページ全体を 500 にせず
-  // graceful degrade する。auth.getUser がネットワーク失敗を error として握りつぶすのと同じ方針
-  let images: PublicLgtmImage[] = [];
-  let nextCursor: string | null = null;
-  let loadError = false;
-  try {
-    const result = await getHomeImagesInitial();
-    images = result.images;
-    nextCursor = result.nextCursor;
-  } catch (err) {
-    console.error('[HomePage] failed to list images', err);
-    loadError = true;
-  }
+  // graceful degrade する (auth.getUser はネットワーク失敗を握りつぶし user=null を返す)
+  const [userResult, imagesResult] = await Promise.all([
+    supabase.auth.getUser(),
+    getHomeImagesInitial().catch((err: unknown) => {
+      console.error('[HomePage] failed to list images', err);
+      return null;
+    }),
+  ]);
+
+  const user = userResult.data.user;
+  const images: PublicLgtmImage[] = imagesResult?.images ?? [];
+  const nextCursor: string | null = imagesResult?.nextCursor ?? null;
+  const loadError = imagesResult === null;
 
   return (
     <>
