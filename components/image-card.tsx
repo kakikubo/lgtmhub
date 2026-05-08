@@ -17,7 +17,7 @@ export function ImageCard({
         data-testid="image-card-link"
         className="block focus:outline-none focus:ring-2 focus:ring-gray-900 rounded"
       >
-        <div className="relative aspect-[4/3] overflow-hidden rounded border bg-gray-50">
+        <div className="relative aspect-[266/199] overflow-hidden rounded border bg-gray-50">
           <Image
             src={image.imageUrl}
             alt="LGTM"
@@ -25,6 +25,7 @@ export function ImageCard({
             sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
             className="object-cover"
             priority={priority}
+            unoptimized
           />
         </div>
       </Link>
