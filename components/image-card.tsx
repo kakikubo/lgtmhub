@@ -17,14 +17,16 @@ export function ImageCard({
         data-testid="image-card-link"
         className="block focus:outline-none focus:ring-2 focus:ring-gray-900 rounded"
       >
-        <div className="relative aspect-[4/3] overflow-hidden rounded border bg-gray-50">
+        <div className="overflow-hidden rounded border bg-gray-50">
           <Image
             src={image.imageUrl}
             alt="LGTM"
-            fill
-            sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
-            className="object-cover"
+            width={266}
+            height={199}
+            sizes="266px"
+            className="h-auto w-full object-cover"
             priority={priority}
+            unoptimized
           />
         </div>
       </Link>
