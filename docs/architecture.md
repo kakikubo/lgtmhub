@@ -257,10 +257,19 @@ async function safeImageFetch(url: string): Promise<Response> {
 
 ### モニタリング・可観測性
 
+#### アクセス計測 / Web Vitals (実装済み)
+
+- **計測基盤**: Vercel Analytics + Speed Insights。`app/layout.tsx` で `<Analytics />` / `<SpeedInsights />` を `<body>` 末尾にマウントしている
+- **対象パッケージ**: `@vercel/analytics`（PV / 訪問者 / リファラ）/ `@vercel/speed-insights`（Web Vitals: LCP / CLS / INP）
+- **環境分岐**: パッケージ側で `process.env.NODE_ENV` を判定する（明示的な分岐コードは持たない）。`production` ビルドでは `/_vercel/insights/script.js` を、`development` ではデバッグ版（`https://va.vercel-scripts.com/v1/script.debug.js`）をロードする。デバッグ版でもイベントは送信され、ダッシュボード上で development として区別記録される
+- **データの確認先**: Vercel ダッシュボードの該当プロジェクト（Analytics / Speed Insights タブ）。KPI 計測の正本として PRD KPI セクションと同期する。MAU 等の KPI を読むときは `environment = production` フィルタを適用し、Preview / Development のアクセスを除外する
+- **ダッシュボード有効化**: Vercel プロジェクト設定で Analytics / Speed Insights を ON にする運用（リポジトリ管理者操作）
+
+#### その他のモニタリング (TODO)
+
 > TODO（将来対応）: エラー追跡・ログ集約・容量アラートの設計を以下の方針で具体化する。MVP 期間中はダッシュボード手動確認で運用する。
 >
 > - **エラー追跡**: Vercel Logs で Route Handler の例外を確認。重大度フィルタとアラート条件は P1 で定義
-> - **アクセス計測**: Vercel Analytics（PV / Web Vitals / カスタムイベント）。KPI 計測の正本（PRD KPI セクション参照）
 > - **DB 監視**: Supabase ダッシュボードで容量（500MB 上限）・接続数・スロークエリを定期確認
 > - **Blob 容量**: Vercel Blob ダッシュボードで 1GB 上限の80% 到達時にアラートを設定
 > - **アラート連携**: P1 で Slack または GitHub Issue 自動起票への配線を検討
