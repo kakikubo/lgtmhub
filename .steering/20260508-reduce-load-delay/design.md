@@ -34,14 +34,13 @@
 ### After
 
 ```tsx
-<div className="overflow-hidden rounded border bg-gray-50">
+<div className="relative aspect-[266/199] overflow-hidden rounded border bg-gray-50">
   <Image
     src={image.imageUrl}
     alt="LGTM"
-    width={266}
-    height={199}
-    sizes="266px"
-    className="h-auto w-full object-cover"
+    fill
+    sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
+    className="object-cover"
     priority={priority}
     unoptimized
   />
@@ -51,15 +50,17 @@
 ポイント:
 
 - **`unoptimized`**: `_next/image` をバイパスし、`src` をそのまま `<img src>` に流す。Vercel Blob URL に対して直 fetch される
-- **`width={266} height={199}`**: 元画像と同じサイズを明示。ブラウザのレイアウトシフト (CLS) を防ぐために必須 (`fill` を外すと暗黙の 0×0 になる)
-- **`sizes="266px"`**: 詳細ページと同じ流儀。`unoptimized` でも `srcset` 自体は付かないが、警告抑制と将来 `unoptimized` を外したくなった時のために残す
-- **`h-auto w-full`**: グリッドのカード幅に追従させ、画像のアスペクト比 (266×199) を維持する
-- **`object-cover`**: 親 `div` のサイズに対する fallback。固定 width/height にしたので原理的には不要だが、グリッド幅 < 266px のレスポンシブ局面で潰さないための保険として残す
-- **`aspect-[4/3]` の削除**: 266×199 = 1.337... ≒ 4:3 ではあるが厳密には `aspect-[266/199]`。`<Image>` 自体が幅高比を保つので親側のアスペクト指定は不要 (削った方が DOM/CSS が軽い)
+- **`fill` レイアウトを維持**: 親の `relative` + `aspect-[266/199]` でセルの表示サイズを揃え、`object-cover` でレガシー画像 (266×199 に正規化される前のもの) もクロップして整列させる
+- **`sizes` を以前のまま維持**: `unoptimized` で `srcset` は実際には生成されないが、`<Image>` が要求するため記述だけ残す
+- **`aspect-[4/3]` → `aspect-[266/199]`**: 266×199 = 1.337... を厳密にした (4:3 = 1.333...)。CLS が出ないよう正確なアスペクト比を指定
 
-### 親 `div` の `relative` を削る理由
+### 当初案 (固定 width/height) からの修正経緯
 
-`fill` レイアウトでは親が `position: relative` 必須だが、固定 width/height レイアウトでは不要。残しても害はないが、今回の責務がなくなるので削除する。
+issue 提案では「元画像が 266×199 固定なら `width={266} height={199}` で固定指定の方が DOM/CSS とも軽い」とあり、初版では `fill` を外して `width=266 height=199` + `h-auto w-full` で実装した。
+
+しかし dev で目視確認したところ、**過去に登録されたレガシー画像 (commit 27df379 以前) が 266×199 に正規化されておらず、natural size が 218×342 / 1024×1024 / 564×423 などバラバラ** であることが判明。`h-auto w-full` ではアスペクト比が画像ごとの natural サイズに従うため、グリッドのセル高さが画像ごとに変動して見た目が崩れた。
+
+`unoptimized` 化のメリット (`_next/image` バイパス) は維持しつつ、`fill` + `aspect-[266/199]` + `object-cover` でセル高さを物理的に固定する形に修正。これによりレガシー画像も `cover` でクロップされ、グリッドが揃う。
 
 ## next.config.ts への影響
 

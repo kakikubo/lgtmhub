@@ -41,8 +41,9 @@
 ### 学んだこと
 
 1. **`next/image` の `priority` は `<img>` 属性に直接出力されない**: 既存 E2E テスト (`tests/e2e/image-list.test.ts:37-38`) は `fetchpriority="high"` / `loading="eager"` を期待しているが、Next.js 15.5.15 の `node_modules/next/dist/shared/lib/get-img-props.js` を確認した結果、`priority` 属性は `<link rel="preload">` を出力するだけで `<img>` の属性化は行わない。`fetchPriority` プロパティは destructure された値をそのまま forward しているだけで、`priority` から自動派生はしない。dev 環境で main ブランチのコードでも同じく `null` が出ることを確認済み。
-2. **biome.json の `!**/.claude/worktrees`**: lint の `npm run lint` を worktree 内で実行すると除外されるため、対象ファイルを直接指定 (`./node_modules/.bin/biome lint components/image-card.tsx`) する必要がある。CI は main ブランチで lint するので問題は出ない。
-3. **prepare スクリプト (lefthook install)**: worktree で `npm install` する場合、`core.hooksPath` が main 側に設定済みのため `lefthook install` が失敗する。`--ignore-scripts` で回避できる。
+2. **レガシー画像の natural size は 266×199 ではない**: issue #61 では「commit 27df379 で 266×199 に正規化済」とあるが、これは新規登録画像のみ。それ以前に登録されたレガシー画像は 218×342 / 1024×1024 などバラバラ。`fill` + `object-cover` で表示サイズを物理的に揃える方が安全。固定 `width/height` + `h-auto w-full` は新規画像だけなら成立するが、混在環境で崩れる。
+3. **biome.json の `!**/.claude/worktrees`**: lint の `npm run lint` を worktree 内で実行すると除外されるため、対象ファイルを直接指定 (`./node_modules/.bin/biome lint components/image-card.tsx`) する必要がある。CI は main ブランチで lint するので問題は出ない。
+4. **prepare スクリプト (lefthook install)**: worktree で `npm install` する場合、`core.hooksPath` が main 側に設定済みのため `lefthook install` が失敗する。`--ignore-scripts` で回避できる。
 
 ### 詳細ページ (`/images/[id]`) への同期適用について
 
