@@ -55,6 +55,13 @@
   ~750 × 75 = 56,250 の bbox が確保できる。`md:text-5xl` (48px × 1.25 = 60px) では
   ~700 × 60 = 42,000 で画像を下回るため、デスクトップでは text-5xl は不十分
 
+### 後追い修正
+
+- レビュー後、ヒーロー見出しを「LGTM 画像でレビューを楽しく」→
+  `Make every LGTM count.` の英語キャッチコピーに変更。E2E と design.md の
+  bbox 計算 (英文 22 char で h1 単行 ~49.5k) も合わせて更新。h1 単独では画像
+  bbox を僅差で下回るが、p (3 行ラップで ~58k) が確実に LCP 候補となる前提
+
 ### 次回への改善提案
 
 - Vercel preview デプロイ後に Chrome DevTools Performance で 3 回計測し、LCP

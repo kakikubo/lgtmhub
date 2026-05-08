@@ -7,7 +7,7 @@ export default function HomePage() {
     <section className="mx-auto max-w-6xl px-4 py-8 space-y-6">
       <header className="space-y-3 py-2">
         <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-tight">
-          LGTM 画像でレビューを楽しく
+          Make every LGTM count.
         </h1>
         <p className="text-base md:text-lg text-gray-700 max-w-2xl leading-relaxed">
           GitHub Pull Request のレビューコメントにそのままコピペできる LGTM 画像を、
