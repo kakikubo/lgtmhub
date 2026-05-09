@@ -37,4 +37,29 @@ test.describe('画像一覧画面 (未ログイン)', () => {
     await expect(firstImg).toHaveAttribute('fetchpriority', 'high');
     await expect(firstImg).toHaveAttribute('loading', 'eager');
   });
+
+  // Issue #63: ImageCard の <Link> に prefetch={false} を設定しているため、
+  // 初回ロード時にカード分の RSC ペイロード (?_rsc=...) が自動プリフェッチされない。
+  // この抑制が将来のリファクタで剥がれると初期ロードの帯域圧迫が再発するため、
+  // ネットワークレベルで検出できるようにしておく
+  test('画像がある場合、初回ロード時に詳細ページの RSC プリフェッチが発火しない', async ({
+    page,
+  }) => {
+    const rscRequests: string[] = [];
+    page.on('request', (req) => {
+      const url = req.url();
+      if (url.includes('/images/') && url.includes('_rsc=')) {
+        rscRequests.push(url);
+      }
+    });
+
+    await page.goto('/', { waitUntil: 'networkidle', timeout: 15_000 });
+
+    const grid = page.getByTestId('image-grid');
+    if (!(await grid.isVisible().catch(() => false))) {
+      test.skip(true, 'グリッド未表示 (empty / error state) のため検証をスキップ');
+    }
+
+    expect(rscRequests).toEqual([]);
+  });
 });
