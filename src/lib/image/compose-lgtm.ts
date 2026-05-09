@@ -4,8 +4,7 @@ import { type Font, parse as parseFont } from 'opentype.js';
 import sharp from 'sharp';
 import { BadRequestError } from '@/src/lib/errors';
 
-export const TARGET_WIDTH = 266;
-export const TARGET_HEIGHT = 199;
+export const MAX_LONG_SIDE = 800;
 export const WEBP_QUALITY = 85;
 
 // Vercel サーバレスでは Pango+fontconfig 経由の family 解決が効かず、
@@ -127,10 +126,29 @@ export async function composeLgtmImage(buffer: Buffer): Promise<ComposedImage> {
     throw new BadRequestError('画像のサイズを判定できませんでした');
   }
 
-  const overlay = await buildLgtmOverlay(TARGET_WIDTH, TARGET_HEIGHT, 'LGTM');
+  // 長辺を MAX_LONG_SIDE に揃える (元アスペクト比保持・原画 < MAX は拡大しない)
+  // 長辺ちょうどを MAX_LONG_SIDE に固定し、短辺は floor で切り捨てる
+  const longSide = Math.max(originalWidth, originalHeight);
+  let targetWidth: number;
+  let targetHeight: number;
+  if (longSide > MAX_LONG_SIDE) {
+    if (originalWidth >= originalHeight) {
+      targetWidth = MAX_LONG_SIDE;
+      targetHeight = Math.floor((originalHeight * MAX_LONG_SIDE) / originalWidth);
+    } else {
+      targetHeight = MAX_LONG_SIDE;
+      targetWidth = Math.floor((originalWidth * MAX_LONG_SIDE) / originalHeight);
+    }
+  } else {
+    targetWidth = originalWidth;
+    targetHeight = originalHeight;
+  }
 
+  const overlay = await buildLgtmOverlay(targetWidth, targetHeight, 'LGTM');
+
+  // scale を反映済みの W/H を明示するため fit: 'fill' を選択 (アスペクト比は保持済みなので歪まない)
   const composed = await sharp(buffer)
-    .resize(TARGET_WIDTH, TARGET_HEIGHT, { fit: 'cover', position: 'center' })
+    .resize(targetWidth, targetHeight, { fit: 'fill' })
     .composite([{ input: overlay, blend: 'over' }])
     .webp({ quality: WEBP_QUALITY })
     .toBuffer({ resolveWithObject: true });

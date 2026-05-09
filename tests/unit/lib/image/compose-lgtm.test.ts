@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { composeLgtmImage, TARGET_HEIGHT, TARGET_WIDTH } from '@/src/lib/image/compose-lgtm';
+import { composeLgtmImage, MAX_LONG_SIDE } from '@/src/lib/image/compose-lgtm';
 
 async function makeImage(width: number, height: number): Promise<Buffer> {
   return sharp({
@@ -17,86 +17,55 @@ async function makeImage(width: number, height: number): Promise<Buffer> {
     .toBuffer();
 }
 
-// 中央クロップ検証用に左半分赤・右半分青の画像を作成する。
-// 中央クロップ後も赤と青の境界が出力中央付近に残ることを確認する。
-async function makeSplitImage(width: number, height: number): Promise<Buffer> {
-  const left = await sharp({
-    create: { width: width / 2, height, channels: 3, background: { r: 255, g: 0, b: 0 } },
-  })
-    .png()
-    .toBuffer();
-  const right = await sharp({
-    create: { width: width / 2, height, channels: 3, background: { r: 0, g: 0, b: 255 } },
-  })
-    .png()
-    .toBuffer();
-
-  return sharp({
-    create: { width, height, channels: 3, background: { r: 0, g: 0, b: 0 } },
-  })
-    .composite([
-      { input: left, top: 0, left: 0 },
-      { input: right, top: 0, left: width / 2 },
-    ])
-    .png()
-    .toBuffer();
-}
-
 describe('composeLgtmImage', () => {
-  it('出力は WebP 形式で、固定の 266×199 になる', async () => {
-    const input = await makeImage(800, 600);
+  it('出力は WebP 形式で、長辺が MAX_LONG_SIDE になる (横長 1920×1080 → 800×450)', async () => {
+    const input = await makeImage(1920, 1080);
     const result = await composeLgtmImage(input);
 
-    expect(result.width).toBe(TARGET_WIDTH);
-    expect(result.height).toBe(TARGET_HEIGHT);
+    expect(result.width).toBe(MAX_LONG_SIDE);
+    expect(result.height).toBe(450);
     expect(result.byteLength).toBeGreaterThan(0);
 
     const meta = await sharp(result.buffer).metadata();
     expect(meta.format).toBe('webp');
-    expect(meta.width).toBe(TARGET_WIDTH);
-    expect(meta.height).toBe(TARGET_HEIGHT);
+    expect(meta.width).toBe(MAX_LONG_SIDE);
+    expect(meta.height).toBe(450);
   });
 
   it.each([
-    { label: '正方形', width: 1024, height: 1024 },
-    { label: '横長', width: 1920, height: 1080 },
-    { label: '縦長', width: 800, height: 1200 },
-  ])('入力アスペクト比違い ($label) でも出力は 266×199 になる', async ({ width, height }) => {
+    { label: '横長', width: 1920, height: 1080, expectedW: 800, expectedH: 450 },
+    { label: '4:3 横長', width: 1200, height: 900, expectedW: 800, expectedH: 600 },
+    { label: '正方形', width: 1024, height: 1024, expectedW: 800, expectedH: 800 },
+    { label: '縦長', width: 736, height: 1000, expectedW: 588, expectedH: 800 },
+    { label: '縦長 (短辺切り捨て)', width: 600, height: 1000, expectedW: 480, expectedH: 800 },
+  ])('アスペクト比違い ($label) でも長辺が $expectedW × $expectedH (長辺 800) になる', async ({
+    width,
+    height,
+    expectedW,
+    expectedH,
+  }) => {
     const input = await makeImage(width, height);
     const result = await composeLgtmImage(input);
 
-    expect(result.width).toBe(TARGET_WIDTH);
-    expect(result.height).toBe(TARGET_HEIGHT);
+    expect(Math.max(result.width, result.height)).toBe(MAX_LONG_SIDE);
+    expect(result.width).toBe(expectedW);
+    expect(result.height).toBe(expectedH);
   });
 
-  it('元画像が 266×199 より小さくても拡大されて 266×199 になる', async () => {
-    const input = await makeImage(100, 75);
+  it('原画が MAX_LONG_SIDE 未満の場合は拡大されず原画サイズで保存される (600×400 → 600×400)', async () => {
+    const input = await makeImage(600, 400);
     const result = await composeLgtmImage(input);
 
-    expect(result.width).toBe(TARGET_WIDTH);
-    expect(result.height).toBe(TARGET_HEIGHT);
+    expect(result.width).toBe(600);
+    expect(result.height).toBe(400);
   });
 
-  it('中央クロップが効く: 左赤・右青の元画像で出力中央左寄りが赤・中央右寄りが青になる', async () => {
-    // 1200×900 (4:3) の左赤・右青画像。中央クロップで 266×199 (アスペクト比 ≒ 4:3) も
-    // 横方向の中央を維持するため、左右の色配置が出力にも保存される。
-    const input = await makeSplitImage(1200, 900);
+  it('原画長辺がちょうど MAX_LONG_SIDE のときは元サイズが維持される (800×600 → 800×600)', async () => {
+    const input = await makeImage(800, 600);
     const result = await composeLgtmImage(input);
 
-    const { data, info } = await sharp(result.buffer).raw().toBuffer({ resolveWithObject: true });
-
-    const sample = (x: number, y: number) => {
-      const idx = (y * info.width + x) * info.channels;
-      return { r: data[idx] ?? 0, g: data[idx + 1] ?? 0, b: data[idx + 2] ?? 0 };
-    };
-
-    // LGTM テキストが中心に乗るので、垂直方向はテキストに重ならない上端寄りの行で確認する
-    const probeY = 5;
-    const leftSample = sample(20, probeY);
-    const rightSample = sample(TARGET_WIDTH - 21, probeY);
-
-    expect(leftSample.r).toBeGreaterThan(leftSample.b);
-    expect(rightSample.b).toBeGreaterThan(rightSample.r);
+    expect(result.width).toBe(800);
+    expect(result.height).toBe(600);
   });
 
   it('破損した入力は BadRequestError を throw する', async () => {
