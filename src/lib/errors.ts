@@ -56,3 +56,17 @@ export class ForbiddenError extends AppError {
     this.name = 'ForbiddenError';
   }
 }
+
+export class RateLimitedError extends AppError {
+  constructor(message = '外部サービスのレート上限に達しました') {
+    super(message, 'RATE_LIMITED');
+    this.name = 'RateLimitedError';
+  }
+}
+
+export class ExternalServiceError extends AppError {
+  constructor(message = '外部サービスとの通信に失敗しました') {
+    super(message, 'EXTERNAL_SERVICE_ERROR');
+    this.name = 'ExternalServiceError';
+  }
+}
