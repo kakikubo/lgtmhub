@@ -155,4 +155,4 @@ src/types/database.types.ts.tmp
 tmp/
 
 # Vercelのプロジェクトにリンクされた際に作成されるディレクトリ
-.vercel/*
+.vercel
