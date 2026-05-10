@@ -27,6 +27,9 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
+// 認証必須ルートのみを列挙する allow list 方式。
+// `/`, `/images/[id]` など読み取り専用ルートは middleware を通さず Supabase 往復を 1 回減らす (Issue #46)。
+// `/api/auth/*` は自前で response cookie を書き換える設計のため middleware は不要。
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/images/new', '/api/images/:path*'],
 };
