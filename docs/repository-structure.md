@@ -18,6 +18,7 @@ lgtmhub/
 │   │   │   └── callback/route.ts   # GitHub OAuth コールバック
 │   │   ├── images/
 │   │   │   ├── route.ts            # GET（一覧）/ POST（登録）
+│   │   │   ├── search/route.ts     # GET（外部画像検索プロバイダー連携）
 │   │   │   └── [id]/route.ts       # DELETE（削除）
 │   │   └── favorites/
 │   │       ├── route.ts            # GET（一覧）/ POST（追加）
@@ -27,6 +28,7 @@ lgtmhub/
 ├── src/                        # ビジネスロジック・ユーティリティ
 │   ├── services/               # Service Layer（ビジネスロジック）
 │   │   ├── image-service.ts
+│   │   ├── image-search-service.ts # 外部画像検索プロバイダー (Pexels) アダプタ
 │   │   └── favorite-service.ts
 │   ├── repositories/           # Data Layer（DB・Blob アクセス）
 │   │   ├── image-repository.ts
@@ -45,6 +47,7 @@ lgtmhub/
 │   │   │   └── safe-fetch.ts       # SSRF対策付きfetch
 │   │   ├── validation/             # zod スキーマ集約（API入力検証）
 │   │   │   ├── image.ts            # 画像登録・削除リクエスト
+│   │   │   ├── image-search.ts     # 画像検索クエリ・結果スキーマ
 │   │   │   └── favorite.ts         # お気に入り追加・解除リクエスト
 │   │   └── supabase/
 │   │       ├── client.ts           # クライアントサイドSupabase
