@@ -176,6 +176,7 @@ Presentation → API → Service → Data
     - `SUPABASE_SERVICE_ROLE_KEY`（サーバーサイド専用、絶対にクライアント露出禁止）
     - `BLOB_READ_WRITE_TOKEN`（Vercel Blob書き込み用）
     - `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET`（Supabase Auth経由で利用）
+    - `IMAGE_SEARCH_PROVIDER` / `IMAGE_SEARCH_API_KEY`（画像検索プロバイダー設定。MVP は `pexels` 固定）
 
 ### 入力検証
 
@@ -319,6 +320,7 @@ async function safeImageFetch(url: string): Promise<Response> {
   - GitHub OAuth App（Client ID / Secret 取得）
   - Supabase プロジェクト
   - Vercel アカウント・Blob ストア
+  - Pexels API キー（画像登録ページのキーワード検索タブを利用する場合のみ。未設定なら検索タブは 503 を返し、URL 入力タブのみ稼働）
 
 ### パフォーマンス制約
 
