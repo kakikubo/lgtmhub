@@ -9,7 +9,7 @@ import {
 } from '@/src/lib/errors';
 import type { DailyUploadCountRepository } from '@/src/repositories/daily-upload-count-repository';
 import type { ImageRepository } from '@/src/repositories/image-repository';
-import { BLOB_CACHE_CONTROL_MAX_AGE_SECONDS } from '@/src/services/image-service';
+import { BLOB_CACHE_CONTROL_MAX_AGE_SECONDS, type BlobClient } from '@/src/services/image-service';
 import type { Database } from '@/src/types/database.types';
 import type { LgtmImage } from '@/src/types/image';
 
@@ -75,7 +75,10 @@ interface Mocks {
     softDelete: ReturnType<typeof vi.fn>;
   };
   countRepo: { getCount: ReturnType<typeof vi.fn>; increment: ReturnType<typeof vi.fn> };
-  blob: { put: ReturnType<typeof vi.fn>; del: ReturnType<typeof vi.fn> };
+  blob: {
+    put: ReturnType<typeof vi.fn<BlobClient['put']>>;
+    del: ReturnType<typeof vi.fn<BlobClient['del']>>;
+  };
   clock: () => Date;
 }
 
@@ -93,8 +96,10 @@ function buildMocks(): Mocks {
       increment: vi.fn().mockResolvedValue(1),
     },
     blob: {
-      put: vi.fn().mockResolvedValue({ url: 'https://blob.example/lgtm/x.webp' }),
-      del: vi.fn().mockResolvedValue(undefined),
+      put: vi
+        .fn<BlobClient['put']>()
+        .mockResolvedValue({ url: 'https://blob.example/lgtm/x.webp' }),
+      del: vi.fn<BlobClient['del']>().mockResolvedValue(undefined),
     },
     clock: () => new Date('2026-05-04T12:00:00.000Z'),
   };
