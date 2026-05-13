@@ -38,6 +38,24 @@ test.describe('画像一覧画面 (未ログイン)', () => {
     await expect(firstImg).toHaveAttribute('loading', 'eager');
   });
 
+  // Issue #98: 画像カードに投稿者プロフィール (アバター + 表示名) を表示する。
+  // プロフィール行が無い場合のフォールバック (Unknown + デフォルトアバター) も含めて
+  // すべてのカードが投稿者行を持つ。
+  test('画像がある場合、各カードに投稿者プロフィール行が表示される', async ({ page }) => {
+    await page.goto('/');
+
+    const grid = page.getByTestId('image-grid');
+    if (!(await grid.isVisible().catch(() => false))) {
+      test.skip(true, 'グリッド未表示 (empty / error state) のため検証をスキップ');
+    }
+
+    const cardCount = await grid.locator('li').count();
+    const uploaderRows = grid.getByTestId('image-card-uploader');
+    await expect(uploaderRows).toHaveCount(cardCount);
+    // 先頭カードでは表示名が空文字でないことを確認 (Unknown フォールバックでも非空)
+    await expect(uploaderRows.first().locator('span')).not.toHaveText('');
+  });
+
   // Issue #63: ImageCard の <Link> に prefetch={false} を設定しているため、
   // 初回ロード時にカード分の RSC ペイロード (?_rsc=...) が自動プリフェッチされない。
   // この抑制が将来のリファクタで剥がれると初期ロードの帯域圧迫が再発するため、
