@@ -99,6 +99,32 @@ export function CopyMarkdownButton({ imageUrl }: { imageUrl: string }) {
 }
 ```
 
+**一覧画面での関連エンティティ取得 (N+1 防止)**:
+
+一覧 (例: `HomeContent` の画像グリッド) で各行に紐づくエンティティ (例: 投稿者プロフィール) を表示する場合、
+**リクエスト内で `findManyByIds` を 1 回だけ呼ぶ**。`ImageCard` ごとに `findById` を呼んではならない。
+取得結果は `Map<string, T>` に変換し、子コンポーネントには plain object として props で渡す。
+
+```typescript
+// ✅ components/home-content.tsx
+const images = await getHomeImagesInitial();
+const profiles = await buildUserProfileService(supabase).findManyByIds(
+  images.map((i) => i.uploaderId),
+);
+const profileMap = new Map(profiles.map((p) => [p.id, p]));
+
+return <ImageGrid images={images} profiles={profileMap} />;
+
+// ❌ ImageCard 内で findById を呼ぶ (= N+1)
+// async function ImageCard({ image }) {
+//   const profile = await userProfileService.findById(image.uploaderId); // NG
+// }
+```
+
+`findManyByIds` を提供するのは Service 層 (`UserProfileService.findManyByIds` 等)。
+入力が空配列のときは Repository を呼ばないガードを Service / Repository の両層に置くこと
+(契約と実装の二重防衛)。
+
 **Route Handler のパターン**:
 
 ```typescript
