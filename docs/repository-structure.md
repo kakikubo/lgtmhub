@@ -27,7 +27,8 @@ lgtmhub/
 ├── src/                        # ビジネスロジック・ユーティリティ
 │   ├── services/               # Service Layer（ビジネスロジック）
 │   │   ├── image-service.ts
-│   │   └── favorite-service.ts
+│   │   ├── favorite-service.ts
+│   │   └── user-profile-service.ts
 │   ├── repositories/           # Data Layer（DB・Blob アクセス）
 │   │   ├── image-repository.ts
 │   │   ├── favorite-repository.ts
@@ -162,12 +163,6 @@ app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositori
 - ビジネスロジックを含まないため `src/services/` を経由しない（経由する必要のあるロジックも存在しない）
 - 認証コールバックは Next.js / Supabase の規約に従った実装が必要であり、本ルートのみ Service Layer 経由ルールから明示的に除外する
 
-**例外: 認証済みユーザーのプロフィール表示用に Server Component から `UserProfileRepository` を直接呼ぶこと**:
-- 対象ファイル: `app/(site)/layout.tsx` 配下のヘッダー (`components/header.tsx`)、`app/(site)/page.tsx` などの Server Component
-- 理由: `UserProfileRepository.findById` は「現在のセッションユーザーの公開プロフィールを 1 件取得するだけ」のリードオペレーションで、ビジネスロジックを伴わない
-- 制約: 書き込み (insert / update) や複数リポジトリにまたがる操作が必要になった時点で `UserProfileService` を新設し、Service Layer 経由に切り替えること
-- 同等のリードを Service 化する判断基準: 取得後の整形や複数データソースの結合、権限分岐などのロジックが入る場合は Service 経由を必須とする
-
 ---
 
 ### `src/services/` (Service Layer)
@@ -177,6 +172,7 @@ app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositori
 **配置ファイル**:
 - `image-service.ts`: 画像登録・削除・一覧取得のオーケストレーション
 - `favorite-service.ts`: お気に入りの追加・解除・一覧取得
+- `user-profile-service.ts`: ユーザープロフィールの単一 / 複数取得 (画像一覧の N+1 回避を含む)
 
 **命名規則**:
 - ファイル名: `{機能名}-service.ts`（kebab-case）
@@ -189,8 +185,9 @@ app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositori
 **例**:
 ```
 src/services/
-├── image-service.ts    # 画像登録（取得→検証→重複チェック→合成→保存→DB）
-└── favorite-service.ts # お気に入りCRUD
+├── image-service.ts        # 画像登録（取得→検証→重複チェック→合成→保存→DB）
+├── favorite-service.ts     # お気に入りCRUD
+└── user-profile-service.ts # ユーザープロフィール取得（単一 / 複数）
 ```
 
 ---
