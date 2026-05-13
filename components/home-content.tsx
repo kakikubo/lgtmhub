@@ -3,7 +3,9 @@ import { LoadMoreButton } from '@/components/load-more-button';
 import { signInWithGithub } from '@/src/lib/auth/actions';
 import { getHomeImagesInitial } from '@/src/lib/cache/list-home-images';
 import { createClient } from '@/src/lib/supabase/server';
+import { buildUserProfileService } from '@/src/services/user-profile-service';
 import type { PublicLgtmImage } from '@/src/types/image';
+import type { UserProfile } from '@/src/types/user';
 
 function EmptyState({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
@@ -52,6 +54,11 @@ export async function HomeContent() {
   const nextCursor: string | null = imagesResult?.nextCursor ?? null;
   const loadError = imagesResult === null;
 
+  // 投稿者プロフィールは画像一覧に依存するため第 2 段で取得する。
+  // N+1 を避けるため findManyByIds をリクエスト内で 1 回のみ呼ぶ (画像ごとに findById を呼ばない)。
+  // 取得失敗時は空 Map にフォールバックし、各カードは Unknown 表示で graceful degrade する。
+  const profileMap = await fetchUploaderProfileMap(supabase, images);
+
   return (
     <>
       {user ? null : (
@@ -67,7 +74,7 @@ export async function HomeContent() {
         <EmptyState isLoggedIn={!!user} />
       ) : (
         <>
-          <ImageGrid images={images} />
+          <ImageGrid images={images} profiles={profileMap} />
           {nextCursor ? <LoadMoreButton initialCursor={nextCursor} /> : null}
         </>
       )}
@@ -84,4 +91,20 @@ export async function HomeContent() {
       )}
     </>
   );
+}
+
+async function fetchUploaderProfileMap(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  images: PublicLgtmImage[],
+): Promise<Map<string, UserProfile>> {
+  if (images.length === 0) return new Map();
+
+  const profiles = await buildUserProfileService(supabase)
+    .findManyByIds(images.map((image) => image.uploaderId))
+    .catch((err: unknown) => {
+      console.error('[HomePage] failed to fetch uploader profiles', err);
+      return [];
+    });
+
+  return new Map(profiles.map((profile) => [profile.id, profile]));
 }
