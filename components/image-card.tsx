@@ -16,23 +16,45 @@ export function ImageCard({
 }) {
   const uploader = resolveUploaderDisplay(profile);
 
+  const uploaderInner = (
+    <>
+      <Image
+        src={uploader.avatarUrl}
+        alt=""
+        width={24}
+        height={24}
+        className="rounded-full bg-gray-100"
+        unoptimized
+      />
+      <span className="text-sm text-gray-700 truncate group-hover:underline">
+        {uploader.displayName}
+      </span>
+    </>
+  );
+
   return (
     <article className="space-y-2">
-      <div
-        data-testid="image-card-uploader"
-        data-fallback={uploader.isFallback ? 'true' : 'false'}
-        className="flex items-center gap-2"
-      >
-        <Image
-          src={uploader.avatarUrl}
-          alt={uploader.displayName}
-          width={24}
-          height={24}
-          className="rounded-full bg-gray-100"
-          unoptimized
-        />
-        <span className="text-sm text-gray-700 truncate">{uploader.displayName}</span>
-      </div>
+      {uploader.profileUrl ? (
+        <a
+          href={uploader.profileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${uploader.displayName} の GitHub プロフィール`}
+          data-testid="image-card-uploader"
+          data-fallback="false"
+          className="group flex items-center gap-2 rounded focus:outline-none focus:ring-2 focus:ring-gray-900"
+        >
+          {uploaderInner}
+        </a>
+      ) : (
+        <div
+          data-testid="image-card-uploader"
+          data-fallback="true"
+          className="flex items-center gap-2"
+        >
+          {uploaderInner}
+        </div>
+      )}
       <Link
         href={`/images/${image.id}`}
         data-testid="image-card-link"

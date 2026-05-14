@@ -56,6 +56,59 @@ test.describe('画像一覧画面 (未ログイン)', () => {
     await expect(uploaderRows.first().locator('span')).not.toHaveText('');
   });
 
+  // Issue #102: 投稿者プロフィールが取得できたカードでは、アバター + 表示名のブロックが
+  // GitHub プロフィールページへの新規タブリンクになっている。fallback (Unknown) カードは
+  // リンクにならず <div> のまま。
+  test('投稿者プロフィール行は profile 有のとき新規タブで GitHub プロフィールへ遷移するリンクになっている', async ({
+    page,
+  }) => {
+    await page.goto('/');
+
+    const grid = page.getByTestId('image-grid');
+    if (!(await grid.isVisible().catch(() => false))) {
+      test.skip(true, 'グリッド未表示 (empty / error state) のため検証をスキップ');
+    }
+
+    const linkedRow = grid.locator('[data-testid="image-card-uploader"][data-fallback="false"]');
+    const linkedCount = await linkedRow.count();
+    if (linkedCount === 0) {
+      test.skip(true, 'profile 取得済みカードが無いため検証をスキップ');
+    }
+
+    const firstLinked = linkedRow.first();
+    await expect(firstLinked).toHaveJSProperty('tagName', 'A');
+
+    const href = await firstLinked.getAttribute('href');
+    expect(href).toMatch(/^https:\/\/github\.com\/.+/);
+
+    await expect(firstLinked).toHaveAttribute('target', '_blank');
+    const rel = (await firstLinked.getAttribute('rel')) ?? '';
+    expect(rel).toContain('noopener');
+    expect(rel).toContain('noreferrer');
+
+    const ariaLabel = (await firstLinked.getAttribute('aria-label')) ?? '';
+    expect(ariaLabel).toMatch(/^.+ の GitHub プロフィール$/);
+  });
+
+  // Issue #102: fallback カード (profile 未取得) は <a> ではなく <div> のままで、
+  // GitHub プロフィールへ飛ばないことを保証する。
+  test('fallback カード (profile 未取得) の投稿者行はリンクにならない', async ({ page }) => {
+    await page.goto('/');
+
+    const grid = page.getByTestId('image-grid');
+    if (!(await grid.isVisible().catch(() => false))) {
+      test.skip(true, 'グリッド未表示 (empty / error state) のため検証をスキップ');
+    }
+
+    const fallbackRow = grid.locator('[data-testid="image-card-uploader"][data-fallback="true"]');
+    const fallbackCount = await fallbackRow.count();
+    if (fallbackCount === 0) {
+      test.skip(true, 'fallback カードが無いため検証をスキップ');
+    }
+
+    await expect(fallbackRow.first()).toHaveJSProperty('tagName', 'DIV');
+  });
+
   // Issue #63: ImageCard の <Link> に prefetch={false} を設定しているため、
   // 初回ロード時にカード分の RSC ペイロード (?_rsc=...) が自動プリフェッチされない。
   // この抑制が将来のリファクタで剥がれると初期ロードの帯域圧迫が再発するため、
