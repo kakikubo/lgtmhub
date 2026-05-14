@@ -4,7 +4,7 @@ import { type Font, parse as parseFont } from 'opentype.js';
 import sharp from 'sharp';
 import { BadRequestError } from '@/src/lib/errors';
 
-export const MAX_LONG_SIDE = 800;
+export const MAX_LONG_SIDE = 400;
 export const WEBP_QUALITY = 85;
 
 // Vercel サーバレスでは Pango+fontconfig 経由の family 解決が効かず、

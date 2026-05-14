@@ -43,7 +43,7 @@ vi.mock('@/src/lib/image/calculate-phash', () => ({
 
 vi.mock('@/src/lib/image/compose-lgtm', () => ({
   composeLgtmImage: (...args: unknown[]) => composeLgtmImage(...args),
-  MAX_LONG_SIDE: 800,
+  MAX_LONG_SIDE: 400,
   WEBP_QUALITY: 85,
 }));
 
@@ -141,8 +141,8 @@ function setupHappyPathMocks(): void {
   isDuplicate.mockReturnValue(false);
   composeLgtmImage.mockResolvedValue({
     buffer: Buffer.from('webp'),
-    width: 800,
-    height: 600,
+    width: 400,
+    height: 300,
     byteLength: 4,
   });
 }
