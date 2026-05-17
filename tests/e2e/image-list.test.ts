@@ -134,3 +134,73 @@ test.describe('画像一覧画面 (未ログイン)', () => {
     expect(rscRequests).toEqual([]);
   });
 });
+
+// Issue #109: 一覧画面のランダム表示機能。
+// seed 画像が無い環境でも安定するよう、grid/empty/error のいずれかが出ることだけを
+// 保証する既存テストの耐性パターンに倣う。
+test.describe('画像一覧画面 ランダム表示 (Issue #109)', () => {
+  test('ページ先頭に「ランダム表示」ボタンが常時表示される', async ({ page }) => {
+    await page.goto('/');
+
+    const randomButton = page.getByTestId('random-button');
+    await expect(randomButton).toBeVisible();
+    await expect(randomButton).toHaveText('ランダム表示');
+  });
+
+  test('押下するとランダム表示に切り替わり、「もっと読み込む」が出ない', async ({ page }) => {
+    await page.goto('/');
+
+    const randomButton = page.getByTestId('random-button');
+    await randomButton.click();
+
+    // ランダム fetch 完了後、ボタン文言が通常へ戻る (loading 解除) のを待つ
+    await expect(randomButton).toHaveText('ランダム表示');
+
+    // モードがランダムへ切り替わったことを決定的に検証する
+    await expect(page.getByTestId('home-images')).toHaveAttribute('data-mode', 'random');
+
+    // ランダムモードでは grid (= 抽出結果) か empty (= 0 件) が表示される
+    const grid = page.getByTestId('image-grid');
+    const empty = page.getByTestId('image-list-empty');
+    await expect(grid.or(empty)).toBeVisible();
+
+    // ランダム表示中は「もっと読み込む」を出さない (受け入れ条件)
+    await expect(page.getByTestId('load-more-button')).toHaveCount(0);
+  });
+
+  test('再押下してもクラッシュせず、引き続きランダム表示が成立する', async ({ page }) => {
+    await page.goto('/');
+
+    const randomButton = page.getByTestId('random-button');
+    await randomButton.click();
+    await expect(randomButton).toHaveText('ランダム表示');
+    await randomButton.click();
+    await expect(randomButton).toHaveText('ランダム表示');
+
+    const grid = page.getByTestId('image-grid');
+    const empty = page.getByTestId('image-list-empty');
+    await expect(grid.or(empty)).toBeVisible();
+    await expect(page.getByTestId('load-more-button')).toHaveCount(0);
+  });
+
+  test('リロードするとランダム状態が解除され通常表示へ戻る', async ({ page }) => {
+    await page.goto('/');
+
+    const randomButton = page.getByTestId('random-button');
+    await randomButton.click();
+    await expect(randomButton).toHaveText('ランダム表示');
+    await expect(page.getByTestId('home-images')).toHaveAttribute('data-mode', 'random');
+
+    await page.reload();
+
+    // リロード後は SSR の通常表示。クライアント状態が破棄され mode=default へ戻ることを
+    // 決定的に検証する (受け入れ条件: リロードで通常表示へ自動復帰)。
+    await expect(page.getByTestId('home-images')).toHaveAttribute('data-mode', 'default');
+    await expect(page.getByTestId('random-button')).toBeVisible();
+
+    const grid = page.getByTestId('image-grid');
+    const emptyState = page.getByTestId('image-list-empty');
+    const errorState = page.getByTestId('image-list-error');
+    await expect(grid.or(emptyState).or(errorState)).toBeVisible();
+  });
+});
