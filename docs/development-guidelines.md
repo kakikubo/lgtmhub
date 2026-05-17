@@ -579,7 +579,7 @@ LGTM文字合成ロジックを実装
 
 **PRの大きさの目安**:
 - 変更ファイル数: 10ファイル以内を推奨
-- 変更行数: 300行以内を推奨
+- 変更行数: 500行以内（500行を超えると Danger が CI を失敗させる）
 
 **計測対象**:
 - プロダクションコード（`app/`、`src/`、`components/`）の追加・変更行数で判定する
@@ -588,24 +588,27 @@ LGTM文字合成ロジックを実装
   - 自動生成ファイル（`src/types/database.types.ts` など）
   - lockfile（`package-lock.json`）
   - マイグレーションSQL（`supabase/migrations/`）
+  - markdown ファイル（`*.md` / `*.mdx`）
 
 確認方法:
 
 ```bash
-# プロダクションコード変更行数の確認例
+# プロダクションコード変更行数の確認例（あくまで目安。正確な集計は dangerfile.ts に従う）
+# tests/ ・ package-lock.json ・ supabase/migrations/ は対象パス指定で既に除外される
 git diff --stat main...HEAD -- 'app/' 'src/' 'components/' \
-  ':(exclude)src/types/database.types.ts'
+  ':(exclude)src/types/database.types.ts' \
+  ':(exclude)*.md' ':(exclude)*.mdx'
 ```
 
-300行を超える場合は分割を検討する。例外を認める場合はPR説明欄に理由を記載する。
+500行を超える場合は関心事ごとに分割する。
 
 **自動チェック（Danger）**:
 
-PR の作成・更新時に GitHub Actions（`.github/workflows/danger.yml`）が `dangerfile.ts` を実行し、上記閾値を超過した場合に PR コメントで warning を出す。
+PR の作成・更新時に GitHub Actions（`.github/workflows/danger.yml`）が `dangerfile.ts` を実行し、行数閾値を超過した場合に Danger ジョブを**失敗（CI エラー）**させる。
 
-- 行数閾値（300行）または ファイル数閾値（10ファイル）を超えた場合のみコメントが付く
-- ブロックではなく warning なので、例外運用（PR 説明欄に理由を記載してマージ）はそのまま継続できる
-- 計測対象・除外ルールは `dangerfile.ts` の `INCLUDE_PREFIXES` / `EXCLUDE_PATTERNS` に集約し、本ドキュメントと同期する
+- 行数閾値（500行）を超えた場合は `fail()` となり、`npx danger ci --failOnErrors` により Danger ジョブが赤くなる（ブロッキング）
+- ファイル数閾値（10ファイル）超過は `warn()`（コメント警告のみ、ブロックしない）
+- 計測対象・除外ルール（markdown 除外を含む）は `dangerfile.ts` の `INCLUDE_PREFIXES` / `EXCLUDE_PATTERNS` に集約し、本ドキュメントと同期する
 
 ---
 
@@ -866,9 +869,9 @@ jobs:
       - run: npm audit --audit-level=high
 ```
 
-#### Danger（PR サイズ警告）
+#### Danger（PR サイズチェック）
 
-`.github/workflows/danger.yml` で `pull_request` イベントごとに `npx danger ci` を実行する。判定ロジックは `dangerfile.ts` に集約しており、「PRの大きさの目安」セクションの閾値超過時に PR コメントで warning を出す。既存 `ci.yml` とは独立した workflow とし、API 書き込みの副作用が他ジョブに波及しないようにしている。
+`.github/workflows/danger.yml` で `pull_request` イベントごとに `npx danger ci --failOnErrors` を実行する。判定ロジックは `dangerfile.ts` に集約しており、「PRの大きさの目安」セクションの行数閾値（500行）を超過した場合は `fail()` となり、`--failOnErrors` により Danger ジョブが失敗（CI エラー）する。ファイル数閾値（10ファイル）超過は `warn()`（コメント警告のみ）。markdown ファイル（`*.md` / `*.mdx`）は集計対象外。既存 `ci.yml` とは独立した workflow とし、API 書き込みの副作用が他ジョブに波及しないようにしている。
 
 #### Codecov（カバレッジ可視化）
 
