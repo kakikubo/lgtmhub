@@ -270,7 +270,7 @@ describe('buildImageService', () => {
 });
 
 describe('ImageService.listImages', () => {
-  it('limit 未指定なら 20 件で repository を呼び、PublicLgtmImage に絞り込んで返す', async () => {
+  it('limit 未指定なら 16 件で repository を呼び、PublicLgtmImage に絞り込んで返す', async () => {
     const mocks = buildMocks();
     mocks.imageRepo.list.mockResolvedValue([
       buildImage({ id: 'image-1', createdAt: new Date('2026-05-04T12:00:00.000Z') }),
@@ -280,7 +280,7 @@ describe('ImageService.listImages', () => {
     const service = await buildService(mocks);
     const result = await service.listImages();
 
-    expect(mocks.imageRepo.list).toHaveBeenCalledWith({ cursor: undefined, limit: 20 });
+    expect(mocks.imageRepo.list).toHaveBeenCalledWith({ cursor: undefined, limit: 16 });
     expect(result.images).toEqual([
       {
         id: 'image-1',
@@ -299,7 +299,7 @@ describe('ImageService.listImages', () => {
         createdAt: new Date('2026-05-04T11:00:00.000Z'),
       },
     ]);
-    // limit (20) ちょうどでないので nextCursor は null
+    // limit (16) ちょうどでないので nextCursor は null
     expect(result.nextCursor).toBeNull();
   });
 

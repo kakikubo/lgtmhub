@@ -220,7 +220,7 @@ GET /api/images
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|----|-----------|----|
 | `cursor` | string | - | ページネーション用カーソル（`createdAt` ISO文字列） |
-| `limit` | number | 20 | 取得件数（最大50） |
+| `limit` | number | 16 | 取得件数（最大50、デフォルトは `LIST_IMAGES_DEFAULT_LIMIT`） |
 
 **レスポンス**:
 ```json
@@ -624,7 +624,7 @@ app/
 ```typescript
 interface ListImagesParams {
   cursor?: string;       // 前ページ末尾の createdAt (ISO 8601 / UTC)
-  limit?: number;        // デフォルト 20、最大 50
+  limit?: number;        // デフォルト 16 (LIST_IMAGES_DEFAULT_LIMIT)、最大 50
 }
 
 interface ListImagesResult {

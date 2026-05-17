@@ -140,7 +140,7 @@ Presentation → API → Service → Data
 
 | 操作 | 目標時間 | 測定指標 | 測定環境 | 測定方法 |
 |------|---------|----------|---------|----------|
-| 画像一覧の初期表示（20件） | 3秒以内 | **LCP（Largest Contentful Paint）** | Vercel Edge Network、3G相当回線 | Lighthouse / Vercel Analytics |
+| 画像一覧の初期表示（16件） | 3秒以内 | **LCP（Largest Contentful Paint）** | Vercel Edge Network、3G相当回線 | Lighthouse / Vercel Analytics |
 | マークダウンリンクのコピー | 100ms以内 | 操作完了時間 | クライアント側 | クリック→クリップボード書き込み完了までの計測 |
 | 画像登録処理（ダウンロード〜CDN保存） | 10秒以内 | サーバー処理時間 | Vercel Function（リージョン: hnd1） | サーバーログでstart/end計測 |
 | API応答（一覧取得） | 500ms以内（p95） | TTFB相当 | Vercel Function | Vercel Analytics |

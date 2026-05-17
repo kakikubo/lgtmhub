@@ -170,7 +170,7 @@ lgtmoon.comの課題（白文字の見づらさ・不適切コンテンツ・同
 - [ ] ログインなしでも閲覧できる
 - [ ] 各画像にマークダウンコピーボタンを表示し、クリック一発でマークダウンリンクをクリップボードにコピーできる
 - [ ] コピー後にフィードバック（「コピーしました」等）を表示する
-- [ ] 1ページあたり最大20件のカーソルページネーションで取得する（詳細は `docs/functional-design.md#画像一覧取得` 参照）
+- [ ] 1ページあたり16件のカーソルページネーションで取得する（詳細は `docs/functional-design.md#画像一覧取得` 参照）
 - [ ] 50件以上のデータがあっても一覧描画が破綻しないこと（パフォーマンス基準は下記参照）
 - [ ] パフォーマンス基準は「非機能要件 > パフォーマンス」セクションを参照（LCP 3秒以内、Vercel Edge Network経由・3G相当回線で測定）
 
@@ -260,7 +260,7 @@ lgtmoon.comの課題（白文字の見づらさ・不適切コンテンツ・同
 
 | 操作 | 目標 | 測定指標・条件 |
 |------|------|----------------|
-| 画像一覧の初期表示（20件） | 3秒以内 | LCP（Largest Contentful Paint）、Vercel Edge Network経由・3G相当回線、Lighthouse / Vercel Analyticsで計測 |
+| 画像一覧の初期表示（16件） | 3秒以内 | LCP（Largest Contentful Paint）、Vercel Edge Network経由・3G相当回線、Lighthouse / Vercel Analyticsで計測 |
 | 画像詳細ページの初期表示 | 2秒以内 | LCP、Vercel Edge Network経由・3G相当回線、Lighthouseで計測 |
 | マークダウンリンクのコピー | 100ms以内 | クリックからクリップボード書き込み完了までの計測 |
 | 画像登録処理（ダウンロード・合成・CDN保存） | 10秒以内 | Vercel Functionのタイムアウト内、サーバーログでstart/end計測 |

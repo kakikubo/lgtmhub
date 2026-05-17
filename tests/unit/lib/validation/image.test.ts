@@ -49,7 +49,7 @@ describe('createImageRequestSchema', () => {
 
 describe('listImagesQuerySchema', () => {
   it('デフォルト定数が想定値である', () => {
-    expect(LIST_IMAGES_DEFAULT_LIMIT).toBe(20);
+    expect(LIST_IMAGES_DEFAULT_LIMIT).toBe(16);
     expect(LIST_IMAGES_MAX_LIMIT).toBe(50);
   });
 
