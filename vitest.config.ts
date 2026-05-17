@@ -1,14 +1,6 @@
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { defineConfig } from 'vitest/config';
 
-// v8 の function カバレッジ計測は Node のマイナーバージョン差で数 % ブレる。
-// 閾値はローカル / devcontainer での開発者の自己チェック用ゲートとして残し、
-// CI では Codecov 可視化目的で計測のみ行いゲートにしない
-// (VITEST_DISABLE_THRESHOLDS=true)。新規ゲート化は本対応のスコープ外
-// (.steering/20260517-add-codecov/requirements.md)。テスト失敗自体は閾値と
-// 無関係に vitest が非 0 終了するため CI の test ジョブのゲートは維持される。
-const enforceThresholds = process.env.VITEST_DISABLE_THRESHOLDS !== 'true';
-
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
@@ -21,14 +13,16 @@ export default defineConfig({
       reporter: ['text', 'json', 'html', 'lcov'],
       include: ['src/**/*.ts', 'src/**/*.tsx'],
       exclude: ['src/types/**', 'src/**/*.test.ts'],
-      ...(enforceThresholds
-        ? {
-            thresholds: {
-              'src/services/**': { branches: 90, functions: 90, lines: 90, statements: 90 },
-              'src/lib/**': { branches: 80, functions: 80, lines: 80, statements: 80 },
-            },
-          }
-        : {}),
+      // 閾値は CI を含め常時ゲート。v8 の function 計測は Node マイナー差で
+      // 約 12〜13pt 下振れする (ローカル services 100% / lib 90.9% に対し
+      // CI(ubuntu/Node 24.x) で 88.23% / 77.5%) ため、functions のみ CI 実測
+      // フロアの下にバッファを取った値へ引き下げる (services 85 / lib 75)。
+      // branches/lines/statements は v8-to-istanbul でソースレンジにマップされ
+      // 安定し CI 実測でも 90/80 を通過するため据え置く (Issue #113)。
+      thresholds: {
+        'src/services/**': { branches: 90, functions: 85, lines: 90, statements: 90 },
+        'src/lib/**': { branches: 80, functions: 75, lines: 80, statements: 80 },
+      },
     },
   },
 });
