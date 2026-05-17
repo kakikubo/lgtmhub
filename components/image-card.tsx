@@ -17,19 +17,14 @@ export function ImageCard({
   const uploader = resolveUploaderDisplay(profile);
 
   const uploaderInner = (
-    <>
-      <Image
-        src={uploader.avatarUrl}
-        alt=""
-        width={24}
-        height={24}
-        className="rounded-full bg-gray-100"
-        unoptimized
-      />
-      <span className="text-sm text-gray-700 truncate group-hover:underline">
-        {uploader.displayName}
-      </span>
-    </>
+    <Image
+      src={uploader.avatarUrl}
+      alt=""
+      width={24}
+      height={24}
+      className="rounded-full bg-gray-100"
+      unoptimized
+    />
   );
 
   return (

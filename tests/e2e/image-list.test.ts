@@ -52,11 +52,11 @@ test.describe('画像一覧画面 (未ログイン)', () => {
     const cardCount = await grid.locator('li').count();
     const uploaderRows = grid.getByTestId('image-card-uploader');
     await expect(uploaderRows).toHaveCount(cardCount);
-    // 先頭カードでは表示名が空文字でないことを確認 (Unknown フォールバックでも非空)
-    await expect(uploaderRows.first().locator('span')).not.toHaveText('');
+    // 投稿者名は非表示。アバター画像のみが描画されていることを確認
+    await expect(uploaderRows.first().locator('img')).toHaveAttribute('src', /.+/);
   });
 
-  // Issue #102: 投稿者プロフィールが取得できたカードでは、アバター + 表示名のブロックが
+  // Issue #102: 投稿者プロフィールが取得できたカードでは、アバターのブロックが
   // GitHub プロフィールページへの新規タブリンクになっている。fallback (Unknown) カードは
   // リンクにならず <div> のまま。
   test('投稿者プロフィール行は profile 有のとき新規タブで GitHub プロフィールへ遷移するリンクになっている', async ({
