@@ -71,6 +71,7 @@
 | ドキュメント更新範囲 | CI/CD 節 + カバレッジ目標 1 行 | + validator 指摘により「実際の ci.yml を正とする」注記と codecov-action の renovate 自動更新の記載を追加 |
 | codecov.yml の ignore | `src/**/*.test.ts` で整合 | `**/*.test.ts` (より広く安全な superset)。`tests/**` と併せテストコード全体を確実に除外できるため据え置き |
 | lint 確認 | `npm run lint` のみ | rtk フィルタで出力が壊れたため `vitest.config.ts` 単体 lint も追加実施し clean を確認 |
+| CI 閾値の扱い | `test:coverage` をそのまま CI 実行（閾値はローカルと同じく通る前提） | **PR #112 の CI で閾値 fail**。v8 の function 計測が Node マイナー差で数 % ブレ、CI(ubuntu/24.x)では services 88.23%・lib 77.5% に低下。`test:coverage` を CI 経由にしたことで意図せず「新規ゲート」を持ち込みスコープ違反に。`VITEST_DISABLE_THRESHOLDS` 環境変数で閾値を env ゲート化し、CI は計測のみ・ローカル/devcontainer は自己チェック用ゲート維持に修正 |
 
 ### 学んだこと
 

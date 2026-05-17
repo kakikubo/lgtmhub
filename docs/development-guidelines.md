@@ -679,7 +679,7 @@ coverage: {
 }
 ```
 
-この `thresholds` がカバレッジの**ゲート**（未達ならビルド失敗）。Codecov はこの数値の代替ではなく、カバレッジの**可視化**（PR コメント・時系列・バッジ）を担う。詳細は「CI/CDパイプライン > Codecov」を参照。
+この `thresholds` は**ローカル / devcontainer で `npm run test:coverage` を実行したときの開発者向け自己チェック用ゲート**。v8 の function 計測は Node のマイナーバージョン差で数 % ブレるため、CI では `VITEST_DISABLE_THRESHOLDS=true` で閾値判定をゲートにせず、カバレッジは Codecov での**可視化**（PR コメント・時系列・バッジ）に用いる（新規ゲート化はスコープ外）。詳細は「CI/CDパイプライン > Codecov」を参照。
 
 ### 統合テスト (Vitest + Supabase Local)
 
@@ -806,7 +806,12 @@ jobs:
       # test:unit / test:integration の 2 回実行をやめ、test:coverage
       # (= vitest run --coverage) の 1 パスに統合。include/exclude により
       # unit + integration をまとめて実行し (e2e は対象外)、カバレッジを計測する。
+      # 閾値判定は v8 の function 計測が Node マイナー差でブレるため CI では
+      # ゲートにしない (VITEST_DISABLE_THRESHOLDS)。テスト失敗自体は閾値と
+      # 無関係に vitest が非 0 終了するため test ジョブのゲートは維持される。
       - run: npm run test:coverage
+        env:
+          VITEST_DISABLE_THRESHOLDS: "true"
       # カバレッジを Codecov にアップロードして PR / main で可視化する。
       # public リポジトリのため CODECOV_TOKEN 未設定でも tokenless で動作し、
       # アップロード可否を CI のゲートにしない (fail_ci_if_error: false)。
@@ -869,7 +874,7 @@ jobs:
 
 `ci.yml` の `test` ジョブで `npm run test:coverage` を実行し、生成された `coverage/lcov.info` を `codecov/codecov-action@v5` で Codecov にアップロードする。`test` ジョブは `push: [main]` と `pull_request` 両方で走るため、**PR と main マージ後の双方**でカバレッジが Codecov に記録され、PR には差分コメントが付く。README のカバレッジバッジも Codecov を参照する。
 
-- **目的は可視化**: カバレッジのゲート (ビルド失敗判定) は引き続き `vitest.config.ts` の `thresholds`（`src/services/**` 90% / `src/lib/**` 80%）が `test:coverage` 実行内で担保する。Codecov 側の project / patch ステータスは `codecov.yml` で `informational: true` とし、PR をブロックしない（導入初手の運用摩擦を避ける。ゲート化は運用安定後に別途検討）。
+- **目的は可視化（CI ではゲートにしない）**: CI の `test:coverage` step は `VITEST_DISABLE_THRESHOLDS=true` を渡し、閾値判定で CI を落とさない。v8 の function 計測は Node のマイナーバージョン差で数 % ブレるため、これを CI のハードゲートにすると不安定になる。`vitest.config.ts` の `thresholds`（`src/services/**` 90% / `src/lib/**` 80%）は**ローカル / devcontainer で `npm run test:coverage` を実行したときの開発者向け自己チェック**として残る。Codecov 側の project / patch ステータスも `codecov.yml` で `informational: true`。新規ゲート化はスコープ外で、必要なら運用安定後に別途検討（例: env 非依存の `lines`/`statements` のみで CI ゲート化）。なお**テスト失敗自体は閾値と無関係に `vitest` が非 0 終了するため、`test` ジョブのゲート（テストが通ること）は維持される**。
 - **token は任意**: public リポジトリのため `CODECOV_TOKEN` 未設定でも tokenless でアップロードできる。レート制限回避のため設定する場合は GitHub Secrets に `CODECOV_TOKEN` を登録する。アップロード失敗で `test` ジョブを落とさないよう `fail_ci_if_error: false`。
 - **集計対象**: `codecov.yml` の `ignore` を `vitest.config.ts` の `coverage.exclude`（`src/types/**` / `*.test.ts`）と整合させている。
 - **バージョン管理**: `codecov/codecov-action` は `renovate.json` の `github-actions` グループで自動更新対象（固定運用ではない）。
