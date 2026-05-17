@@ -38,8 +38,22 @@ jobs:
           node-version: "24"
           cache: "npm"
       - run: npm ci
-      - run: npm run test:unit
-      - run: npm run test:integration
+      # 設計意図: test:unit / test:integration の 2 回実行をやめ、
+      # test:coverage (= vitest run --coverage) の 1 パスに統合する。
+      # vitest.config.ts の include/exclude により unit + integration を
+      # まとめて実行し (e2e は対象外)、二重実行せずカバレッジを計測する。
+      # カバレッジのゲートは vitest.config.ts の thresholds が担保する。
+      - run: npm run test:coverage
+      # 設計意図: カバレッジを Codecov にアップロードし、PR / main で可視化する。
+      # public リポジトリのため CODECOV_TOKEN が未設定でも tokenless で動作する。
+      # 可視化が目的でアップロード可否を CI のゲートにしないため
+      # fail_ci_if_error: false とし、Codecov 側の一時障害で test を落とさない。
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
 
   e2e:
     runs-on: ubuntu-latest

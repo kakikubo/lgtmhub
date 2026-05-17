@@ -1,5 +1,7 @@
 # lgtmhub
 
+[![codecov](https://codecov.io/gh/kakikubo/lgtmhub/branch/main/graph/badge.svg)](https://codecov.io/gh/kakikubo/lgtmhub)
+
 LGTM 画像を GitHub 上のコードレビューに気軽に貼り付けられる、安心安全な LGTM 画像共有サービス。
 
 詳細仕様は `docs/` 配下の永続ドキュメントを参照してください。

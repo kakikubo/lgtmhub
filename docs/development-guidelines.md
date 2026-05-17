@@ -679,6 +679,8 @@ coverage: {
 }
 ```
 
+この `thresholds` がカバレッジの**ゲート**（未達ならビルド失敗）。Codecov はこの数値の代替ではなく、カバレッジの**可視化**（PR コメント・時系列・バッジ）を担う。詳細は「CI/CDパイプライン > Codecov」を参照。
+
 ### 統合テスト (Vitest + Supabase Local)
 
 **対象**: API Routeの正常系・異常系、RLSポリシーの検証
@@ -759,6 +761,8 @@ GitHub OAuth 全体を E2E に含めるのは外部 IDP に依存して不安定
 
 ### GitHub Actions
 
+> 以下は構成を説明するためのサンプル。`actions/*` などのバージョンは `renovate.json` の `github-actions` グループで自動更新されるため、**常に実際の `.github/workflows/ci.yml` を正**とする（サンプルのバージョン表記をそのままコピーしない）。
+
 ```yaml
 # .github/workflows/ci.yml
 name: CI
@@ -799,8 +803,19 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
-      - run: npm run test:unit
-      - run: npm run test:integration
+      # test:unit / test:integration の 2 回実行をやめ、test:coverage
+      # (= vitest run --coverage) の 1 パスに統合。include/exclude により
+      # unit + integration をまとめて実行し (e2e は対象外)、カバレッジを計測する。
+      - run: npm run test:coverage
+      # カバレッジを Codecov にアップロードして PR / main で可視化する。
+      # public リポジトリのため CODECOV_TOKEN 未設定でも tokenless で動作し、
+      # アップロード可否を CI のゲートにしない (fail_ci_if_error: false)。
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
 
   e2e:
     runs-on: ubuntu-latest
@@ -849,6 +864,16 @@ jobs:
 #### Danger（PR サイズ警告）
 
 `.github/workflows/danger.yml` で `pull_request` イベントごとに `npx danger ci` を実行する。判定ロジックは `dangerfile.ts` に集約しており、「PRの大きさの目安」セクションの閾値超過時に PR コメントで warning を出す。既存 `ci.yml` とは独立した workflow とし、API 書き込みの副作用が他ジョブに波及しないようにしている。
+
+#### Codecov（カバレッジ可視化）
+
+`ci.yml` の `test` ジョブで `npm run test:coverage` を実行し、生成された `coverage/lcov.info` を `codecov/codecov-action@v5` で Codecov にアップロードする。`test` ジョブは `push: [main]` と `pull_request` 両方で走るため、**PR と main マージ後の双方**でカバレッジが Codecov に記録され、PR には差分コメントが付く。README のカバレッジバッジも Codecov を参照する。
+
+- **目的は可視化**: カバレッジのゲート (ビルド失敗判定) は引き続き `vitest.config.ts` の `thresholds`（`src/services/**` 90% / `src/lib/**` 80%）が `test:coverage` 実行内で担保する。Codecov 側の project / patch ステータスは `codecov.yml` で `informational: true` とし、PR をブロックしない（導入初手の運用摩擦を避ける。ゲート化は運用安定後に別途検討）。
+- **token は任意**: public リポジトリのため `CODECOV_TOKEN` 未設定でも tokenless でアップロードできる。レート制限回避のため設定する場合は GitHub Secrets に `CODECOV_TOKEN` を登録する。アップロード失敗で `test` ジョブを落とさないよう `fail_ci_if_error: false`。
+- **集計対象**: `codecov.yml` の `ignore` を `vitest.config.ts` の `coverage.exclude`（`src/types/**` / `*.test.ts`）と整合させている。
+- **バージョン管理**: `codecov/codecov-action` は `renovate.json` の `github-actions` グループで自動更新対象（固定運用ではない）。
+- **初回の手動セットアップ（リポジトリ管理者作業）**: Codecov (codecov.io) に GitHub アカウントでサインインし `kakikubo/lgtmhub` を有効化する。これにより PR コメントとダッシュボードが有効になる。必要に応じて `CODECOV_TOKEN` を GitHub Secrets に登録する。
 
 #### Supabase Migrations Auto Deploy
 

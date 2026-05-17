@@ -9,7 +9,8 @@ export default defineConfig({
     exclude: ['tests/e2e/**'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      // lcov: Codecov が解釈する標準フォーマット (coverage/lcov.info を生成)
+      reporter: ['text', 'json', 'html', 'lcov'],
       include: ['src/**/*.ts', 'src/**/*.tsx'],
       exclude: ['src/types/**', 'src/**/*.test.ts'],
       thresholds: {
