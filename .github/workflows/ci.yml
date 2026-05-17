@@ -42,13 +42,11 @@ jobs:
       # test:coverage (= vitest run --coverage) の 1 パスに統合する。
       # vitest.config.ts の include/exclude により unit + integration を
       # まとめて実行し (e2e は対象外)、二重実行せずカバレッジを計測する。
-      # 閾値判定は v8 の function 計測が Node マイナー差で数 % ブレ CI を
-      # 不安定にするため CI ではゲートにしない (VITEST_DISABLE_THRESHOLDS)。
-      # 可視化が目的で新規ゲート化はスコープ外。テスト失敗自体は閾値と
-      # 無関係に vitest が非 0 終了するため test ジョブのゲートは維持される。
+      # カバレッジ閾値は vitest.config.ts で CI を含め常時ゲート。v8 の
+      # function 計測が Node マイナー差でブレる分は functions 閾値を CI 実測
+      # ベースに調整して吸収済み (Issue #113)。閾値未達・テスト失敗いずれも
+      # vitest が非 0 終了するため test ジョブのゲートとして機能する。
       - run: npm run test:coverage
-        env:
-          VITEST_DISABLE_THRESHOLDS: "true"
       # 設計意図: カバレッジを Codecov にアップロードし、PR / main で可視化する。
       # public リポジトリのため CODECOV_TOKEN が未設定でも tokenless で動作する。
       # 可視化が目的でアップロード可否を CI のゲートにしないため
