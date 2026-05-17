@@ -54,7 +54,7 @@ jobs:
       # 可視化が目的でアップロード可否を CI のゲートにしないため
       # fail_ci_if_error: false とし、Codecov 側の一時障害で test を落とさない。
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info
