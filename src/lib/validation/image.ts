@@ -26,6 +26,21 @@ export const listImagesQuerySchema = z.object({
 
 export type ListImagesQuery = z.infer<typeof listImagesQuerySchema>;
 
+// 投稿者プロフィール (UserProfile を JSON シリアライズした形)。
+// createdAt / updatedAt は Date が JSON 上 ISO 文字列になるため string で受ける。
+// LoadMoreButton が ImageGrid にアバターを渡すために GET /api/images が同梱する。
+export const userProfileResponseSchema = z.object({
+  id: z.string(),
+  githubLogin: z.string(),
+  displayName: z.string(),
+  avatarUrl: z.string(),
+  isAdmin: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type UserProfileResponse = z.infer<typeof userProfileResponseSchema>;
+
 // クライアントが GET /api/images のレスポンスを fetch().json() で受けたときに、
 // any の握り潰しを避けて runtime バリデーションするためのスキーマ
 export const listImagesResponseSchema = z.object({
@@ -39,6 +54,8 @@ export const listImagesResponseSchema = z.object({
       createdAt: z.string(),
     }),
   ),
+  // 投稿者の重複排除済みプロフィール一覧。取得失敗時はサーバー側で [] に degrade する。
+  profiles: z.array(userProfileResponseSchema),
   nextCursor: z.string().nullable(),
 });
 

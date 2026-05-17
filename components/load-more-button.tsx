@@ -4,10 +4,14 @@ import { useState } from 'react';
 import { ImageGrid } from '@/components/image-grid';
 import { listImagesResponseSchema } from '@/src/lib/validation/image';
 import type { PublicLgtmImage } from '@/src/types/image';
+import type { UserProfile } from '@/src/types/user';
 
 export function LoadMoreButton({ initialCursor }: { initialCursor: string }) {
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [extra, setExtra] = useState<PublicLgtmImage[]>([]);
+  // extra は複数ページ分を 1 つの ImageGrid でまとめて描画するため、
+  // プロフィールもページをまたいで蓄積する (uploaderId をキーに上書きマージ)。
+  const [profiles, setProfiles] = useState<Map<string, UserProfile>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,7 +33,21 @@ export function LoadMoreButton({ initialCursor }: { initialCursor: string }) {
         height: img.height,
         createdAt: new Date(img.createdAt),
       }));
+      const restoredProfiles: UserProfile[] = json.profiles.map((p) => ({
+        id: p.id,
+        githubLogin: p.githubLogin,
+        displayName: p.displayName,
+        avatarUrl: p.avatarUrl,
+        isAdmin: p.isAdmin,
+        createdAt: new Date(p.createdAt),
+        updatedAt: new Date(p.updatedAt),
+      }));
       setExtra((prev) => [...prev, ...restored]);
+      setProfiles((prev) => {
+        const next = new Map(prev);
+        for (const profile of restoredProfiles) next.set(profile.id, profile);
+        return next;
+      });
       setCursor(json.nextCursor);
     } catch {
       setError('読み込みに失敗しました。時間をおいて再度お試しください');
@@ -40,7 +58,9 @@ export function LoadMoreButton({ initialCursor }: { initialCursor: string }) {
 
   return (
     <div className="space-y-4">
-      {extra.length > 0 && <ImageGrid images={extra} testId="image-grid-extra" />}
+      {extra.length > 0 && (
+        <ImageGrid images={extra} profiles={profiles} testId="image-grid-extra" />
+      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       {cursor && (
         <div className="text-center">
