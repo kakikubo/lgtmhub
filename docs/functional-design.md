@@ -248,6 +248,43 @@ GET /api/images
 
 ---
 
+### 画像ランダム取得（Issue #109）
+
+```
+GET /api/images/random
+```
+
+全 `active` 画像からサーバーサイドでランダムに最大 `LIST_IMAGES_DEFAULT_LIMIT`（16）枚を抽出して返す。一覧画面先頭の「ランダム表示」ボタンが押下時のみ呼び出す。
+
+**クエリパラメータ**: なし（抽出件数は #108 の共通定数 `LIST_IMAGES_DEFAULT_LIMIT` に固定）
+
+**レスポンス**:
+```json
+{
+  "images": [
+    {
+      "id": "uuid",
+      "imageUrl": "https://...",
+      "uploaderId": "uuid",
+      "width": 266,
+      "height": 199,
+      "createdAt": "2026-05-02T00:00:00Z"
+    }
+  ]
+}
+```
+
+**設計メモ**:
+- ランダム表示は 16 枚で完結するため `nextCursor` を返さない（カーソルは `created_at` 基準でランダム順と不整合）。「もっと読み込む」は UI 側でも描画しない。
+- 抽出方式は「全 active id を取得 → サーバーで Fisher-Yates シャッフル → 先頭 N 件の本体を取得」。新規 migration / DB 型再生成が不要で影響範囲が最小。データ規模が 10 万件超に達した場合は RPC（`order by random()`）/ pgvector ベースへの移行を検討する（pHash 全件比較と同じ判断基準）。
+- 押下のたびに別の組み合わせを返すため、ルート単位・レスポンス双方でキャッシュさせない（`Cache-Control: no-store` / `dynamic = 'force-dynamic'`）。
+- ランダム状態はクライアントの一時状態。リロード・再訪問で通常表示（新着順 16 枚 + もっと読み込む）へ自動的に戻る。
+
+**エラーレスポンス**:
+- 500 Internal Server Error: サーバー内部エラー
+
+---
+
 ### 画像登録
 
 ```
