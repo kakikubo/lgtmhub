@@ -1,6 +1,6 @@
-import { danger, warn } from 'danger';
+import { danger, fail, warn } from 'danger';
 
-const LINE_THRESHOLD = 300;
+const LINE_THRESHOLD = 500;
 const FILE_THRESHOLD = 10;
 
 const INCLUDE_PREFIXES = ['app/', 'src/', 'components/'] as const;
@@ -10,6 +10,9 @@ const EXCLUDE_PATTERNS: ReadonlyArray<RegExp> = [
   /^src\/types\/database\.types\.ts$/,
   /^package-lock\.json$/,
   /^supabase\/migrations\//,
+  // markdown ファイルは行数・ファイル数の集計対象外（Issue #114）。
+  // .md / .mdx を大文字小文字問わず除外する。
+  /\.mdx?$/i,
 ];
 
 const isProductionFile = (filePath: string): boolean => {
@@ -42,10 +45,10 @@ const run = async (): Promise<void> => {
   }
 
   if (totalChangedLines > LINE_THRESHOLD) {
-    warn(
+    fail(
       [
-        `プロダクションコード（\`app/\` \`src/\` \`components/\`）の追加・変更行数が **${totalChangedLines} 行** で、推奨上限 ${LINE_THRESHOLD} 行を超えています。`,
-        '分割を検討してください。例外的に大きい PR の場合は PR 説明欄に理由を記載してください。',
+        `プロダクションコード（\`app/\` \`src/\` \`components/\`、markdown は除く）の追加・変更行数が **${totalChangedLines} 行** で、上限 ${LINE_THRESHOLD} 行を超えています。`,
+        'PR を関心事ごとに分割してください。',
         `詳細: ${guidelineLink}。`,
       ].join(' '),
     );
