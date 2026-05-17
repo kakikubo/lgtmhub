@@ -1,0 +1,28 @@
+# Codecov 設定
+# 目的: テストカバレッジの「可視化」。導入初手では merge をブロックしない。
+# カバレッジのゲート自体は vitest.config.ts の thresholds (services 90% / lib 80%)
+# が CI の test ジョブ内 (npm run test:coverage) で担保する。
+# ここでは PR コメントと時系列の可視化に専念する。
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto # main 比でカバレッジが下がっていないか
+        threshold: 1% # 1% 以内の低下は許容 (誤検知抑制)
+        informational: true # 表示するが必須チェックにはしない
+    patch:
+      default:
+        target: 80% # 変更行 (diff) の目標カバレッジ
+        informational: true
+
+comment:
+  layout: "header, diff, flags, components"
+  require_changes: false # カバレッジ変化が無い PR でもコメントを残す
+
+# vitest.config.ts の coverage.exclude (src/types/**, src/**/*.test.ts) と整合させ、
+# Codecov 側の集計でも型定義・テストコードを母数から外す。
+ignore:
+  - "src/types/**"
+  - "tests/**"
+  - "**/*.test.ts"
