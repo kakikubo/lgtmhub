@@ -11,7 +11,7 @@ export const createImageRequestSchema = z.object({
 
 export type CreateImageRequest = z.infer<typeof createImageRequestSchema>;
 
-export const LIST_IMAGES_DEFAULT_LIMIT = 20;
+export const LIST_IMAGES_DEFAULT_LIMIT = 16;
 export const LIST_IMAGES_MAX_LIMIT = 50;
 
 export const listImagesQuerySchema = z.object({
