@@ -7,6 +7,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '@/src/lib/errors';
+import { LIST_IMAGES_DEFAULT_LIMIT } from '@/src/lib/validation/image';
 import type { DailyUploadCountRepository } from '@/src/repositories/daily-upload-count-repository';
 import type { ImageRepository } from '@/src/repositories/image-repository';
 import { BLOB_CACHE_CONTROL_MAX_AGE_SECONDS, type BlobClient } from '@/src/services/image-service';
@@ -73,6 +74,8 @@ interface Mocks {
     list: ReturnType<typeof vi.fn>;
     findActiveById: ReturnType<typeof vi.fn>;
     softDelete: ReturnType<typeof vi.fn>;
+    listActiveIds: ReturnType<typeof vi.fn>;
+    findManyActiveByIds: ReturnType<typeof vi.fn>;
   };
   countRepo: { getCount: ReturnType<typeof vi.fn>; increment: ReturnType<typeof vi.fn> };
   blob: {
@@ -90,6 +93,8 @@ function buildMocks(): Mocks {
       list: vi.fn().mockResolvedValue([]),
       findActiveById: vi.fn(),
       softDelete: vi.fn(),
+      listActiveIds: vi.fn().mockResolvedValue([]),
+      findManyActiveByIds: vi.fn().mockResolvedValue([]),
     },
     countRepo: {
       getCount: vi.fn().mockResolvedValue(0),
@@ -355,6 +360,109 @@ describe('ImageService.listImages', () => {
 
     expect(result.images).toEqual([]);
     expect(result.nextCursor).toBeNull();
+  });
+});
+
+describe('ImageService.listRandomImages', () => {
+  it('active が 0 件なら findManyActiveByIds を呼ばず空配列を返す', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.listActiveIds.mockResolvedValue([]);
+
+    const service = await buildService(mocks);
+    const result = await service.listRandomImages();
+
+    expect(result).toEqual({ images: [] });
+    expect(mocks.imageRepo.findManyActiveByIds).not.toHaveBeenCalled();
+  });
+
+  it('limit 未指定なら LIST_IMAGES_DEFAULT_LIMIT 件に切り詰めて取得する', async () => {
+    const mocks = buildMocks();
+    const ids = Array.from({ length: 30 }, (_, i) => `id-${i}`);
+    mocks.imageRepo.listActiveIds.mockResolvedValue(ids);
+    mocks.imageRepo.findManyActiveByIds.mockResolvedValue([]);
+
+    const service = await buildService(mocks);
+    await service.listRandomImages();
+
+    const sampled = mocks.imageRepo.findManyActiveByIds.mock.calls[0]?.[0] as string[];
+    expect(sampled).toHaveLength(LIST_IMAGES_DEFAULT_LIMIT);
+    // 抽出は母集団 (全 active id) の部分集合であること
+    expect(sampled.every((id) => ids.includes(id))).toBe(true);
+    expect(new Set(sampled).size).toBe(LIST_IMAGES_DEFAULT_LIMIT);
+  });
+
+  it('総件数が limit 以下なら全件を返す', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.listActiveIds.mockResolvedValue(['a', 'b']);
+    mocks.imageRepo.findManyActiveByIds.mockImplementation(async (ids: string[]) =>
+      ids.map((id) => buildImage({ id })),
+    );
+
+    const service = await buildService(mocks);
+    const result = await service.listRandomImages();
+
+    expect(result.images).toHaveLength(2);
+    expect(result.images.map((i) => i.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('明示 limit で抽出件数を絞れる', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.listActiveIds.mockResolvedValue(['a', 'b', 'c', 'd', 'e']);
+    mocks.imageRepo.findManyActiveByIds.mockResolvedValue([]);
+
+    const service = await buildService(mocks);
+    await service.listRandomImages(2);
+
+    const sampled = mocks.imageRepo.findManyActiveByIds.mock.calls[0]?.[0] as string[];
+    expect(sampled).toHaveLength(2);
+  });
+
+  it('findManyActiveByIds の返却順に依らず、抽出 (シャッフル) 順で整列して返す', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.listActiveIds.mockResolvedValue(['a', 'b', 'c']);
+    // 要求した順 (sampled) と逆順で返しても、Service が sampled 順へ再整列する
+    mocks.imageRepo.findManyActiveByIds.mockImplementation(async (ids: string[]) =>
+      [...ids].reverse().map((id) => buildImage({ id })),
+    );
+
+    const service = await buildService(mocks);
+    const result = await service.listRandomImages();
+
+    const sampled = mocks.imageRepo.findManyActiveByIds.mock.calls[0]?.[0] as string[];
+    expect(result.images.map((i) => i.id)).toEqual(sampled);
+  });
+
+  it('PublicLgtmImage に絞り込んで返す (pHash 等の内部フィールドを含まない)', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.listActiveIds.mockResolvedValue(['a']);
+    mocks.imageRepo.findManyActiveByIds.mockResolvedValue([
+      buildImage({ id: 'a', width: 320, height: 240 }),
+    ]);
+
+    const service = await buildService(mocks);
+    const result = await service.listRandomImages();
+
+    expect(result.images[0]).toEqual({
+      id: 'a',
+      imageUrl: 'https://blob.example/lgtm/x.webp',
+      uploaderId: 'user-1',
+      width: 320,
+      height: 240,
+      createdAt: new Date('2026-05-04T12:00:00.000Z'),
+    });
+    expect(result).not.toHaveProperty('nextCursor');
+  });
+
+  it('抽出と取得の間に行が消えて一部 id が欠落しても、取得できた分だけ返す', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.listActiveIds.mockResolvedValue(['a', 'b']);
+    // b は findManyActiveByIds の時点で active でなくなり返ってこない
+    mocks.imageRepo.findManyActiveByIds.mockResolvedValue([buildImage({ id: 'a' })]);
+
+    const service = await buildService(mocks);
+    const result = await service.listRandomImages();
+
+    expect(result.images.map((i) => i.id)).toEqual(['a']);
   });
 });
 

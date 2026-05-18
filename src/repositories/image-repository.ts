@@ -128,6 +128,39 @@ export class ImageRepository {
   }
 
   /**
+   * ランダム抽出の母集合用に、閲覧可能な (status='active') 画像の id を全件取得する。
+   * 本体カラムを引かないため `listActivePHashes()` (id + p_hash 全件) より遥かに軽量。
+   * 件数が 10 万件超に達したら RPC / pgvector 化を検討する (architecture.md と同基準)。
+   */
+  async listActiveIds(): Promise<string[]> {
+    const { data, error } = await this.supabase
+      .from('lgtm_images')
+      .select('id')
+      .eq('status', 'active');
+
+    if (error) throw new DatabaseError(error.message);
+    return (data ?? []).map((row) => row.id);
+  }
+
+  /**
+   * 指定 id 群のうち閲覧可能な (status='active') 画像を取得する。
+   * `.in` の返却順は不定なため、表示順は呼び出し元 (Service) で整列する。
+   * ids が空のときは Supabase を呼ばず空配列を返す (空配列ガード)。
+   */
+  async findManyActiveByIds(ids: string[]): Promise<LgtmImage[]> {
+    if (ids.length === 0) return [];
+
+    const { data, error } = await this.supabase
+      .from('lgtm_images')
+      .select('*')
+      .eq('status', 'active')
+      .in('id', ids);
+
+    if (error) throw new DatabaseError(error.message);
+    return (data ?? []).map(toLgtmImage);
+  }
+
+  /**
    * 一覧表示用に閲覧可能な (status='active') 画像を新着順で取得する。
    * cursor は前ページ末尾の created_at (ISO 8601) を渡し、`<` で次ページを取得する。
    */
