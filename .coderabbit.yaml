@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+# 設計意図: CodeRabbit の初期設定 (Issue #122)。最小構成で導入し、実際の
+# 挙動を確認してから必要に応じて拡張する方針。パスフィルタ・ツール連携・
+# poem 抑制などの調整は今回スコープ外とし、CodeRabbit のデフォルトに委ねる。
+
+# レビューコメント・要約・ウォークスルーをすべて日本語で生成する。
+language: "ja-JP"
+
+reviews:
+  # 個人開発・お試し導入のため、ノイズの少ない chill プロファイルで開始する。
+  # 指摘が物足りなければ後続 Issue で assertive へ引き上げる。
+  profile: "chill"

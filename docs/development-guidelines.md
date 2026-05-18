@@ -579,7 +579,7 @@ LGTM文字合成ロジックを実装
 
 **PRの大きさの目安**:
 - 変更ファイル数: 10ファイル以内を推奨
-- 変更行数: 300行以内を推奨
+- 変更行数: 500行以内（500行を超えると Danger が CI を失敗させる）
 
 **計測対象**:
 - プロダクションコード（`app/`、`src/`、`components/`）の追加・変更行数で判定する
@@ -588,24 +588,27 @@ LGTM文字合成ロジックを実装
   - 自動生成ファイル（`src/types/database.types.ts` など）
   - lockfile（`package-lock.json`）
   - マイグレーションSQL（`supabase/migrations/`）
+  - markdown ファイル（`*.md` / `*.mdx`）
 
 確認方法:
 
 ```bash
-# プロダクションコード変更行数の確認例
+# プロダクションコード変更行数の確認例（あくまで目安。正確な集計は dangerfile.ts に従う）
+# tests/ ・ package-lock.json ・ supabase/migrations/ は対象パス指定で既に除外される
 git diff --stat main...HEAD -- 'app/' 'src/' 'components/' \
-  ':(exclude)src/types/database.types.ts'
+  ':(exclude)src/types/database.types.ts' \
+  ':(exclude)*.md' ':(exclude)*.mdx'
 ```
 
-300行を超える場合は分割を検討する。例外を認める場合はPR説明欄に理由を記載する。
+500行を超える場合は関心事ごとに分割する。
 
 **自動チェック（Danger）**:
 
-PR の作成・更新時に GitHub Actions（`.github/workflows/danger.yml`）が `dangerfile.ts` を実行し、上記閾値を超過した場合に PR コメントで warning を出す。
+PR の作成・更新時に GitHub Actions（`.github/workflows/danger.yml`）が `dangerfile.ts` を実行し、行数閾値を超過した場合に Danger ジョブを**失敗（CI エラー）**させる。
 
-- 行数閾値（300行）または ファイル数閾値（10ファイル）を超えた場合のみコメントが付く
-- ブロックではなく warning なので、例外運用（PR 説明欄に理由を記載してマージ）はそのまま継続できる
-- 計測対象・除外ルールは `dangerfile.ts` の `INCLUDE_PREFIXES` / `EXCLUDE_PATTERNS` に集約し、本ドキュメントと同期する
+- 行数閾値（500行）を超えた場合は `fail()` となり、`npx danger ci --failOnErrors` により Danger ジョブが赤くなる（ブロッキング）
+- ファイル数閾値（10ファイル）超過は `warn()`（コメント警告のみ、ブロックしない）
+- 計測対象・除外ルール（markdown 除外を含む）は `dangerfile.ts` の `INCLUDE_PREFIXES` / `EXCLUDE_PATTERNS` に集約し、本ドキュメントと同期する
 
 ---
 
@@ -670,16 +673,16 @@ describe('ImageService.createImage', () => {
 
 **カバレッジ目標**:
 ```typescript
-// vitest.config.ts
+// vitest.config.ts — 閾値は CI を含め常時ゲート
 coverage: {
   thresholds: {
-    'src/services/**': { branches: 90, functions: 90, lines: 90 },
-    'src/lib/**': { branches: 80, functions: 80, lines: 80 },
+    'src/services/**': { branches: 90, functions: 85, lines: 90, statements: 90 },
+    'src/lib/**': { branches: 80, functions: 75, lines: 80, statements: 80 },
   }
 }
 ```
 
-この `thresholds` は**ローカル / devcontainer で `npm run test:coverage` を実行したときの開発者向け自己チェック用ゲート**。v8 の function 計測は Node のマイナーバージョン差で数 % ブレるため、CI では `VITEST_DISABLE_THRESHOLDS=true` で閾値判定をゲートにせず、カバレッジは Codecov での**可視化**（PR コメント・時系列・バッジ）に用いる（新規ゲート化はスコープ外）。詳細は「CI/CDパイプライン > Codecov」を参照。
+この `thresholds` は **CI を含め常に有効なゲート**（ローカル / devcontainer / CI のいずれでも `npm run test:coverage` で適用）。v8 の `functions` 計測は Node のマイナーバージョン差で約 12〜13pt 下振れする（ローカル `src/services/**` 100% / `src/lib/**` 90.9% に対し CI(ubuntu/Node 24.x) では 88.23% / 77.5%）ため、`functions` のみ CI 実測フロアの下にバッファを取った値（services 85 / lib 75）へ引き下げて env 差を吸収している。`branches`/`lines`/`statements` は v8-to-istanbul でソースレンジにマップされ安定し CI 実測でも 90/80 を通過するため据え置く。閾値未達は `vitest` が非 0 終了するため `test` ジョブのゲートとなる。Codecov は別途**可視化**（PR コメント・時系列・バッジ）に用いる。採用アプローチと却下理由は Issue #113 / `.steering/20260517-coverage-threshold-ci-gate/` を参照。詳細は「CI/CDパイプライン > Codecov」も参照。
 
 ### 統合テスト (Vitest + Supabase Local)
 
@@ -806,12 +809,10 @@ jobs:
       # test:unit / test:integration の 2 回実行をやめ、test:coverage
       # (= vitest run --coverage) の 1 パスに統合。include/exclude により
       # unit + integration をまとめて実行し (e2e は対象外)、カバレッジを計測する。
-      # 閾値判定は v8 の function 計測が Node マイナー差でブレるため CI では
-      # ゲートにしない (VITEST_DISABLE_THRESHOLDS)。テスト失敗自体は閾値と
-      # 無関係に vitest が非 0 終了するため test ジョブのゲートは維持される。
+      # カバレッジ閾値は vitest.config.ts で CI を含め常時ゲート。v8 の function
+      # 計測の Node マイナー差は functions 閾値を CI 実測ベースに調整して吸収済み。
+      # 閾値未達・テスト失敗いずれも vitest が非 0 終了し test ジョブのゲートとなる。
       - run: npm run test:coverage
-        env:
-          VITEST_DISABLE_THRESHOLDS: "true"
       # カバレッジを Codecov にアップロードして PR / main で可視化する。
       # public リポジトリのため CODECOV_TOKEN 未設定でも tokenless で動作し、
       # アップロード可否を CI のゲートにしない (fail_ci_if_error: false)。
@@ -866,15 +867,15 @@ jobs:
       - run: npm audit --audit-level=high
 ```
 
-#### Danger（PR サイズ警告）
+#### Danger（PR サイズチェック）
 
-`.github/workflows/danger.yml` で `pull_request` イベントごとに `npx danger ci` を実行する。判定ロジックは `dangerfile.ts` に集約しており、「PRの大きさの目安」セクションの閾値超過時に PR コメントで warning を出す。既存 `ci.yml` とは独立した workflow とし、API 書き込みの副作用が他ジョブに波及しないようにしている。
+`.github/workflows/danger.yml` で `pull_request` イベントごとに `npx danger ci --failOnErrors` を実行する。判定ロジックは `dangerfile.ts` に集約しており、「PRの大きさの目安」セクションの行数閾値（500行）を超過した場合は `fail()` となり、`--failOnErrors` により Danger ジョブが失敗（CI エラー）する。ファイル数閾値（10ファイル）超過は `warn()`（コメント警告のみ）。markdown ファイル（`*.md` / `*.mdx`）は集計対象外。既存 `ci.yml` とは独立した workflow とし、API 書き込みの副作用が他ジョブに波及しないようにしている。
 
 #### Codecov（カバレッジ可視化）
 
 `ci.yml` の `test` ジョブで `npm run test:coverage` を実行し、生成された `coverage/lcov.info` を `codecov/codecov-action@v5` で Codecov にアップロードする。`test` ジョブは `push: [main]` と `pull_request` 両方で走るため、**PR と main マージ後の双方**でカバレッジが Codecov に記録され、PR には差分コメントが付く。README のカバレッジバッジも Codecov を参照する。
 
-- **目的は可視化（CI ではゲートにしない）**: CI の `test:coverage` step は `VITEST_DISABLE_THRESHOLDS=true` を渡し、閾値判定で CI を落とさない。v8 の function 計測は Node のマイナーバージョン差で数 % ブレるため、これを CI のハードゲートにすると不安定になる。`vitest.config.ts` の `thresholds`（`src/services/**` 90% / `src/lib/**` 80%）は**ローカル / devcontainer で `npm run test:coverage` を実行したときの開発者向け自己チェック**として残る。Codecov 側の project / patch ステータスも `codecov.yml` で `informational: true`。新規ゲート化はスコープ外で、必要なら運用安定後に別途検討（例: env 非依存の `lines`/`statements` のみで CI ゲート化）。なお**テスト失敗自体は閾値と無関係に `vitest` が非 0 終了するため、`test` ジョブのゲート（テストが通ること）は維持される**。
+- **可視化が責務（ゲートは vitest 側）**: カバレッジ閾値は `vitest.config.ts` の `thresholds` で **CI を含め常時ゲート**（`src/services/**` は branches/lines/statements 90% ・ functions 85%、`src/lib/**` は branches/lines/statements 80% ・ functions 75%）。v8 の `functions` 計測は Node のマイナーバージョン差で約 12〜13pt 下振れするため、`functions` のみ CI 実測フロア（services 88.23% / lib 77.5%）の下にバッファを取った値へ引き下げて env 差を吸収している（採用アプローチと却下案は Issue #113 を参照。Node patch 固定／functions 除外／istanbul 化は却下し、CI 実測ベースの閾値調整を採用）。Codecov は閾値ゲートを持たず可視化に専念し、`codecov.yml` の project / patch ステータスも `informational: true`（二重ゲートにしない）。なお**閾値未達・テスト失敗いずれも `vitest` が非 0 終了するため、`test` ジョブのゲートとして機能する**。
 - **token は任意**: public リポジトリのため `CODECOV_TOKEN` 未設定でも tokenless でアップロードできる。レート制限回避のため設定する場合は GitHub Secrets に `CODECOV_TOKEN` を登録する。アップロード失敗で `test` ジョブを落とさないよう `fail_ci_if_error: false`。
 - **集計対象**: `codecov.yml` の `ignore` を `vitest.config.ts` の `coverage.exclude`（`src/types/**` / `*.test.ts`）と整合させている。
 - **バージョン管理**: `codecov/codecov-action` は `renovate.json` の `github-actions` グループで自動更新対象（固定運用ではない）。
