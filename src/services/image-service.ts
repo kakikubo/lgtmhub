@@ -34,6 +34,27 @@ export interface ListImagesResult {
   nextCursor: string | null;
 }
 
+// ランダム表示は 16 枚で完結し「もっと読み込む」を持たないため、
+// nextCursor を構造的に持たせない (型レベルでページネーション不可を表現)。
+export interface RandomImagesResult {
+  images: PublicLgtmImage[];
+}
+
+/**
+ * Fisher-Yates シャッフル (非破壊)。表示の多様化が目的なので
+ * 暗号強度は不要で `Math.random` で十分。
+ */
+function shuffle<T>(items: readonly T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    // tuple 代入の推論が各要素を `T | undefined` に広げるための narrowing。
+    // 同一配列内 (i, j は有効インデックス) のスワップなので実行時の型は保証済み。
+    [result[i], result[j]] = [result[j] as T, result[i] as T];
+  }
+  return result;
+}
+
 function toPublic(image: LgtmImage): PublicLgtmImage {
   return {
     id: image.id,
@@ -209,6 +230,36 @@ export class ImageService {
     const last = records[records.length - 1];
     const nextCursor = records.length === limit && last ? last.createdAt.toISOString() : null;
     return { images, nextCursor };
+  }
+
+  /**
+   * 全 active 画像からサーバーサイドでランダムに最大 `limit` 枚を抽出する。
+   *
+   * 表示中 16 枚のクライアントシャッフルではなく「母集団全体からの抽出」を満たすため、
+   * 全 active id を取得 → サーバーで Fisher-Yates → 先頭 `limit` 件の本体を取得する。
+   * `limit` 既定は #108 の共通定数 `LIST_IMAGES_DEFAULT_LIMIT` を参照する。
+   *
+   * - 総件数が `limit` 以下なら全件をランダム順で返す。
+   * - `findManyActiveByIds` の返却順は不定なため、シャッフル順で再整列して
+   *   表示順そのものをランダム化する。
+   * - ページネーション (nextCursor) は持たない (ランダム順と created_at カーソル不整合)。
+   */
+  async listRandomImages(limit: number = LIST_IMAGES_DEFAULT_LIMIT): Promise<RandomImagesResult> {
+    const ids = await this.imageRepo.listActiveIds();
+    if (ids.length === 0) return { images: [] };
+
+    const sampled = shuffle(ids).slice(0, limit);
+    const records = await this.imageRepo.findManyActiveByIds(sampled);
+
+    // sampled (シャッフル順) を表示順とし、取得行をその順に整列する。
+    // findManyActiveByIds が一部 id を返さなかった場合 (取得と抽出の間に
+    // 論理削除された等) は欠落分を素直に除外する。
+    const byId = new Map(records.map((record) => [record.id, record]));
+    const ordered = sampled
+      .map((id) => byId.get(id))
+      .filter((record): record is LgtmImage => record !== undefined);
+
+    return { images: ordered.map(toPublic) };
   }
 }
 

@@ -7,6 +7,7 @@ import {
   LIST_IMAGES_MAX_LIMIT,
   listImagesQuerySchema,
   listImagesResponseSchema,
+  randomImagesResponseSchema,
 } from '@/src/lib/validation/image';
 
 describe('createImageRequestSchema', () => {
@@ -193,6 +194,49 @@ describe('listImagesResponseSchema', () => {
       images: [{ id: 'x', imageUrl: 'https://blob.example/x.webp' }],
       profiles: [],
       nextCursor: null,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('randomImagesResponseSchema', () => {
+  it('images のみのレスポンスを受理する (nextCursor を持たない)', () => {
+    const result = randomImagesResponseSchema.safeParse({
+      images: [
+        {
+          id: 'image-1',
+          imageUrl: 'https://blob.example/lgtm/x.webp',
+          uploaderId: 'user-1',
+          width: 800,
+          height: 600,
+          createdAt: '2026-05-04T12:00:00.000Z',
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('空配列を受理する', () => {
+    const result = randomImagesResponseSchema.safeParse({ images: [] });
+    expect(result.success).toBe(true);
+  });
+
+  it('nextCursor が混入していても images が正しければ受理する (未知キーは無視)', () => {
+    const result = randomImagesResponseSchema.safeParse({ images: [], nextCursor: 'x' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({ images: [] });
+    }
+  });
+
+  it('images が欠けていれば拒否する', () => {
+    const result = randomImagesResponseSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  it('image の必須フィールドが欠けていれば拒否する', () => {
+    const result = randomImagesResponseSchema.safeParse({
+      images: [{ id: 'x', imageUrl: 'https://blob.example/x.webp' }],
     });
     expect(result.success).toBe(false);
   });

@@ -243,6 +243,7 @@ async function safeImageFetch(url: string): Promise<Response> {
 - **静的アセット**: Next.js / Vercel Edge Network が自動でCDNキャッシュ
 - **画像本体（Vercel Blob）**: Cache-Control: `public, max-age=31536000, immutable`（URL変更時は再生成）
 - **画像一覧API**: `Cache-Control: s-maxage=60, stale-while-revalidate=300`（60秒キャッシュ＋5分リバリデート）
+- **画像ランダム取得API（`GET /api/images/random`）**: `Cache-Control: no-store` ＋ `dynamic = 'force-dynamic'`。押下のたびに別の 16 枚を返す要件のため、ルート単位・レスポンス双方でキャッシュしない（Issue #109）
 
 #### 論理削除とキャッシュの関係
 

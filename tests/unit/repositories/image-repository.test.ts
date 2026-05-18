@@ -296,6 +296,120 @@ function createListStub(result: ListResult): ListStub {
   return { client, spies: { from, select, eq, order, limit, lt } };
 }
 
+interface ActiveIdsResult {
+  data: { id: string }[] | null;
+  error: { message: string } | null;
+}
+
+interface ActiveIdsStub {
+  client: SupabaseClient<Database>;
+  spies: {
+    from: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+  };
+}
+
+function createActiveIdsStub(result: ActiveIdsResult): ActiveIdsStub {
+  const eq = vi.fn().mockResolvedValue(result);
+  const select = vi.fn().mockReturnValue({ eq });
+  const from = vi.fn().mockReturnValue({ select });
+  const client = { from } as unknown as SupabaseClient<Database>;
+  return { client, spies: { from, select, eq } };
+}
+
+describe('ImageRepository.listActiveIds', () => {
+  it('status=active の id 配列を返す', async () => {
+    const stub = createActiveIdsStub({
+      data: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      error: null,
+    });
+    const repo = new ImageRepository(stub.client);
+
+    const ids = await repo.listActiveIds();
+
+    expect(stub.spies.from).toHaveBeenCalledWith('lgtm_images');
+    expect(stub.spies.select).toHaveBeenCalledWith('id');
+    expect(stub.spies.eq).toHaveBeenCalledWith('status', 'active');
+    expect(ids).toEqual(['a', 'b', 'c']);
+  });
+
+  it('行が空のときは空配列を返す', async () => {
+    const stub = createActiveIdsStub({ data: [], error: null });
+    const repo = new ImageRepository(stub.client);
+    expect(await repo.listActiveIds()).toEqual([]);
+  });
+
+  it('error 時は DatabaseError を throw する', async () => {
+    const stub = createActiveIdsStub({ data: null, error: { message: 'oops' } });
+    const repo = new ImageRepository(stub.client);
+    await expect(repo.listActiveIds()).rejects.toBeInstanceOf(DatabaseError);
+  });
+});
+
+interface FindManyResult {
+  data: Row[] | null;
+  error: { message: string } | null;
+}
+
+interface FindManyStub {
+  client: SupabaseClient<Database>;
+  spies: {
+    from: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+    inFn: ReturnType<typeof vi.fn>;
+  };
+}
+
+function createFindManyStub(result: FindManyResult): FindManyStub {
+  const inFn = vi.fn().mockResolvedValue(result);
+  const eq = vi.fn().mockReturnValue({ in: inFn });
+  const select = vi.fn().mockReturnValue({ eq });
+  const from = vi.fn().mockReturnValue({ select });
+  const client = { from } as unknown as SupabaseClient<Database>;
+  return { client, spies: { from, select, eq, inFn } };
+}
+
+describe('ImageRepository.findManyActiveByIds', () => {
+  it('ids が空のときは Supabase を呼ばず空配列を返す (空配列ガード)', async () => {
+    const stub = createFindManyStub({ data: [], error: null });
+    const repo = new ImageRepository(stub.client);
+
+    expect(await repo.findManyActiveByIds([])).toEqual([]);
+    expect(stub.spies.from).not.toHaveBeenCalled();
+  });
+
+  it('status=active を id in (...) で取得し camelCase で返す', async () => {
+    const stub = createFindManyStub({
+      data: [buildRow({ id: 'image-1' }), buildRow({ id: 'image-2' })],
+      error: null,
+    });
+    const repo = new ImageRepository(stub.client);
+
+    const results = await repo.findManyActiveByIds(['image-1', 'image-2']);
+
+    expect(stub.spies.from).toHaveBeenCalledWith('lgtm_images');
+    expect(stub.spies.select).toHaveBeenCalledWith('*');
+    expect(stub.spies.eq).toHaveBeenCalledWith('status', 'active');
+    expect(stub.spies.inFn).toHaveBeenCalledWith('id', ['image-1', 'image-2']);
+    expect(results.map((r) => r.id)).toEqual(['image-1', 'image-2']);
+    expect(results[0]?.createdAt).toEqual(new Date('2026-05-04T00:00:00.000Z'));
+  });
+
+  it('行が空のときは空配列を返す', async () => {
+    const stub = createFindManyStub({ data: [], error: null });
+    const repo = new ImageRepository(stub.client);
+    expect(await repo.findManyActiveByIds(['x'])).toEqual([]);
+  });
+
+  it('error 時は DatabaseError を throw する', async () => {
+    const stub = createFindManyStub({ data: null, error: { message: 'oops' } });
+    const repo = new ImageRepository(stub.client);
+    await expect(repo.findManyActiveByIds(['x'])).rejects.toBeInstanceOf(DatabaseError);
+  });
+});
+
 describe('ImageRepository.list', () => {
   it('cursor 無し: status=active を created_at desc で limit 件取得する', async () => {
     const stub = createListStub({ data: [buildRow({ id: 'image-1' })], error: null });

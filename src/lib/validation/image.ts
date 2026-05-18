@@ -41,25 +41,34 @@ export const userProfileResponseSchema = z.object({
 
 export type UserProfileResponse = z.infer<typeof userProfileResponseSchema>;
 
+// 一覧系 API レスポンスの image 1 件分。通常一覧 / ランダム表示で共有する。
+export const imageListItemSchema = z.object({
+  id: z.string(),
+  imageUrl: z.string(),
+  uploaderId: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  createdAt: z.string(),
+});
+
 // クライアントが GET /api/images のレスポンスを fetch().json() で受けたときに、
 // any の握り潰しを避けて runtime バリデーションするためのスキーマ
 export const listImagesResponseSchema = z.object({
-  images: z.array(
-    z.object({
-      id: z.string(),
-      imageUrl: z.string(),
-      uploaderId: z.string(),
-      width: z.number().int().positive(),
-      height: z.number().int().positive(),
-      createdAt: z.string(),
-    }),
-  ),
+  images: z.array(imageListItemSchema),
   // 投稿者の重複排除済みプロフィール一覧。取得失敗時はサーバー側で [] に degrade する。
   profiles: z.array(userProfileResponseSchema),
   nextCursor: z.string().nullable(),
 });
 
 export type ListImagesResponse = z.infer<typeof listImagesResponseSchema>;
+
+// GET /api/images/random のレスポンス。ランダム表示は 16 枚で完結し
+// ページネーションを持たないため nextCursor を含まない。
+export const randomImagesResponseSchema = z.object({
+  images: z.array(imageListItemSchema),
+});
+
+export type RandomImagesResponse = z.infer<typeof randomImagesResponseSchema>;
 
 // POST /api/images の 201 レスポンス
 export const createImageResponseSchema = z.object({
