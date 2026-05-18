@@ -123,9 +123,37 @@ describe('listImagesResponseSchema', () => {
           createdAt: '2026-05-04T12:00:00.000Z',
         },
       ],
+      profiles: [
+        {
+          id: 'user-1',
+          githubLogin: 'octocat',
+          displayName: 'The Octocat',
+          avatarUrl: 'https://avatars.example/octocat.png',
+          isAdmin: false,
+          createdAt: '2026-05-03T00:00:00.000Z',
+          updatedAt: '2026-05-03T00:00:00.000Z',
+        },
+      ],
       nextCursor: '2026-05-04T11:00:00.000Z',
     });
     expect(result.success).toBe(true);
+  });
+
+  it('profiles が欠けていれば拒否する', () => {
+    const result = listImagesResponseSchema.safeParse({
+      images: [],
+      nextCursor: null,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('profile の必須フィールドが欠けていれば拒否する', () => {
+    const result = listImagesResponseSchema.safeParse({
+      images: [],
+      profiles: [{ id: 'user-1', githubLogin: 'octocat' }],
+      nextCursor: null,
+    });
+    expect(result.success).toBe(false);
   });
 
   it('width / height が欠けていれば拒否する', () => {
@@ -144,18 +172,27 @@ describe('listImagesResponseSchema', () => {
   });
 
   it('nextCursor は null でも良い', () => {
-    const result = listImagesResponseSchema.safeParse({ images: [], nextCursor: null });
+    const result = listImagesResponseSchema.safeParse({
+      images: [],
+      profiles: [],
+      nextCursor: null,
+    });
     expect(result.success).toBe(true);
   });
 
   it('images が配列でなければ拒否する', () => {
-    const result = listImagesResponseSchema.safeParse({ images: 'oops', nextCursor: null });
+    const result = listImagesResponseSchema.safeParse({
+      images: 'oops',
+      profiles: [],
+      nextCursor: null,
+    });
     expect(result.success).toBe(false);
   });
 
   it('image の必須フィールドが欠けていれば拒否する', () => {
     const result = listImagesResponseSchema.safeParse({
       images: [{ id: 'x', imageUrl: 'https://blob.example/x.webp' }],
+      profiles: [],
       nextCursor: null,
     });
     expect(result.success).toBe(false);
