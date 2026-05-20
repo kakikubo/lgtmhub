@@ -67,6 +67,9 @@ export function HomeImages({
 
   const [mode, setMode] = useState<'default' | 'random'>('default');
   const [randomImages, setRandomImages] = useState<PublicLgtmImage[]>([]);
+  // ランダム結果は「再押下するとシャッフルし直す」要件 (Issue #109) のため、
+  // LoadMoreButton と違いマージではなく毎回置き換える。
+  const [randomProfiles, setRandomProfiles] = useState<Map<string, UserProfile>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,7 +90,17 @@ export function HomeImages({
         height: img.height,
         createdAt: new Date(img.createdAt),
       }));
+      const restoredProfiles: UserProfile[] = json.profiles.map((p) => ({
+        id: p.id,
+        githubLogin: p.githubLogin,
+        displayName: p.displayName,
+        avatarUrl: p.avatarUrl,
+        isAdmin: p.isAdmin,
+        createdAt: new Date(p.createdAt),
+        updatedAt: new Date(p.updatedAt),
+      }));
       setRandomImages(images);
+      setRandomProfiles(new Map(restoredProfiles.map((profile) => [profile.id, profile])));
       setMode('random');
     } catch {
       setError('読み込みに失敗しました。時間をおいて再度お試しください');
@@ -102,9 +115,9 @@ export function HomeImages({
       randomImages.length === 0 ? (
         <EmptyState isLoggedIn={isLoggedIn} />
       ) : (
-        // ランダム結果は LoadMoreButton 同様 profiles 無しで描画 (最小構成)。
+        // ランダムモードでも初期表示と同じ投稿者アバターを描画する (Issue #126)。
         // 「もっと読み込む」は描画しない (ランダム順は cursor と不整合のため)。
-        <ImageGrid images={randomImages} />
+        <ImageGrid images={randomImages} profiles={randomProfiles} />
       );
   } else if (loadError) {
     body = <LoadErrorState />;
