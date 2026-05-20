@@ -64,8 +64,12 @@ export type ListImagesResponse = z.infer<typeof listImagesResponseSchema>;
 
 // GET /api/images/random のレスポンス。ランダム表示は 16 枚で完結し
 // ページネーションを持たないため nextCursor を含まない。
+// クライアント (HomeImages) が ImageGrid にアバターを渡すため、
+// listImagesResponseSchema と同じく profiles を同梱する (Issue #126)。
 export const randomImagesResponseSchema = z.object({
   images: z.array(imageListItemSchema),
+  // 投稿者の重複排除済みプロフィール一覧。取得失敗時はサーバー側で [] に degrade する。
+  profiles: z.array(userProfileResponseSchema),
 });
 
 export type RandomImagesResponse = z.infer<typeof randomImagesResponseSchema>;
