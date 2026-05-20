@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/src/lib/supabase/server';
 import { buildImageService } from '@/src/services/image-service';
-import { buildUserProfileService } from '@/src/services/user-profile-service';
 
 // 押下のたびに別の 16 枚を返す要件のため、ルート単位でもキャッシュさせない。
 export const dynamic = 'force-dynamic';
@@ -14,21 +13,10 @@ export async function GET() {
     const service = buildImageService(supabase);
     const result = await service.listRandomImages();
 
-    // クライアント (HomeImages) でも初期表示と同じ投稿者アバターを描画するため、
-    // GET /api/images と同じ流れでプロフィールを同梱する (Issue #126)。
-    // N+1 を避けるため findManyByIds を 1 回だけ呼ぶ。取得失敗はページ全体を 500 に
-    // せず空配列へ degrade し、各カードは Unknown 表示にフォールバックする。
-    const profiles = await buildUserProfileService(supabase)
-      .findManyByIds(result.images.map((image) => image.uploaderId))
-      .catch((err: unknown) => {
-        console.error('[GET /api/images/random] failed to fetch uploader profiles', err);
-        return [];
-      });
-
-    return NextResponse.json(
-      { ...result, profiles },
-      { status: 200, headers: { 'Cache-Control': 'no-store' } },
-    );
+    return NextResponse.json(result, {
+      status: 200,
+      headers: { 'Cache-Control': 'no-store' },
+    });
   } catch (err) {
     console.error('[GET /api/images/random]', err);
     return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });

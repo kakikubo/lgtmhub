@@ -3,9 +3,12 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { CopyMarkdownButton } from '@/components/copy-markdown-button';
 import { ImageDetailActions } from '@/components/image-detail-actions';
+import { UploaderProfileRow } from '@/components/uploader-profile-row';
 import { createClient } from '@/src/lib/supabase/server';
 import { buildImageService } from '@/src/services/image-service';
+import { buildUserProfileService } from '@/src/services/user-profile-service';
 import type { PublicLgtmImage } from '@/src/types/image';
+import type { UserProfile } from '@/src/types/user';
 
 interface ImageDetailPageProps {
   params: Promise<{ id: string }>;
@@ -13,10 +16,11 @@ interface ImageDetailPageProps {
 
 interface DetailViewProps {
   image: PublicLgtmImage;
+  uploader: UserProfile | null;
   isOwner: boolean;
 }
 
-function DetailView({ image, isOwner }: DetailViewProps) {
+function DetailView({ image, uploader, isOwner }: DetailViewProps) {
   return (
     <section data-testid="image-detail-page" className="mx-auto max-w-3xl px-4 py-8 space-y-6">
       <Link
@@ -41,6 +45,8 @@ function DetailView({ image, isOwner }: DetailViewProps) {
           className="h-auto w-full"
         />
       </div>
+
+      <UploaderProfileRow profile={uploader} />
 
       <CopyMarkdownButton imageUrl={image.imageUrl} />
 
@@ -71,9 +77,19 @@ export default async function ImageDetailPage({ params }: ImageDetailPageProps) 
     notFound();
   }
 
+  // 投稿者プロフィールは画像取得後にしか uploaderId が分からないため逐次取得する。
+  // 詳細ページは 1 件のみなので findById で十分 (N+1 を避けるための findManyByIds は不要)。
+  // 取得失敗時は null へ degrade し、UploaderProfileRow 側で Unknown + デフォルトアバター表示にフォールバックする
+  const uploader = await buildUserProfileService(supabase)
+    .findById(imageResult.uploaderId)
+    .catch((err: unknown) => {
+      console.error('[ImageDetailPage] failed to load uploader profile', err);
+      return null;
+    });
+
   // 所有者判定だけクライアントに渡す。認証情報そのものは流さない
   const user = userResult.data.user;
   const isOwner = !!user && user.id === imageResult.uploaderId;
 
-  return <DetailView image={imageResult} isOwner={isOwner} />;
+  return <DetailView image={imageResult} uploader={uploader} isOwner={isOwner} />;
 }

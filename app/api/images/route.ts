@@ -11,7 +11,6 @@ import {
 import { createClient } from '@/src/lib/supabase/server';
 import { createImageRequestSchema, listImagesQuerySchema } from '@/src/lib/validation/image';
 import { buildImageService } from '@/src/services/image-service';
-import { buildUserProfileService } from '@/src/services/user-profile-service';
 
 export async function GET(request: NextRequest) {
   // 空文字クエリ (`?cursor=` など) は zod の .optional() で弾けないため、事前に undefined 化する
@@ -35,18 +34,7 @@ export async function GET(request: NextRequest) {
     const service = buildImageService(supabase);
     const result = await service.listImages(parsed.data);
 
-    // LoadMoreButton (クライアント) でも初期表示と同じ投稿者アバターを描画するため、
-    // HomeContent.fetchUploaderProfileMap と同じ流れでプロフィールを同梱する。
-    // N+1 を避けるため findManyByIds を 1 回だけ呼ぶ。取得失敗はページ全体を 500 に
-    // せず空配列へ degrade し、各カードは Unknown 表示にフォールバックする。
-    const profiles = await buildUserProfileService(supabase)
-      .findManyByIds(result.images.map((image) => image.uploaderId))
-      .catch((err: unknown) => {
-        console.error('[GET /api/images] failed to fetch uploader profiles', err);
-        return [];
-      });
-
-    return NextResponse.json({ ...result, profiles }, { status: 200 });
+    return NextResponse.json(result, { status: 200 });
   } catch (err) {
     console.error('[GET /api/images]', err);
     return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });

@@ -1,11 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ImageGrid } from '@/components/image-grid';
 import { LoadMoreButton } from '@/components/load-more-button';
 import { randomImagesResponseSchema } from '@/src/lib/validation/image';
 import type { PublicLgtmImage } from '@/src/types/image';
-import type { UserProfile } from '@/src/types/user';
 
 function EmptyState({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
@@ -37,8 +36,6 @@ function LoadErrorState() {
 
 interface HomeImagesProps {
   initialImages: PublicLgtmImage[];
-  // Map は RSC 境界を越えにくいため配列で受け取りクライアントで Map を再構築する
-  initialProfiles: UserProfile[];
   initialNextCursor: string | null;
   loadError: boolean;
   isLoggedIn: boolean;
@@ -48,28 +45,19 @@ interface HomeImagesProps {
  * 一覧の表示モード (通常 / ランダム) を管理するクライアントコンポーネント。
  *
  * - 先頭に常時表示の「ランダム表示」ボタンを置く (Issue #109)。
- * - 通常モード: SSR で渡された新着順 16 枚 + profiles + もっと読み込む (#108 の挙動)。
+ * - 通常モード: SSR で渡された新着順 16 枚 + もっと読み込む (#108 の挙動)。
  * - ランダムモード: サーバーで全 active からランダム抽出した 16 枚。
  *   「もっと読み込む」は出さない。再押下で再抽出する。
  * - 状態はクライアントメモリのみ。リロードで SSR の通常表示へ自動的に戻る。
  */
 export function HomeImages({
   initialImages,
-  initialProfiles,
   initialNextCursor,
   loadError,
   isLoggedIn,
 }: HomeImagesProps) {
-  const profileMap = useMemo(
-    () => new Map(initialProfiles.map((profile) => [profile.id, profile])),
-    [initialProfiles],
-  );
-
   const [mode, setMode] = useState<'default' | 'random'>('default');
   const [randomImages, setRandomImages] = useState<PublicLgtmImage[]>([]);
-  // ランダム結果は「再押下するとシャッフルし直す」要件 (Issue #109) のため、
-  // LoadMoreButton と違いマージではなく毎回置き換える。
-  const [randomProfiles, setRandomProfiles] = useState<Map<string, UserProfile>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,17 +78,7 @@ export function HomeImages({
         height: img.height,
         createdAt: new Date(img.createdAt),
       }));
-      const restoredProfiles: UserProfile[] = json.profiles.map((p) => ({
-        id: p.id,
-        githubLogin: p.githubLogin,
-        displayName: p.displayName,
-        avatarUrl: p.avatarUrl,
-        isAdmin: p.isAdmin,
-        createdAt: new Date(p.createdAt),
-        updatedAt: new Date(p.updatedAt),
-      }));
       setRandomImages(images);
-      setRandomProfiles(new Map(restoredProfiles.map((profile) => [profile.id, profile])));
       setMode('random');
     } catch {
       setError('読み込みに失敗しました。時間をおいて再度お試しください');
@@ -115,9 +93,9 @@ export function HomeImages({
       randomImages.length === 0 ? (
         <EmptyState isLoggedIn={isLoggedIn} />
       ) : (
-        // ランダムモードでも初期表示と同じ投稿者アバターを描画する (Issue #126)。
+        // ランダムモードでも初期表示と同じカード描画。
         // 「もっと読み込む」は描画しない (ランダム順は cursor と不整合のため)。
-        <ImageGrid images={randomImages} profiles={randomProfiles} />
+        <ImageGrid images={randomImages} />
       );
   } else if (loadError) {
     body = <LoadErrorState />;
@@ -126,7 +104,7 @@ export function HomeImages({
   } else {
     body = (
       <>
-        <ImageGrid images={initialImages} profiles={profileMap} />
+        <ImageGrid images={initialImages} />
         {initialNextCursor ? <LoadMoreButton initialCursor={initialNextCursor} /> : null}
       </>
     );

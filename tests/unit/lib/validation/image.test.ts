@@ -123,37 +123,9 @@ describe('listImagesResponseSchema', () => {
           createdAt: '2026-05-04T12:00:00.000Z',
         },
       ],
-      profiles: [
-        {
-          id: 'user-1',
-          githubLogin: 'octocat',
-          displayName: 'The Octocat',
-          avatarUrl: 'https://avatars.example/octocat.png',
-          isAdmin: false,
-          createdAt: '2026-05-03T00:00:00.000Z',
-          updatedAt: '2026-05-03T00:00:00.000Z',
-        },
-      ],
       nextCursor: '2026-05-04T11:00:00.000Z',
     });
     expect(result.success).toBe(true);
-  });
-
-  it('profiles が欠けていれば拒否する', () => {
-    const result = listImagesResponseSchema.safeParse({
-      images: [],
-      nextCursor: null,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('profile の必須フィールドが欠けていれば拒否する', () => {
-    const result = listImagesResponseSchema.safeParse({
-      images: [],
-      profiles: [{ id: 'user-1', githubLogin: 'octocat' }],
-      nextCursor: null,
-    });
-    expect(result.success).toBe(false);
   });
 
   it('width / height が欠けていれば拒否する', () => {
@@ -174,7 +146,6 @@ describe('listImagesResponseSchema', () => {
   it('nextCursor は null でも良い', () => {
     const result = listImagesResponseSchema.safeParse({
       images: [],
-      profiles: [],
       nextCursor: null,
     });
     expect(result.success).toBe(true);
@@ -183,7 +154,6 @@ describe('listImagesResponseSchema', () => {
   it('images が配列でなければ拒否する', () => {
     const result = listImagesResponseSchema.safeParse({
       images: 'oops',
-      profiles: [],
       nextCursor: null,
     });
     expect(result.success).toBe(false);
@@ -192,7 +162,6 @@ describe('listImagesResponseSchema', () => {
   it('image の必須フィールドが欠けていれば拒否する', () => {
     const result = listImagesResponseSchema.safeParse({
       images: [{ id: 'x', imageUrl: 'https://blob.example/x.webp' }],
-      profiles: [],
       nextCursor: null,
     });
     expect(result.success).toBe(false);
@@ -200,7 +169,7 @@ describe('listImagesResponseSchema', () => {
 });
 
 describe('randomImagesResponseSchema', () => {
-  it('images と profiles を含むレスポンスを受理する (nextCursor を持たない)', () => {
+  it('images を含むレスポンスを受理する (nextCursor を持たない)', () => {
     const result = randomImagesResponseSchema.safeParse({
       images: [
         {
@@ -212,60 +181,34 @@ describe('randomImagesResponseSchema', () => {
           createdAt: '2026-05-04T12:00:00.000Z',
         },
       ],
-      profiles: [
-        {
-          id: 'user-1',
-          githubLogin: 'octocat',
-          displayName: 'The Octocat',
-          avatarUrl: 'https://avatars.example/octocat.png',
-          isAdmin: false,
-          createdAt: '2026-05-03T00:00:00.000Z',
-          updatedAt: '2026-05-03T00:00:00.000Z',
-        },
-      ],
     });
     expect(result.success).toBe(true);
   });
 
   it('空配列を受理する', () => {
-    const result = randomImagesResponseSchema.safeParse({ images: [], profiles: [] });
+    const result = randomImagesResponseSchema.safeParse({ images: [] });
     expect(result.success).toBe(true);
   });
 
-  it('nextCursor が混入していても images / profiles が正しければ受理する (未知キーは無視)', () => {
+  it('nextCursor が混入していても images が正しければ受理する (未知キーは無視)', () => {
     const result = randomImagesResponseSchema.safeParse({
       images: [],
-      profiles: [],
       nextCursor: 'x',
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data).toEqual({ images: [], profiles: [] });
+      expect(result.data).toEqual({ images: [] });
     }
   });
 
   it('images が欠けていれば拒否する', () => {
-    const result = randomImagesResponseSchema.safeParse({ profiles: [] });
-    expect(result.success).toBe(false);
-  });
-
-  it('profiles が欠けていれば拒否する', () => {
-    const result = randomImagesResponseSchema.safeParse({ images: [] });
+    const result = randomImagesResponseSchema.safeParse({});
     expect(result.success).toBe(false);
   });
 
   it('image の必須フィールドが欠けていれば拒否する', () => {
     const result = randomImagesResponseSchema.safeParse({
       images: [{ id: 'x', imageUrl: 'https://blob.example/x.webp' }],
-      profiles: [],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('profile の必須フィールドが欠けていれば拒否する', () => {
-    const result = randomImagesResponseSchema.safeParse({
-      images: [],
-      profiles: [{ id: 'user-1', githubLogin: 'octocat' }],
     });
     expect(result.success).toBe(false);
   });
