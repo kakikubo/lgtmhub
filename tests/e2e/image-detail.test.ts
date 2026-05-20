@@ -28,4 +28,59 @@ test.describe('画像詳細ページ', () => {
     // h2 "This page could not be found." も同時に表示されるが、role+level 指定で h1 のみを狙う
     await expect(page.getByRole('heading', { name: '404', level: 1 })).toBeVisible();
   });
+
+  // Issue #128: 投稿者情報を一覧から詳細ページへ移動。詳細ページでは
+  // 「投稿者： アバター 表示名」が必ず描画される (fallback でも Unknown + デフォルトアバター)。
+  // データ有無に依存しないよう、image-list.test.ts と同じく「empty/error のときはスキップ」パターン。
+  test('詳細ページに投稿者行 (アバター + 表示名) が表示される', async ({ page }) => {
+    await page.goto('/');
+
+    const empty = page.getByTestId('image-list-empty');
+    const error = page.getByTestId('image-list-error');
+    if ((await empty.count()) > 0 || (await error.count()) > 0) {
+      test.skip();
+    }
+
+    const firstLink = page.getByTestId('image-card-link').first();
+    await firstLink.click();
+    await expect(page.getByTestId('image-detail-page')).toBeVisible();
+
+    const uploader = page.getByTestId('image-detail-uploader');
+    await expect(uploader).toBeVisible();
+    await expect(uploader).toContainText('投稿者：');
+    // アバター画像は装飾扱いの alt="" だが、src は必ず付く
+    await expect(uploader.locator('img')).toHaveAttribute('src', /.+/);
+  });
+
+  // Issue #128: profile 取得済みカードでは表示名が GitHub プロフィールへの
+  // 新規タブリンクになる。fallback (Unknown) のときはリンクを張らない。
+  test('投稿者プロフィール取得済みのとき、表示名は新規タブで GitHub プロフィールへ遷移するリンクになる', async ({
+    page,
+  }) => {
+    await page.goto('/');
+
+    const empty = page.getByTestId('image-list-empty');
+    const error = page.getByTestId('image-list-error');
+    if ((await empty.count()) > 0 || (await error.count()) > 0) {
+      test.skip();
+    }
+
+    const firstLink = page.getByTestId('image-card-link').first();
+    await firstLink.click();
+    await expect(page.getByTestId('image-detail-page')).toBeVisible();
+
+    const uploader = page.getByTestId('image-detail-uploader');
+    const fallback = await uploader.getAttribute('data-fallback');
+    if (fallback !== 'false') {
+      test.skip(true, 'profile が取得できなかったため (fallback) 検証をスキップ');
+    }
+
+    const anchor = uploader.locator('a').first();
+    const href = await anchor.getAttribute('href');
+    expect(href).toMatch(/^https:\/\/github\.com\/.+/);
+    await expect(anchor).toHaveAttribute('target', '_blank');
+    const rel = (await anchor.getAttribute('rel')) ?? '';
+    expect(rel).toContain('noopener');
+    expect(rel).toContain('noreferrer');
+  });
 });
