@@ -78,7 +78,7 @@ jobs:
           node-version: "24"
           cache: "npm"
       - run: npm ci
-      - uses: supabase/setup-cli@v2.0.0
+      - uses: supabase/setup-cli@v2.1.1
         with:
           version: 2.98.0
       - name: Start Supabase Local
