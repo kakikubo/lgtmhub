@@ -914,6 +914,7 @@ jobs:
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
+    "db:nuke": "supabase stop --no-backup",
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --local > src/types/database.types.ts"
   }

@@ -150,6 +150,31 @@ Error response from daemon: error while creating mount source path
    git checkout -- supabase/config.toml
    ```
 
+### `npm run db:start` が `relation "user_profiles" already exists` で失敗する
+
+エラー例:
+
+```
+Applying migration 20260503000000_create_user_profiles.sql...
+ERROR: relation "user_profiles" already exists (SQLSTATE 42P07)
+```
+
+原因: `supabase stop`(デフォルト)は Docker volume(`supabase_db_lgtmhub`)を「バックアップ」として保持します。volume と Supabase CLI が管理する migration 履歴が不整合になると、次回 `supabase start` 時に `Initialising schema...` が走り、既存テーブルと衝突して上記エラーになります。
+
+> **注意**: 以下の手順は **ローカルの開発データ(画像・ユーザー等を含む)を完全に破棄** します。
+
+復旧手順:
+
+```bash
+# 1. volume ごと破棄
+npm run db:nuke
+
+# 2. 新規に起動(マイグレーションが順次適用される)
+npm run db:start
+```
+
+`npm run db:nuke` は内部で `supabase stop --no-backup` を実行し、`supabase_db_lgtmhub` / `supabase_storage_lgtmhub` の Docker volume を削除します。通常の停止(`npm run db:stop`)は volume を保持するため、ローカルデータを失いません。
+
 ---
 
 ## ライセンス
