@@ -147,6 +147,7 @@ tests/e2e/.auth/
 # Supabase
 supabase/.temp/
 supabase/.branches/
+supabase/snippets/
 
 # Generated database types(コミット対象だが、再生成中の中間状態は無視)
 src/types/database.types.ts.tmp
