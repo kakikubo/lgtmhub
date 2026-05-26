@@ -54,7 +54,9 @@ test.describe('画像詳細ページ', () => {
 
   // Issue #128: profile 取得済みカードでは表示名が GitHub プロフィールへの
   // 新規タブリンクになる。fallback (Unknown) のときはリンクを張らない。
-  test('投稿者プロフィール取得済みのとき、表示名は新規タブで GitHub プロフィールへ遷移するリンクになる', async ({
+  // Issue #147: アバター画像 (アイコン) もクリックで投稿者プロフィールへ遷移できるよう、
+  // アバターと表示名を 1 本の `<a>` でラップする (リンクが冗長化しない構造)。
+  test('投稿者プロフィール取得済みのとき、アバターと表示名は同じ GitHub プロフィールへの新規タブリンクになる', async ({
     page,
   }) => {
     await page.goto('/');
@@ -75,12 +77,19 @@ test.describe('画像詳細ページ', () => {
       test.skip(true, 'profile が取得できなかったため (fallback) 検証をスキップ');
     }
 
-    const anchor = uploader.locator('a').first();
+    const anchors = uploader.locator('a');
+    await expect(anchors).toHaveCount(1);
+
+    const anchor = anchors.first();
     const href = await anchor.getAttribute('href');
     expect(href).toMatch(/^https:\/\/github\.com\/.+/);
     await expect(anchor).toHaveAttribute('target', '_blank');
     const rel = (await anchor.getAttribute('rel')) ?? '';
     expect(rel).toContain('noopener');
     expect(rel).toContain('noreferrer');
+
+    // 同じリンク内にアバター画像と表示名が両方含まれる (= アイコンクリックでも遷移できる)
+    await expect(anchor.locator('img')).toHaveAttribute('src', /.+/);
+    await expect(anchor).toContainText(/.+/);
   });
 });
