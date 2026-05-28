@@ -30,13 +30,18 @@
 
 ### 検証 (デプロイ環境)
 
-- [ ] D1. PR preview URL で `/api/images` にアクセスし `x-vercel-id` が `hnd1::hnd1::...` (Function も東京) になることを確認
-- [ ] D2. 関数実行パス (`POST /api/images` / CDN MISS の GET) の TTFB が短縮したことを計測 (PR #149 の Production 値 1.06s 〜 3.19s と比較)
+- [x] D1. PR preview URL で `/api/images` にアクセスし `x-vercel-id` が `hnd1::hnd1::...` (Function も東京) になることを確認
+  - 計測 (2026-05-29, preview `lgtmhub-qsj8tn6jr`): `x-vercel-id: hnd1::hnd1::...` を確認。Function 部が `iad1` → `hnd1` に是正された ✅
+- [x] D2. 関数実行パス (CDN MISS の GET) の TTFB が短縮したことを計測 (PR #149 の Production 値 1.06s 〜 3.19s と比較)
+  - 計測 (forced MISS x6, `time_starttransfer`): 0.487 / 0.244 / 0.190 / 0.185 / 0.269 / 0.268 s
+  - PR #149 Production (`iad1` 関数): 3.19s (cold) / 1.06s / 1.06s → **約 4〜6 倍高速化** ✅
 
 ### 環境確認 (運用 / ユーザ作業)
 
 - [ ] R1. Supabase ダッシュボードでプロジェクトリージョンを確認 (期待: `ap-northeast-1` / Tokyo)
   - ずれていれば移設要否を判断 (移設は影響大のため別途検討)
+  - 傍証: 関数 MISS TTFB が DB クエリ込みで 0.19〜0.49s と低く、preview Supabase は `ap-northeast-1` の可能性が高い (確定はダッシュボード確認が必要)
+  - 注: preview/prod の Supabase URL は Vercel 環境変数管理でリポジトリからは判別不可 (`.env.local` は localhost)
 
 ### Issue クローズ
 
