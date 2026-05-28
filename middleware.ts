@@ -2,6 +2,14 @@ import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  // /api/images GET は Vercel CDN キャッシュ対象 (Issue #46 案 #3)。
+  // session refresh で Set-Cookie がレスポンスに乗ると CDN がキャッシュを諦めるため、
+  // matcher で拾われた後に method/path 条件で early-return する。
+  // Next.js の config.matcher は HTTP method 分岐をサポートしないため middleware 本体で判定する。
+  if (request.method === 'GET' && request.nextUrl.pathname === '/api/images') {
+    return NextResponse.next({ request });
+  }
+
   const response = NextResponse.next({ request });
 
   const supabase = createServerClient(

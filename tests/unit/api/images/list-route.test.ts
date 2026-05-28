@@ -3,6 +3,7 @@ import { DatabaseError } from '@/src/lib/errors';
 import { listImagesResponseSchema } from '@/src/lib/validation/image';
 
 const createClient = vi.fn();
+const createAnonClient = vi.fn();
 const buildImageService = vi.fn();
 const revalidateTag = vi.fn();
 
@@ -16,6 +17,10 @@ vi.mock('next/cache', () => ({
 
 vi.mock('@/src/lib/supabase/server', () => ({
   createClient: () => createClient(),
+}));
+
+vi.mock('@/src/lib/supabase/anon', () => ({
+  createAnonClient: () => createAnonClient(),
 }));
 
 vi.mock('@/src/services/image-service', () => ({
@@ -33,6 +38,7 @@ const IMAGE = {
 
 beforeEach(() => {
   createClient.mockReset();
+  createAnonClient.mockReset();
   buildImageService.mockReset();
   revalidateTag.mockReset();
 });
@@ -49,7 +55,7 @@ async function callGet(query = '') {
 
 describe('GET /api/images', () => {
   it('cursor が ISO8601 でなければ 400 を返し Service を呼ばない', async () => {
-    createClient.mockResolvedValue({});
+    createAnonClient.mockReturnValue({});
 
     const res = await callGet('?cursor=not-a-date');
 
@@ -58,7 +64,7 @@ describe('GET /api/images', () => {
   });
 
   it('成功時は listImagesResponseSchema 準拠の JSON を返す', async () => {
-    createClient.mockResolvedValue({});
+    createAnonClient.mockReturnValue({});
     buildImageService.mockReturnValue({
       listImages: vi.fn().mockResolvedValue({ images: [IMAGE], nextCursor: null }),
     });
@@ -77,8 +83,31 @@ describe('GET /api/images', () => {
     expect(parsed.nextCursor).toBeNull();
   });
 
+  it('成功時は Vercel CDN 用 Cache-Control ヘッダを返す (Issue #46 案 #3)', async () => {
+    createAnonClient.mockReturnValue({});
+    buildImageService.mockReturnValue({
+      listImages: vi.fn().mockResolvedValue({ images: [IMAGE], nextCursor: null }),
+    });
+
+    const res = await callGet();
+
+    expect(res.headers.get('Cache-Control')).toBe('s-maxage=60, stale-while-revalidate=300');
+  });
+
+  it('Cookie 連携の createClient は呼ばず anon クライアントだけを使う (CDN キャッシュ条件)', async () => {
+    createAnonClient.mockReturnValue({});
+    buildImageService.mockReturnValue({
+      listImages: vi.fn().mockResolvedValue({ images: [IMAGE], nextCursor: null }),
+    });
+
+    await callGet();
+
+    expect(createAnonClient).toHaveBeenCalledTimes(1);
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
   it('listImages が想定外のエラーを投げたら 500 を返す', async () => {
-    createClient.mockResolvedValue({});
+    createAnonClient.mockReturnValue({});
     buildImageService.mockReturnValue({
       listImages: vi.fn().mockRejectedValue(new DatabaseError('list boom')),
     });
