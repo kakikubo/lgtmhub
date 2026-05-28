@@ -103,6 +103,13 @@ Presentation → API → Service → Data
 
 > CI/CD の詳細設定（GitHub Actions の jobs / steps、npm scripts、テスト戦略）は [`docs/development-guidelines.md`](./development-guidelines.md)「CI/CDパイプライン」を正典とする。本セクションはデプロイフローの概要のみを扱う。
 
+### 実行リージョン
+
+- **Vercel 関数リージョン**: `vercel.json` の `regions` で `hnd1`（東京）に固定する。Vercel のデフォルトは `iad1`（US 東海岸）のため、明示しないと全 Route Handler / SSR が US 東海岸で実行され、日本のユーザー・Supabase（`ap-northeast-1` 想定）との RTT が無駄に伸びる。`regions` は全 Vercel 関数のデフォルトリージョンを設定する（単一リージョン指定は全プランで利用可）。
+- **Edge Middleware**: `regions` の対象外。常にユーザー近傍の Edge で実行される。
+- **確認方法**: レスポンスヘッダ `x-vercel-id`（`<edge>::<function>::<reqid>`）の Function 部が `hnd1` であることで実行リージョンを判定できる。
+- **Supabase リージョン**: `ap-northeast-1`（東京）で揃えることを前提とする。関数を東京にしても DB が遠隔だと往復が遠回りになるため、両者を東京で揃える。
+
 ---
 
 ## データ永続化戦略
