@@ -49,17 +49,17 @@
 
 ## Phase 5: 検証(停止ウィンドウ終了)
 
-- [ ] 本番/preview で GitHub ログイン(既存ユーザーが同一アカウントで入れる)
-- [ ] 画像一覧 `/api/images` が表示される
-- [ ] 画像アップロード(INSERT → Blob put → 一覧反映)が成功
-- [ ] アップロード上限 RPC(`increment_daily_upload_count`)が機能
-- [ ] `supabase db push --linked`(新)が「up to date」
+- [x] preview(PR #153)で GitHub ログイン(既存ユーザーが同一アカウントで入れる)・一覧・アップロードを確認、体感速度向上
+- [x] 画像一覧 `/api/images` が表示される(preview の x-vercel-id が hnd1/東京エッジ)
+- [x] 画像アップロード(INSERT → Blob put → 一覧反映)が成功
+- [x] アップロード上限 RPC(`increment_daily_upload_count`)が機能
+- [x] `supabase db push --linked`(新)が「up to date」
 
 ## Phase 6: リポジトリ/メモリ更新(Claude 作業、切替成功後)
 
-- [ ] `docs/development-guidelines.md` L892 等の旧 ref → `qbkoalhilwtjydpscrye`
-- [ ] `.github/workflows/supabase-deploy.yml` のコメント(`lgtmdb`/Singapore)を更新
-- [ ] `README.md` L75 周辺の記述を確認・更新
+- [x] `docs/development-guidelines.md` の旧 ref `szjjdsagnitpmzbbtfoy` → `qbkoalhilwtjydpscrye`、`lgtmdb` → `lgtm2`
+- [x] `.github/workflows/supabase-deploy.yml` のコメント(`lgtmdb` → `lgtm2` / 東京)を更新
+- [x] ~~`README.md` L75 周辺~~(旧 ref のリテラル参照なし。`<project-ref>` 汎用表記のため変更不要)
 - [ ] メモリ `supabase-prod-region-singapore.md` を東京移設済みに更新
 - [ ] Issue #152 をクローズ
 

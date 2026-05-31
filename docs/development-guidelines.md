@@ -883,13 +883,13 @@ jobs:
 
 #### Supabase Migrations Auto Deploy
 
-`.github/workflows/supabase-deploy.yml` で main マージ時に `supabase/migrations/**` の差分をリモート Supabase (`lgtmdb`) に自動 push する。
+`.github/workflows/supabase-deploy.yml` で main マージ時に `supabase/migrations/**` の差分をリモート Supabase (`lgtm2`) に自動 push する。
 
 - トリガー: `push: branches: [main]` + `paths: ['supabase/migrations/**']`、および `workflow_dispatch`（手動再実行用）
 - 必要な GitHub Secrets:
   - `SUPABASE_ACCESS_TOKEN`: Supabase アカウント個人アクセストークン (CLI 認証)
   - `SUPABASE_DB_PASSWORD`: リモート DB 接続パスワード
-  - `SUPABASE_PROJECT_REF`: リンク先プロジェクト ref (`szjjdsagnitpmzbbtfoy`)
+  - `SUPABASE_PROJECT_REF`: リンク先プロジェクト ref (`qbkoalhilwtjydpscrye`)
 - `concurrency: { group: supabase-db-push, cancel-in-progress: false }` で直列化（部分適用防止のため実行中を殺さず queue する）
 - `permissions: contents: read` のみ。フォーク PR からの secrets 露出を避けるため `pull_request` トリガーは持たない
 - 失敗時の手動リカバリ: ローカルから `npx supabase db push --linked`
