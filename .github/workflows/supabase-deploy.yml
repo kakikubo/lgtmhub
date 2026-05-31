@@ -1,7 +1,7 @@
 name: Supabase Migrations Deploy
 
 # main ブランチに supabase/migrations/ の変更がマージされたとき、
-# リモート Supabase (lgtmdb) に DDL を自動 push する。
+# リモート Supabase (lgtm2 / 東京 ap-northeast-1) に DDL を自動 push する。
 #
 # 背景: PR #35 で「ローカルで動くがリモートに未反映」の事故が発生した。
 #       手動 `supabase db push` の運用に依存していた箇所を CI に置換する。
