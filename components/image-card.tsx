@@ -11,7 +11,7 @@ export function ImageCard({
   priority?: boolean;
 }) {
   return (
-    <article className="space-y-2">
+    <article className="group relative">
       <Link
         href={`/images/${image.id}`}
         data-testid="image-card-link"
@@ -30,7 +30,15 @@ export function ImageCard({
           />
         </div>
       </Link>
-      <CopyMarkdownButton imageUrl={image.imageUrl} />
+      {/*
+        画像へホバー (またはキーボードフォーカス) したときだけ右上に出現するオーバーレイ。
+        Link の後ろの兄弟として絶対配置することで前面に重なり、クリックがリンク遷移と競合しない。
+        非表示時は pointer-events-none で透過させ、画像クリック (= 詳細遷移) を奪わない。
+      */}
+      <CopyMarkdownButton
+        imageUrl={image.imageUrl}
+        className="absolute right-2 top-2 w-auto opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+      />
     </article>
   );
 }
