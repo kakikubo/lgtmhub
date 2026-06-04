@@ -1,10 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import { cn } from '@/src/lib/utils';
 
 const FEEDBACK_DURATION_MS = 2000;
 
-export function CopyMarkdownButton({ imageUrl }: { imageUrl: string }) {
+export function CopyMarkdownButton({
+  imageUrl,
+  className,
+}: {
+  imageUrl: string;
+  className?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   const handleClick = async () => {
@@ -25,7 +32,10 @@ export function CopyMarkdownButton({ imageUrl }: { imageUrl: string }) {
       onClick={handleClick}
       data-testid="copy-markdown-button"
       data-copy-state={copied ? 'copied' : 'idle'}
-      className="w-full text-sm bg-gray-900 text-white px-3 py-1.5 rounded hover:bg-gray-700"
+      className={cn(
+        'w-full text-sm bg-gray-900 text-white px-3 py-1.5 rounded hover:bg-gray-700',
+        className,
+      )}
     >
       {copied ? <span data-testid="copy-feedback">コピーしました ✓</span> : 'マークダウンをコピー'}
     </button>

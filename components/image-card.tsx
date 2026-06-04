@@ -11,7 +11,7 @@ export function ImageCard({
   priority?: boolean;
 }) {
   return (
-    <article className="space-y-2">
+    <article className="group relative">
       <Link
         href={`/images/${image.id}`}
         data-testid="image-card-link"
@@ -30,7 +30,19 @@ export function ImageCard({
           />
         </div>
       </Link>
-      <CopyMarkdownButton imageUrl={image.imageUrl} />
+      {/*
+        画像へホバー (またはキーボードフォーカス) したときだけ右上に出現するオーバーレイ。
+        Link の後ろの兄弟として絶対配置することで前面に重なり、クリックがリンク遷移と競合しない。
+        非表示時は pointer-events-none で透過させ、画像クリック (= 詳細遷移) を奪わない。
+        キーボード表示は group-focus-within ではなく group-has-[:focus-visible] を使う:
+        前者だとマウスでボタンをクリックした後もボタンが :focus を保持し続け、
+        ホバーを外してもオーバーレイが消えない (Issue #169 の不具合)。:focus-visible は
+        キーボード操作時のみ立つため、マウスクリック後はホバーが外れた時点で確実に消える。
+      */}
+      <CopyMarkdownButton
+        imageUrl={image.imageUrl}
+        className="absolute right-2 top-2 w-auto opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-has-[:focus-visible]:opacity-100 group-has-[:focus-visible]:pointer-events-auto"
+      />
     </article>
   );
 }
