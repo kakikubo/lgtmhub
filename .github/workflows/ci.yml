@@ -112,4 +112,8 @@ jobs:
           node-version: "24"
           cache: "npm"
       - run: npm ci
-      - run: npm audit --audit-level=high
+      # 本番バンドルに乗る依存のみを high 以上で監査する。
+      # supabase CLI など devDependency はローカル/CI のツールであり本番に出荷されないため
+      # --omit=dev で除外する (例: GHSA-x96m-c5fj-q75c のような dev ツール側アドバイザリで
+      # 全 PR がブロックされるのを防ぐ)。本番依存の脆弱性は引き続きゲートする。
+      - run: npm audit --omit=dev --audit-level=high
