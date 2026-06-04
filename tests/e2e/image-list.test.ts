@@ -140,6 +140,29 @@ test.describe('一覧カードのホバーコピーボタン (Issue #169)', () =
     // ボタンクリックでリンク遷移していない (トップに留まる)。
     await expect(page).toHaveURL(/\/$/);
   });
+
+  // マウスでコピーボタンを押すと :focus が残るため、group-focus-within ではホバーを
+  // 外してもオーバーレイが消えなかった不具合の回帰テスト。group-has-[:focus-visible] へ
+  // 変更したことで、マウスクリック後にホバーが外れたら確実に opacity-0 へ戻る。
+  test('コピーボタンをクリック後、ホバーを外すとボタンは非表示 (opacity=0) へ戻る', async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(['clipboard-write']);
+    const grid = await gotoAndRequireGrid(page);
+
+    const firstCard = grid.locator('li').first();
+    await firstCard.getByTestId('image-card-link').hover();
+
+    const copyButton = firstCard.getByTestId('copy-markdown-button');
+    await copyButton.click();
+    await expect(copyButton).toHaveCSS('opacity', '1');
+
+    // ホバーをカードの外へ移す (見出し付近)。マウス操作由来の :focus は :focus-visible を
+    // 立てないため、ホバーが外れた時点でオーバーレイは消える。
+    await page.getByRole('heading', { name: 'Make every LGTM count.' }).hover();
+    await expect(copyButton).toHaveCSS('opacity', '0');
+  });
 });
 
 // Issue #109: 一覧画面のランダム表示機能。
