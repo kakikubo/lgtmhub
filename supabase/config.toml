@@ -428,3 +428,15 @@ additional_redirect_urls = ["https://lgtmhub.vercel.app/**"]
 # ホスト版の callback は Supabase 固定 URL なので、base の localhost callback を上書きする。
 [remotes.prod.auth.external.github]
 redirect_uri = "https://qbkoalhilwtjydpscrye.supabase.co/auth/v1/callback"
+
+# 本番の Auth ハードニング設定を保持する。base はローカル開発用の弱い値のため、
+# config push がこれらを本番に上書き(MFA/メール確認の無効化・OTP 弱化)しないよう、
+# 現行本番値を明示固定する。
+[remotes.prod.auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[remotes.prod.auth.email]
+enable_confirmations = true
+max_frequency = "1m0s"
+otp_length = 8
