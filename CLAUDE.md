@@ -5,7 +5,7 @@
 - 開発環境: devcontainer
 - Node.js v24.11.0
 - TypeScript 6.x
-- パッケージマネージャー: npm
+- パッケージマネージャー: pnpm(Corepack 経由、`package.json` の `packageManager` でバージョン固定)
 
 ## スペック駆動開発の基本原則
 

@@ -8,7 +8,7 @@
 |------|-----------|----------|
 | Node.js | v24.11.0 | CLAUDE.mdで指定。Next.js 15のサポート対象、非同期I/Oに優れSharpの画像処理を高速に実行可能 |
 | TypeScript | 6.x | CLAUDE.mdで指定。静的型付けでバグを早期検出、Supabase / Next.jsの型生成が充実 |
-| npm | 11.x | CLAUDE.mdで指定。Node.js v24に標準搭載で追加インストール不要 |
+| pnpm | 10.x | CLAUDE.mdで指定。Corepack 経由で利用し、`package.json` の `packageManager` でバージョンを固定 |
 
 ### フレームワーク・ライブラリ
 
@@ -28,7 +28,7 @@
 | 技術 | バージョン | 用途 | 選定理由 |
 |------|-----------|------|----------|
 | Biome | 2.x | リンター + フォーマッター | Rust 実装で高速、設定一元化(`biome.json` 1 ファイル)、ESLint + Prettier の責務を統合 |
-| lefthook | 2.x | Git hooks マネージャー | `npm install` 時の `prepare` スクリプトで自動配置、`pre-commit` で staged ファイルに Biome を自動実行(`lefthook.yml` で設定) |
+| lefthook | 2.x | Git hooks マネージャー | `pnpm install` 時の `prepare` スクリプトで自動配置、`pre-commit` で staged ファイルに Biome を自動実行(`lefthook.yml` で設定) |
 | Vitest | 3.x | ユニットテストフレームワーク | Viteベースで高速、Jestと互換APIで学習コスト低 |
 | Playwright | 1.5x | E2Eテスト | モダンなブラウザ自動化、Vercelプレビュー環境でも動作 |
 | supabase CLI | 2.x | ローカルDB・マイグレーション管理 | ローカルでSupabaseスタックをDocker起動、マイグレーションをコード管理 |
@@ -101,7 +101,7 @@ Presentation → API → Service → Data
 - **GitHub → Vercel自動連携**: `main` ブランチへのpushで本番デプロイ、PR作成でプレビューデプロイ
 - **マイグレーション**: `supabase db push` をGitHub Actionsで `main` マージ時に実行
 
-> CI/CD の詳細設定（GitHub Actions の jobs / steps、npm scripts、テスト戦略）は [`docs/development-guidelines.md`](./development-guidelines.md)「CI/CDパイプライン」を正典とする。本セクションはデプロイフローの概要のみを扱う。
+> CI/CD の詳細設定（GitHub Actions の jobs / steps、package.json scripts、テスト戦略）は [`docs/development-guidelines.md`](./development-guidelines.md)「CI/CDパイプライン」を正典とする。本セクションはデプロイフローの概要のみを扱う。
 
 ### 実行リージョン
 
@@ -374,7 +374,7 @@ async function safeImageFetch(url: string): Promise<Response> {
 - ランタイム依存は `^` でマイナーアップを許容、Next.jsのみパッチ固定（`~15.5.15`）
 - TypeScript はパッチのみ自動更新（`~`）
 - 依存関係の更新 PR は Renovate App が自動で作成する（`renovate.json` 参照、運用ポリシーは `docs/development-guidelines.md`「依存関係管理 (Renovate)」セクション）
-- npm audit を CI で実行し、High 以上の脆弱性検出時は失敗扱い
+- pnpm audit を CI で実行し、High 以上の脆弱性検出時は失敗扱い
 
 **注意事項（メジャーバージョンが古いドキュメント想定から更新されたパッケージ）**:
 - `@supabase/ssr` v0.10 系: Cookie ハンドラが `getAll/setAll` ベース（旧 `get/set/remove` から変更）

@@ -74,7 +74,7 @@ autolabeler:
       - 'middleware.ts'
       - 'next.config.ts'
       - 'package.json'
-      - 'package-lock.json'
+      - 'pnpm-lock.yaml'
       - 'tsconfig.json'
       - 'biome.json'
       - 'postcss.config.mjs'

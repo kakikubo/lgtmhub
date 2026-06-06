@@ -8,7 +8,7 @@
  * Pango/fontconfig や librsvg の @font-face に依存しない方式なので、macOS ホストでも
  * 期待通りに各フォントのレンダリングを差し替えできる。
  *
- * 実行: npx tsx scripts/preview-lgtm-fonts.ts
+ * 実行: pnpm dlx tsx scripts/preview-lgtm-fonts.ts
  */
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';

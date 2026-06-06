@@ -1,7 +1,7 @@
 # Codecov 設定
 # 目的: テストカバレッジの「可視化」。導入初手では merge をブロックしない。
 # カバレッジのゲート自体は vitest.config.ts の thresholds (services 90% / lib 80%)
-# が CI の test ジョブ内 (npm run test:coverage) で担保する。
+# が CI の test ジョブ内 (pnpm run test:coverage) で担保する。
 # ここでは PR コメントと時系列の可視化に専念する。
 
 coverage:
