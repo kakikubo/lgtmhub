@@ -69,4 +69,5 @@ jobs:
           S3_REGION: ''
           S3_ACCESS_KEY: ''
           S3_SECRET_KEY: ''
-        run: supabase config push
+        # 非対話実行では [Y/n] プロンプトを明示的に承認する(暗黙の自動 Yes 依存を避ける)。
+        run: supabase config push --yes
