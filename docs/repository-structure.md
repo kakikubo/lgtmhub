@@ -54,7 +54,7 @@ lgtmhub/
 │       ├── image.ts
 │       ├── favorite.ts
 │       ├── user.ts
-│       └── database.types.ts   # Supabaseスキーマから自動生成（npm run db:types）
+│       └── database.types.ts   # Supabaseスキーマから自動生成（pnpm run db:types）
 ├── components/                 # 再利用可能なReactコンポーネント
 │   ├── ui/                     # 汎用UIプリミティブ
 │   │   ├── button.tsx
@@ -244,7 +244,7 @@ src/services/
 - `image.ts`: `LgtmImage` インターフェース、`ImageStatus` 型
 - `favorite.ts`: `Favorite` インターフェース
 - `user.ts`: `UserProfile` インターフェース
-- `database.types.ts`: Supabase スキーマから自動生成された型定義（`npm run db:types` で生成）
+- `database.types.ts`: Supabase スキーマから自動生成された型定義（`pnpm run db:types` で生成）
 
 **命名規則**:
 - ファイル名: `{エンティティ名}.ts`（kebab-case または単数形）
@@ -252,7 +252,7 @@ src/services/
 
 **自動生成ファイルの扱い**:
 - `database.types.ts` は **コミット対象**（マイグレーションと同期させ、CI で型チェックの対象にするため）
-- マイグレーション変更後は `npm run db:types` を実行し、再生成された型を必ずコミットに含める
+- マイグレーション変更後は `pnpm run db:types` を実行し、再生成された型を必ずコミットに含める
 
 **依存関係**:
 - 依存可能: なし（型定義のみ）

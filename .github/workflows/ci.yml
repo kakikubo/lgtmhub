@@ -10,19 +10,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-          cache: "npm"
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm run typecheck
 
   test:
     runs-on: ubuntu-latest
     # 設計意図: CI 上では Supabase CLI(Docker)の起動コストを避け、
     # 統合テストの DB 接続先として素の Postgres コンテナを使用する。
-    # RLS ポリシーの検証はローカル開発時の `npm run db:start`(Supabase Local)で行い、
+    # RLS ポリシーの検証はローカル開発時の `pnpm run db:start`(Supabase Local)で行い、
     # CI ではテーブル制約・トランザクション・SQL 互換性のみを検証する方針。
     services:
       postgres:
@@ -33,11 +34,12 @@ jobs:
           - 5432:5432
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-          cache: "npm"
-      - run: npm ci
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
       # 設計意図: test:unit / test:integration の 2 回実行をやめ、
       # test:coverage (= vitest run --coverage) の 1 パスに統合する。
       # vitest.config.ts の include/exclude により unit + integration を
@@ -46,7 +48,7 @@ jobs:
       # function 計測が Node マイナー差でブレる分は functions 閾値を CI 実測
       # ベースに調整して吸収済み (Issue #113)。閾値未達・テスト失敗いずれも
       # vitest が非 0 終了するため test ジョブのゲートとして機能する。
-      - run: npm run test:coverage
+      - run: pnpm run test:coverage
       # 設計意図: カバレッジを Codecov にアップロードし、PR / main で可視化する。
       # public リポジトリのため CODECOV_TOKEN が未設定でも tokenless で動作する。
       # 可視化が目的でアップロード可否を CI のゲートにしないため
@@ -65,7 +67,7 @@ jobs:
     # と Route Handler が実 DB を叩けるようにする。これにより HomePage / ImageDetailPage
     # の DATABASE_ERROR ログが出なくなり、後続 PR でログイン済みフロー E2E を書く
     # 土台が整う。NEXT_PUBLIC_* は build 時にインライン化されるため、必ず
-    # `npm run build` の前に `$GITHUB_ENV` 経由で注入する。
+    # `pnpm run build` の前に `$GITHUB_ENV` 経由で注入する。
     env:
       # Supabase の auth.external.github は env() 参照を持つため、未設定だと起動時に
       # warning が出る。CI では OAuth コールバック試験を行わないので空文字を渡す
@@ -73,11 +75,12 @@ jobs:
       GITHUB_OAUTH_CLIENT_SECRET: ""
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-          cache: "npm"
-      - run: npm ci
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
       - uses: supabase/setup-cli@v2.1.1
         with:
           version: 2.98.0
@@ -94,11 +97,11 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon_key" >> "$GITHUB_ENV"
           # globalSetup から admin API でテストユーザーを作るために必要
           echo "SUPABASE_SERVICE_ROLE_KEY=$service_role_key" >> "$GITHUB_ENV"
-      - run: npx playwright install --with-deps chromium
-      - run: npm run build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run build
       # E2E_TEST_MODE は playwright.config.ts の webServer.env で webServer プロセスにのみ渡る。
       # 本番デプロイ環境変数には絶対に追加しないこと
-      - run: npm run test:e2e
+      - run: pnpm run test:e2e
       - name: Stop Supabase Local
         if: always()
         run: supabase stop --no-backup
@@ -107,9 +110,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-          cache: "npm"
-      - run: npm ci
-      - run: npm audit --audit-level=high
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level high

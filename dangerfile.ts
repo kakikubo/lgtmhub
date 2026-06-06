@@ -8,7 +8,7 @@ const INCLUDE_PREFIXES = ['app/', 'src/', 'components/'] as const;
 const EXCLUDE_PATTERNS: ReadonlyArray<RegExp> = [
   /^tests\//,
   /^src\/types\/database\.types\.ts$/,
-  /^package-lock\.json$/,
+  /^pnpm-lock\.yaml$/,
   /^supabase\/migrations\//,
   // markdown ファイルは行数・ファイル数の集計対象外（Issue #114）。
   // .md / .mdx を大文字小文字問わず除外する。

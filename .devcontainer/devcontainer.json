@@ -5,7 +5,7 @@
     "ghcr.io/devcontainers/features/docker-in-docker:3": {}
   },
   "forwardPorts": [3000, 54321, 54322, 54323],
-  "postCreateCommand": "npm install",
+  "postCreateCommand": "corepack enable && pnpm install",
   "customizations": {
     "vscode": {
       "extensions": ["biomejs.biome", "bradlc.vscode-tailwindcss", "denoland.vscode-deno"],
