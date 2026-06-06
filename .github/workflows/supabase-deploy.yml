@@ -1,10 +1,10 @@
-name: Supabase Migrations Deploy
+name: Supabase Deploy
 
-# main ブランチに supabase/migrations/ の変更がマージされたとき、
-# リモート Supabase (lgtm2 / 東京 ap-northeast-1) に DDL を自動 push する。
+# main ブランチに supabase/migrations/ または supabase/config.toml の変更がマージされたとき、
+# リモート Supabase (lgtm2 / 東京 ap-northeast-1) に DDL と config (Auth など) を自動 push する。
 #
 # 背景: PR #35 で「ローカルで動くがリモートに未反映」の事故が発生した。
-#       手動 `supabase db push` の運用に依存していた箇所を CI に置換する。
+#       手動 `supabase db push` / `supabase config push` の運用に依存していた箇所を CI に置換する。
 #
 # トリガー方針: pull_request では起動しない (フォーク PR からの secrets 露出回避)。
 #               main マージ後の push のみで動かし、失敗時は workflow_dispatch で再実行する。
@@ -14,6 +14,7 @@ on:
     branches: [main]
     paths:
       - 'supabase/migrations/**'
+      - 'supabase/config.toml'
   workflow_dispatch:
 
 permissions:
@@ -22,7 +23,7 @@ permissions:
 # 並走させると schema_migrations の部分適用が起きうるので直列化する。
 # 実行中を途中で殺すと中途半端に終わるため cancel-in-progress: false。
 concurrency:
-  group: supabase-db-push
+  group: supabase-deploy
   cancel-in-progress: false
 
 jobs:
@@ -49,3 +50,23 @@ jobs:
 
       - name: Push migrations
         run: supabase db push --linked
+
+      # config.toml (Auth など) をリモートへ反映する。
+      # 本番値は config.toml の [remotes.prod] が project_id 一致で適用する。
+      - name: Push config
+        # config push は config.toml 全体をパースし env() を解決する。
+        # 本番 GitHub OAuth は実値、disabled / local 専用の参照は空文字で渡しパース失敗を防ぐ
+        # (disabled なため適用はされない)。
+        # secret 名は GITHUB_ プレフィックス禁止のため SUPABASE_GITHUB_OAUTH_* とし、
+        # config.toml が参照する env 名 (GITHUB_OAUTH_*) にマップする。
+        env:
+          GITHUB_OAUTH_CLIENT_ID: ${{ secrets.SUPABASE_GITHUB_OAUTH_CLIENT_ID }}
+          GITHUB_OAUTH_CLIENT_SECRET: ${{ secrets.SUPABASE_GITHUB_OAUTH_CLIENT_SECRET }}
+          OPENAI_API_KEY: ''
+          SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN: ''
+          SUPABASE_AUTH_EXTERNAL_APPLE_SECRET: ''
+          S3_HOST: ''
+          S3_REGION: ''
+          S3_ACCESS_KEY: ''
+          S3_SECRET_KEY: ''
+        run: supabase config push

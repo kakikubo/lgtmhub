@@ -412,3 +412,19 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# 本番(lgtm2 / 東京 ap-northeast-1)向けの上書き。
+# `supabase config push` はリンク先プロジェクトの ref と project_id が一致した
+# [remotes.<name>] ブロックを base にディープマージして適用する。
+# base はローカル開発用の localhost 値のため、本番では site_url / redirect を必ず上書きする。
+[remotes.prod]
+project_id = "qbkoalhilwtjydpscrye"
+
+[remotes.prod.auth]
+site_url = "https://lgtmhub.vercel.app"
+additional_redirect_urls = ["https://lgtmhub.vercel.app/**"]
+
+# enabled / client_id / secret は base の env() 参照を継承する(CI で本番 OAuth App の値が入る)。
+# ホスト版の callback は Supabase 固定 URL なので、base の localhost callback を上書きする。
+[remotes.prod.auth.external.github]
+redirect_uri = "https://qbkoalhilwtjydpscrye.supabase.co/auth/v1/callback"
