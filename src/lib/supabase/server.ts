@@ -18,7 +18,7 @@ export async function createClient() {
               cookieStore.set(name, value, options);
             });
           } catch {
-            // Server Component から呼ばれた場合 set は失敗する。middleware で更新する前提のため握りつぶす
+            // Server Component から呼ばれた場合 set は失敗する。proxy で更新する前提のため握りつぶす
           }
         },
       },

@@ -119,10 +119,10 @@ lgtmhub/
 ├── .gitignore
 ├── biome.json                  # Biome (Linter + Formatter) 設定
 ├── dangerfile.ts               # Danger スクリプト（PRの大きさの目安チェック）
-├── middleware.ts               # Supabase セッションリフレッシュ（cookies 伝播）
 ├── next.config.ts
 ├── package.json
 ├── playwright.config.ts
+├── proxy.ts                    # Supabase セッションリフレッシュ（cookies 伝播、旧 middleware.ts）
 ├── tsconfig.json
 ├── vitest.config.ts
 ├── CLAUDE.md
