@@ -47,6 +47,9 @@ export function ImageRegisterForm() {
           setErrorMessage(CREATE_IMAGE_FALLBACK_MESSAGE);
           return;
         }
+        // cacheComponents 下では navigation をまたいでクライアント state が保持され得るため、
+        // 再訪時に古い URL が入力欄へ残らないよう明示的にリセットする。
+        setImageUrl('');
         // /(site)/page.tsx の Server Component キャッシュを破棄して
         // 登録した画像が一覧の先頭に出る状態でトップに戻す
         router.refresh();
