@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
   try {
     const service = buildImageService(supabase);
     const image = await service.createImage(user.id, parsed.data.imageUrl);
-    revalidateTag(HOME_IMAGES_CACHE_TAG);
+    revalidateTag(HOME_IMAGES_CACHE_TAG, 'max');
     return NextResponse.json({ id: image.id, imageUrl: image.imageUrl }, { status: 201 });
   } catch (err) {
     if (err instanceof DuplicateImageError) {

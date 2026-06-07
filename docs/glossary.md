@@ -206,7 +206,7 @@ lgtmoon.comで実際に起きている問題。「ポケットモンスターの
 
 **公式サイト**: https://react.dev/
 
-**本プロジェクトでの用途**: 画面UIの構築。Next.js 15 が要求する React 19 系を使用し、Server Components を活用する。
+**本プロジェクトでの用途**: 画面UIの構築。Next.js 16 が要求する React 19 系を使用し、Server Components を活用する。
 
 **バージョン**: 19.x
 
