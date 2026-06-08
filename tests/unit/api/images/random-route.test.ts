@@ -5,6 +5,16 @@ import { randomImagesResponseSchema } from '@/src/lib/validation/image';
 const createClient = vi.fn();
 const buildImageService = vi.fn();
 
+// route は cacheComponents 下で dynamic 化するため `connection()` を呼ぶ。
+// 単体テストには Next のリクエストスコープが無いので no-op に差し替える (NextResponse は実物を維持)。
+vi.mock('next/server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/server')>();
+  return {
+    ...actual,
+    connection: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
 vi.mock('@/src/lib/supabase/server', () => ({
   createClient: () => createClient(),
 }));
