@@ -21,9 +21,15 @@ test.describe('画像詳細ページ', () => {
     await expect(page.getByTestId('image-detail-back-link')).toBeVisible();
   });
 
-  test('存在しない UUID では Next.js の 404 ページが表示される', async ({ page }) => {
+  test('存在しない UUID では 404 ページ (noindex の soft 404) が表示される', async ({ page }) => {
+    // cacheComponents (loading.tsx の Suspense 境界) 下ではレスポンスが 200 で
+    // ストリーミング開始され、ヘッダー送信後の notFound() は HTTP ステータスを
+    // 404 に変更できない。Next.js は代わりに <meta name="robots" content="noindex">
+    // を出力してクローラのインデックスを防ぐ (公式に「soft 404」と案内される挙動)。
+    // よって HTTP ステータスではなく noindex メタと 404 UI の表示で not-found を検証する。
     const response = await page.goto('/images/00000000-0000-0000-0000-000000000000');
-    expect(response?.status()).toBe(404);
+    expect(response?.status()).toBe(200);
+    await expect(page.locator('meta[name="robots"]').first()).toHaveAttribute('content', /noindex/);
     // Next.js 標準 404 ページの h1 (本ファイルでは not-found.tsx を追加しないためデフォルト出力)。
     // h2 "This page could not be found." も同時に表示されるが、role+level 指定で h1 のみを狙う
     await expect(page.getByRole('heading', { name: '404', level: 1 })).toBeVisible();
