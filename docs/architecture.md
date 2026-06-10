@@ -245,12 +245,28 @@ async function safeImageFetch(url: string): Promise<Response> {
 - **画像処理拡張**: Sharpパイプラインに合成ステップを追加（フォントカスタマイズ等）
 - **認証プロバイダー追加**: Supabase Auth設定で Google / Twitter 等を追加可能（MVP外）
 
+### レンダリング戦略（Cache Components / Partial Prerendering）
+
+Next.js 16 の **Cache Components**（Next.js 15 までの実験的 PPR を安定化・再設計したもの）を採用し、トップページを Partial Prerender 化する（Issue #54）。
+
+- **有効化**: `next.config.ts` で `cacheComponents: true`（グローバルフラグ。Next.js 15 の `experimental.ppr` / ルート単位の `experimental_ppr` は廃止）
+- **トップページ（`app/(site)/`）**: ページ骨格・ヒーロー文言・グリッドスケルトンを静的シェルとしてビルド時にプリレンダーし、エッジキャッシュから即時配信する。`Header`（認証依存・動的）と `HomeContent`（画像一覧）は `<Suspense>` 境界でストリーミングする
+- **初期画像一覧のキャッシュ**: `src/lib/cache/list-home-images.ts` の `getHomeImagesInitial` を `'use cache'` ディレクティブ化する。
+  - `cacheTag('lgtm-images:list')` でタグ付け、`cacheLife('max')` で寿命を最長化
+  - 無効化は `revalidateTag('lgtm-images:list', 'max')` に委ねる（第2引数のプロファイル必須）
+  - `'use cache'` 配下では `cookies()` を呼べないため、Cookie 非依存の `createAnonClient` を採用
+  - RLS の `"anyone can view active images"` ポリシーで匿名 SELECT を担保
+- **`cacheComponents` 互換のための準拠**: `export const dynamic = 'force-dynamic'` はグローバルフラグと非互換のため、動的化が必要なルートは `connection()` で明示的に prerender を抑止する（`app/api/images/random/route.ts`）。dynamic なページ（`/images/[id]`・`/images/new`）には `loading.tsx` で Suspense 境界（静的シェル）を用意する
+- **proxy 化**: Next.js 16 で `middleware.ts` → `proxy.ts` にリネーム（ファイル名に加え、エクスポート関数名も `middleware` → `proxy` に変更）。`proxy.ts` は Node.js runtime 前提で `runtime: 'edge'` 指定は非対応（エラー）。本プロジェクトの `@supabase/ssr` `createServerClient` は Node.js runtime デフォルトで影響なし
+
+> 本番計測（2026-06-09, `hnd1`）: `x-nextjs-prerender: 1` / `x-vercel-cache: HIT` で静的シェルのエッジ配信を確認。LCP 中央値 89ms・TTFB（エッジ HIT）10〜70ms・CLS 0.00 と Core Web Vitals はすべて Good 圏内（Issue #54 完了）。
+
 ### キャッシュ戦略
 
 - **静的アセット**: Next.js / Vercel Edge Network が自動でCDNキャッシュ
 - **画像本体（Vercel Blob）**: Cache-Control: `public, max-age=31536000, immutable`（URL変更時は再生成）
 - **画像一覧API**: `Cache-Control: s-maxage=60, stale-while-revalidate=300`（60秒キャッシュ＋5分リバリデート）
-- **画像ランダム取得API（`GET /api/images/random`）**: `Cache-Control: no-store` ＋ `dynamic = 'force-dynamic'`。押下のたびに別の 16 枚を返す要件のため、ルート単位・レスポンス双方でキャッシュしない（Issue #109）
+- **画像ランダム取得API（`GET /api/images/random`）**: `Cache-Control: no-store` ＋ `connection()` による動的化。押下のたびに別の 16 枚を返す要件のため、ルート単位・レスポンス双方でキャッシュしない（Issue #109）。`cacheComponents` 有効化に伴い `dynamic = 'force-dynamic'` から `connection()` へ移行（Issue #54）
 
 #### 論理削除とキャッシュの関係
 
