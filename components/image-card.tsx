@@ -41,7 +41,8 @@ export function ImageCard({
       */}
       <CopyMarkdownButton
         imageUrl={image.imageUrl}
-        className="absolute right-2 top-2 w-auto opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-has-[:focus-visible]:opacity-100 group-has-[:focus-visible]:pointer-events-auto"
+        variant="icon"
+        className="absolute right-2 top-2 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-has-[:focus-visible]:opacity-100 group-has-[:focus-visible]:pointer-events-auto"
       />
     </article>
   );
