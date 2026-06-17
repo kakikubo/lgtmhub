@@ -117,12 +117,12 @@ test.describe('一覧カードのホバーコピーボタン (Issue #169)', () =
     const grid = await gotoAndRequireGrid(page);
 
     const firstCard = grid.locator('li').first();
-    // group-focus-within により、子の Link がフォーカスされた段階でオーバーレイが出現する。
+    // group-has-[:focus-visible] により、子の Link がキーボードフォーカスされた段階でオーバーレイが出現する。
     await firstCard.getByTestId('image-card-link').focus();
     await expect(firstCard.getByTestId('copy-markdown-button')).toHaveCSS('opacity', '1');
   });
 
-  test('ホバーで現れたボタンを押すとコピー完了フィードバックが表示され、詳細へ遷移しない', async ({
+  test('ホバーで現れたアイコンボタンを押すとコピー完了状態になり、詳細へ遷移しない', async ({
     page,
     context,
   }) => {
@@ -135,8 +135,8 @@ test.describe('一覧カードのホバーコピーボタン (Issue #169)', () =
     const copyButton = firstCard.getByTestId('copy-markdown-button');
     await copyButton.click();
 
-    // コピー完了フィードバックが出る (= ボタンのクリックが成立している)。
-    await expect(firstCard.getByTestId('copy-feedback')).toBeVisible();
+    // アイコン化に伴い表示テキストではなく data-copy-state でコピー完了を判定する (Issue #174)。
+    await expect(copyButton).toHaveAttribute('data-copy-state', 'copied');
     // ボタンクリックでリンク遷移していない (トップに留まる)。
     await expect(page).toHaveURL(/\/$/);
   });
