@@ -508,6 +508,22 @@ GitHub OAuth App の Authorization callback URL は Supabase の固定 URL（`ht
 
 `src/lib/auth/actions.ts` の `buildOrigin` が、`Origin` ヘッダ → `x-forwarded-proto` / `host` の順に Preview の origin を動的算出する。Server Action は POST のため `Origin` が付き、Vercel が `x-forwarded-*` を付与するため Preview 環境でも正しい `redirectTo` が組み立てられる。**コード側の追加対応は不要**で、Supabase 側に Preview ワイルドカードが登録されていれば動作する。
 
+### 本番 DB / Preview DB の分離構成
+
+Issue #20 で、Vercel の Production / Preview デプロイが参照する Supabase プロジェクトを分離した。
+
+| | Supabase プロジェクト | Vercel env スコープ |
+|---|---|---|
+| 本番 | `lgtm2`(`qbkoalhilwtjydpscrye`, 東京) | Production |
+| Preview | `lgtmhub-preview`(東京) | Preview |
+
+- アプリは `NEXT_PUBLIC_SUPABASE_URL` 等をランタイム参照するだけで、参照先 DB は **Vercel 環境変数のスコープ分け**で決まる(コード変更不要)
+- Vercel の Preview スコープには **Preview プロジェクトの値のみ**を設定する。本番の `SUPABASE_SERVICE_ROLE_KEY` を Preview に絶対入れない(事故防止)
+- migrations / config.toml は `supabase-deploy.yml` が main マージ時に prod・preview 両方へ自動 push する(`config.toml` の `[remotes.prod]` / `[remotes.preview]` が project_id 一致で適用)
+- Preview プロジェクトは **独自の GitHub OAuth App** と **独自の URL Configuration** を持つ。上記ワイルドカードは Preview プロジェクト側の Additional Redirect URLs に登録し、Site URL も Preview ドメインにする(本番プロジェクトの設定とは独立)
+- 本番 → Preview のデータ初期コピーは一度きりのスナップショット。`auth.users` 含むフルコピーで、リストア時は `set session_replication_role = replica` で `handle_new_user` トリガを無効化する(二重 insert 回避)
+- 作業手順の詳細は `.steering/20260623-split-preview-db/` を参照
+
 ---
 
 ## Git運用ルール
