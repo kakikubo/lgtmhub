@@ -1,0 +1,79 @@
+name: Supabase Push (reusable)
+
+# 単一の Supabase プロジェクトへ migrations と config を push する再利用ワークフロー。
+# supabase-deploy.yml から prod / preview それぞれの secrets を渡して 2 回呼び出す。
+#
+# prod / preview は別 DB のため並列実行しても schema_migrations の競合は起きない。
+# 直列化・多重起動防止は呼び出し側 (supabase-deploy.yml) の concurrency で担保する。
+#
+# config push は config.toml 全体をパースし、linked 先の project_id に一致する
+# [remotes.<name>] ブロックのみを base にディープマージして適用する。
+# そのため同一の config.toml で prod は [remotes.prod]、preview は [remotes.preview] が当たる。
+
+on:
+  workflow_call:
+    inputs:
+      remote_name:
+        description: 'ログ表示用のリモート名 (prod / preview)'
+        required: true
+        type: string
+    secrets:
+      access_token:
+        required: true
+      project_ref:
+        required: true
+      db_password:
+        required: true
+      gh_oauth_id:
+        required: true
+      gh_oauth_secret:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    env:
+      # supabase CLI が認証に使う。--password フラグだとログ事故が起きうるので env で渡す。
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.access_token }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.db_password }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: supabase/setup-cli@v2.1.1
+        with:
+          # ローカル開発環境および ci.yml の e2e ジョブと揃える
+          version: 2.98.0
+
+      - name: Link to ${{ inputs.remote_name }} project
+        run: supabase link --project-ref "${{ secrets.project_ref }}"
+
+      # 何が pending かをログに残す (db push の前後比較用)
+      - name: Show pending migrations
+        run: supabase migration list --linked
+
+      - name: Push migrations
+        run: supabase db push --linked
+
+      # config.toml (Auth など) をリモートへ反映する。
+      # linked 先に一致する [remotes.<name>] ブロックが project_id 一致で適用される。
+      - name: Push config
+        # config push は config.toml 全体をパースし env() を解決する。
+        # GitHub OAuth は実値、disabled / local 専用の参照は空文字で渡しパース失敗を防ぐ
+        # (disabled なため適用はされない)。
+        # secret 名は GITHUB_ プレフィックス禁止のため SUPABASE_GITHUB_OAUTH_* とし、
+        # config.toml が参照する env 名 (GITHUB_OAUTH_*) にマップする。
+        env:
+          GITHUB_OAUTH_CLIENT_ID: ${{ secrets.gh_oauth_id }}
+          GITHUB_OAUTH_CLIENT_SECRET: ${{ secrets.gh_oauth_secret }}
+          OPENAI_API_KEY: ''
+          SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN: ''
+          SUPABASE_AUTH_EXTERNAL_APPLE_SECRET: ''
+          S3_HOST: ''
+          S3_REGION: ''
+          S3_ACCESS_KEY: ''
+          S3_SECRET_KEY: ''
+        # 非対話実行では [Y/n] プロンプトを明示的に承認する(暗黙の自動 Yes 依存を避ける)。
+        run: supabase config push --yes

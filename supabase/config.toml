@@ -440,3 +440,27 @@ verify_enabled = true
 enable_confirmations = true
 max_frequency = "1m0s"
 otp_length = 8
+
+# Preview(lgtmhub-preview / 東京 ap-northeast-1)向けの上書き。本番とは別 DB。
+[remotes.preview]
+project_id = "mdnyanwprgtqscugnjif"
+
+[remotes.preview.auth]
+# Vercel Preview は URL が動的なため、代表ドメインを site_url に、ワイルドカードを redirect に置く。
+# team slug は kakikubos-projects(supabase/.env.example の記載に準拠)。
+site_url = "https://lgtmhub-git-main-kakikubos-projects.vercel.app"
+additional_redirect_urls = ["https://lgtmhub-*-kakikubos-projects.vercel.app/**"]
+
+# enabled / client_id / secret は base の env() 参照を継承する(CI で Preview 用 OAuth App の値が入る)。
+[remotes.preview.auth.external.github]
+redirect_uri = "https://mdnyanwprgtqscugnjif.supabase.co/auth/v1/callback"
+
+# 本番同様に Auth ハードニング設定を明示固定し、config push による弱体化を防ぐ。
+[remotes.preview.auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[remotes.preview.auth.email]
+enable_confirmations = true
+max_frequency = "1m0s"
+otp_length = 8
