@@ -2,29 +2,29 @@
 
 ## Phase 1: Preview プロジェクト作成【手動・ダッシュボード】
 
-- [ ] Supabase Dashboard → New Project: `lgtmhub-preview` / Region Tokyo (ap-northeast-1)
-- [ ] DB パスワードを生成し保管
-- [ ] `project-ref` を控える
-- [ ] `major_version 17` を確認(config.toml と一致)
+- [x] Supabase Dashboard → New Project: `lgtmhub-preview` / Region Tokyo (ap-northeast-1)
+- [x] DB パスワードを生成し保管
+- [x] `project-ref` を控える(`mdnyanwprgtqscugnjif`)
+- [x] `major_version 17` を確認(db push 成功で実証)
 
 ## Phase 2: Preview にスキーマ反映【手動・CLI 初回】
 
-- [ ] `supabase link --project-ref <preview-ref>`(preview の DB password を使用)
-- [ ] `supabase db push --linked`
-- [ ] Dashboard で user_profiles / lgtm_images / daily_upload_counts と 3 関数・RLS を確認
+- [x] `supabase link --project-ref mdnyanwprgtqscugnjif`(preview の DB password を使用)
+- [x] `supabase db push --linked`(5 マイグレーション適用、Local/Remote 一致)
+- [ ] Dashboard で user_profiles / lgtm_images / daily_upload_counts と 3 関数・RLS を確認(任意)
 
 ## Phase 3: 本番 → Preview データコピー【手動・CLI】
 
-- [ ] 本番 / preview の Connection string (URI) を取得
-- [ ] `supabase db dump --db-url "$PROD_DB_URL" --data-only -s auth -s public -f data.sql`
-- [ ] `{ echo "set session_replication_role = replica;"; cat data.sql; } | psql "$PREV_DB_URL"`
-- [ ] 行数突き合わせ(auth.users / user_profiles / lgtm_images）で一致を確認
-- [ ] `data.sql` を破棄(個人情報を含むためコミット・残置しない)
+- [x] 本番 / preview の Connection string (Session pooler URI) を取得
+- [x] `supabase db dump --db-url "$PROD_DB_URL" --data-only -s auth -s public -f /tmp/data.sql`
+- [x] `{ echo "set session_replication_role = replica;"; cat /tmp/data.sql; } | psql "$PREV_DB_URL"`
+- [x] 行数突き合わせ一致(users=1 / profiles=1 / images=43 / counts=14)
+- [ ] `/tmp/data.sql` を破棄(個人情報を含むためコミット・残置しない)
 
 ## Phase 4: config.toml に [remotes.preview] 追加【コード】
 
-- [ ] `supabase/config.toml` に `[remotes.preview]` ブロックを追加(prod と対称)
-- [ ] preview ref / Vercel preview ドメイン / preview Supabase callback を設定
+- [x] `supabase/config.toml` に `[remotes.preview]` ブロックを追加(prod と対称)
+- [x] preview ref (`mdnyanwprgtqscugnjif`) / Vercel preview ドメイン / preview Supabase callback を設定
 
 ## Phase 5: CI 拡張【コード】
 
