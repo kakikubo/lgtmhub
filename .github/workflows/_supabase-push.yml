@@ -40,7 +40,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.access_token }}
       SUPABASE_DB_PASSWORD: ${{ secrets.db_password }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: supabase/setup-cli@v2.1.1
         with:
