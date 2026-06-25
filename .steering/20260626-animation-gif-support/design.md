@@ -49,8 +49,10 @@ pageHeight=150, pages=10` として読み込まれる。
    - 元画像 1 フレーム分の width / pageHeight からアスペクト比を計算し、
      長辺 400px に揃えた `targetWidth` / `targetPageHeight` を求める。
    - `sharp(buffer, { animated: true })` で
-     `.resize(targetWidth, targetPageHeight * pages, { fit: 'fill' })` を実行
-     (縦タイルなので **高さは pageHeight × pages**)。
+     `.resize(targetWidth, targetPageHeight, { fit: 'fill' })` を実行する。
+     sharp の `{ animated: true }` 入力は **resize の高さを 1 フレーム単位** で
+     受け取り、内部で全 pages に同じ変換を適用するため `targetPageHeight * pages`
+     ではない (実装と一致させた)。
    - `buildLgtmOverlay(targetWidth, targetPageHeight, 'LGTM')` で
      **1 フレーム分の透明 PNG を 1 枚作る**。
    - composite 配列に `{ input: overlay, top: i * targetPageHeight, left: 0 }`
@@ -119,10 +121,12 @@ alter table public.lgtm_images
 
 ### 4-4. `app/(site)/images/[id]/page.tsx`
 
-- `<Image>` に **`unoptimized`** を追加する。
-  Next.js Image Optimizer はアニメ WebP もフレームを 1 枚にしてしまうため、
-  Vercel Blob の生 URL を使う方が単純で確実。一覧 (`image-card.tsx`) は既に
-  `unoptimized` 済み。
+- `<Image>` に **`unoptimized={image.isAnimated}`** を追加する。
+  Next.js Image Optimizer はアニメ WebP のフレームを 1 枚に潰すため、
+  アニメ画像のときだけ最適化をスキップして Vercel Blob の生 URL を使う。
+  静止画 (`isAnimated = false`) は引き続き Optimizer のサイズ圧縮 /
+  フォーマット選択を活かす (CodeRabbit 指摘で条件化に修正)。
+  一覧 (`image-card.tsx`) は既に `unoptimized` 済み。
 
 ### 4-5. `app/api/images/route.ts`
 

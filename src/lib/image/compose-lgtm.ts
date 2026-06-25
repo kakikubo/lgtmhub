@@ -121,8 +121,10 @@ async function buildLgtmOverlay(
     .toBuffer();
 }
 
-// 長辺を MAX_LONG_SIDE に揃える (元アスペクト比保持・原画 < MAX は拡大しない)
+// 長辺を MAX_LONG_SIDE に揃える (元アスペクト比保持・原画 < MAX は拡大しない)。
 // 長辺ちょうどを MAX_LONG_SIDE に固定し、短辺は floor で切り捨てる。
+// 極端なアスペクト比 (10000×1 等) では短辺が 0 に潰れて sharp の resize が
+// 失敗するため、最小 1px に clamp する。
 // アニメ入力は 1 フレーム単位 (width × pageHeight) で判定する必要があるため、
 // composeLgtmImage と共有できるよう関数化した。
 function resolveTargetSize(
@@ -136,11 +138,11 @@ function resolveTargetSize(
   if (originalWidth >= originalHeight) {
     return {
       width: MAX_LONG_SIDE,
-      height: Math.floor((originalHeight * MAX_LONG_SIDE) / originalWidth),
+      height: Math.max(1, Math.floor((originalHeight * MAX_LONG_SIDE) / originalWidth)),
     };
   }
   return {
-    width: Math.floor((originalWidth * MAX_LONG_SIDE) / originalHeight),
+    width: Math.max(1, Math.floor((originalWidth * MAX_LONG_SIDE) / originalHeight)),
     height: MAX_LONG_SIDE,
   };
 }

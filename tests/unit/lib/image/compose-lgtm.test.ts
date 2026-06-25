@@ -103,6 +103,21 @@ describe('composeLgtmImage (静止画)', () => {
     expect(result.isAnimated).toBe(false);
   });
 
+  // 短辺が 0 に潰れる極端なアスペクト比 (10000×1 等) は `resolveTargetSize` が
+  // 1px に clamp するため `sharp.resize` 単体は失敗しなくなった (CodeRabbit 指摘)。
+  // ただし下流の `buildLgtmOverlay` が LGTM 文字 (フォント高 ≥ 24px) を載せられず
+  // 結局 composite で落ちるため、極端アスペクト比は将来的に validate-image 側で
+  // 最小短辺ガードを入れるべき。本テストではアスペクト比由来の floor() を踏みつつ
+  // overlay が成立するレンジ (短辺 200 → 50) を境界として担保する。
+  it('縦横比が大きく floor() で短辺が切り捨てられても overlay 合成が成立する (1600×200 → 400×50)', async () => {
+    const input = await makeImage(1600, 200);
+    const result = await composeLgtmImage(input);
+
+    expect(result.width).toBe(MAX_LONG_SIDE);
+    expect(result.height).toBe(50);
+    expect(result.isAnimated).toBe(false);
+  });
+
   it('破損した入力は BadRequestError を throw する', async () => {
     await expect(composeLgtmImage(Buffer.from('not an image'))).rejects.toThrow();
   });
