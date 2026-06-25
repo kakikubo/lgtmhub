@@ -76,6 +76,7 @@ export function HomeImages({
         uploaderId: img.uploaderId,
         width: img.width,
         height: img.height,
+        isAnimated: img.isAnimated,
         createdAt: new Date(img.createdAt),
       }));
       setRandomImages(images);

@@ -42,6 +42,10 @@ function DetailView({ image, uploader, isOwner }: DetailViewProps) {
           height={image.height}
           sizes="(min-width: 768px) 400px, 100vw"
           priority
+          // Next.js Image Optimizer はアニメーション WebP のフレームを 1 枚に
+          // 潰してしまうため、アニメ画像のときだけ最適化をスキップする (Issue #201)。
+          // 静止画は Optimizer のサイズ圧縮 / フォーマット選択を活かす。
+          unoptimized={image.isAnimated}
           className="h-auto w-full"
         />
       </div>

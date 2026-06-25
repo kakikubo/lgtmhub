@@ -3,6 +3,7 @@ import path from 'node:path';
 import { type Font, parse as parseFont } from 'opentype.js';
 import sharp from 'sharp';
 import { BadRequestError } from '@/src/lib/errors';
+import { MAX_GIF_FRAMES } from '@/src/lib/image/validate-image';
 
 export const MAX_LONG_SIDE = 400;
 export const WEBP_QUALITY = 85;
@@ -31,6 +32,8 @@ export interface ComposedImage {
   width: number;
   height: number;
   byteLength: number;
+  // アニメーション WebP として出力したかどうか。DB の lgtm_images.is_animated に格納される。
+  isAnimated: boolean;
 }
 
 async function renderText(
@@ -118,7 +121,32 @@ async function buildLgtmOverlay(
     .toBuffer();
 }
 
+// 長辺を MAX_LONG_SIDE に揃える (元アスペクト比保持・原画 < MAX は拡大しない)
+// 長辺ちょうどを MAX_LONG_SIDE に固定し、短辺は floor で切り捨てる。
+// アニメ入力は 1 フレーム単位 (width × pageHeight) で判定する必要があるため、
+// composeLgtmImage と共有できるよう関数化した。
+function resolveTargetSize(
+  originalWidth: number,
+  originalHeight: number,
+): { width: number; height: number } {
+  const longSide = Math.max(originalWidth, originalHeight);
+  if (longSide <= MAX_LONG_SIDE) {
+    return { width: originalWidth, height: originalHeight };
+  }
+  if (originalWidth >= originalHeight) {
+    return {
+      width: MAX_LONG_SIDE,
+      height: Math.floor((originalHeight * MAX_LONG_SIDE) / originalWidth),
+    };
+  }
+  return {
+    width: Math.floor((originalWidth * MAX_LONG_SIDE) / originalHeight),
+    height: MAX_LONG_SIDE,
+  };
+}
+
 export async function composeLgtmImage(buffer: Buffer): Promise<ComposedImage> {
+  // 1 回目の metadata はアニメ判定用。`{ animated: true }` 無しでも `pages` は取れる。
   const metadata = await sharp(buffer).metadata();
   const originalWidth = metadata.width ?? 0;
   const originalHeight = metadata.height ?? 0;
@@ -126,37 +154,84 @@ export async function composeLgtmImage(buffer: Buffer): Promise<ComposedImage> {
     throw new BadRequestError('画像のサイズを判定できませんでした');
   }
 
-  // 長辺を MAX_LONG_SIDE に揃える (元アスペクト比保持・原画 < MAX は拡大しない)
-  // 長辺ちょうどを MAX_LONG_SIDE に固定し、短辺は floor で切り捨てる
-  const longSide = Math.max(originalWidth, originalHeight);
-  let targetWidth: number;
-  let targetHeight: number;
-  if (longSide > MAX_LONG_SIDE) {
-    if (originalWidth >= originalHeight) {
-      targetWidth = MAX_LONG_SIDE;
-      targetHeight = Math.floor((originalHeight * MAX_LONG_SIDE) / originalWidth);
-    } else {
-      targetHeight = MAX_LONG_SIDE;
-      targetWidth = Math.floor((originalWidth * MAX_LONG_SIDE) / originalHeight);
-    }
-  } else {
-    targetWidth = originalWidth;
-    targetHeight = originalHeight;
+  const pages = metadata.pages ?? 1;
+  // validate-image でも弾いているが、Service レイヤを介さない呼び出しに対する
+  // 二重防御として compose 側でも上限チェックを行う。
+  if (pages > MAX_GIF_FRAMES) {
+    throw new BadRequestError(
+      `フレーム数が多すぎます (${MAX_GIF_FRAMES} フレーム以下にしてください)`,
+    );
   }
 
-  const overlay = await buildLgtmOverlay(targetWidth, targetHeight, 'LGTM');
+  const isAnimated = pages > 1;
 
-  // scale を反映済みの W/H を明示するため fit: 'fill' を選択 (アスペクト比は保持済みなので歪まない)
-  const composed = await sharp(buffer)
-    .resize(targetWidth, targetHeight, { fit: 'fill' })
-    .composite([{ input: overlay, blend: 'over' }])
+  if (!isAnimated) {
+    // 静止画パス: 既存ロジックを踏襲する
+    const { width: targetWidth, height: targetHeight } = resolveTargetSize(
+      originalWidth,
+      originalHeight,
+    );
+    const overlay = await buildLgtmOverlay(targetWidth, targetHeight, 'LGTM');
+
+    const composed = await sharp(buffer)
+      .resize(targetWidth, targetHeight, { fit: 'fill' })
+      .composite([{ input: overlay, blend: 'over' }])
+      .webp({ quality: WEBP_QUALITY })
+      .toBuffer({ resolveWithObject: true });
+
+    return {
+      buffer: composed.data,
+      width: composed.info.width,
+      height: composed.info.height,
+      byteLength: composed.info.size,
+      isAnimated: false,
+    };
+  }
+
+  // アニメ入力パス: `{ animated: true }` で読み込むと sharp は全フレームを
+  // 縦に連結した 1 枚の画像として扱う (height = pageHeight × pages)。
+  // この状態で resize → composite → webp すると sharp がアニメーション WebP を吐く。
+  const animatedMeta = await sharp(buffer, { animated: true }).metadata();
+  const pageHeight = animatedMeta.pageHeight ?? originalHeight;
+  if (pageHeight <= 0) {
+    throw new BadRequestError('GIF のフレーム高さを判定できませんでした');
+  }
+
+  // アスペクト比は 1 フレーム単位で計算する (animatedMeta.height は縦タイル合計)。
+  const { width: targetWidth, height: targetPageHeight } = resolveTargetSize(
+    originalWidth,
+    pageHeight,
+  );
+  if (targetPageHeight <= 0) {
+    throw new BadRequestError('GIF のフレーム高さを判定できませんでした');
+  }
+
+  // 1 フレーム分のオーバーレイを 1 回だけ作り、全フレームの該当位置に同一オーバーレイを重ねる。
+  // sharp の `{ animated: true }` 入力は全フレームを縦タイル化して扱うため、
+  // resize に渡す高さは **1 フレーム分** (= targetPageHeight) で良い (sharp が内部で
+  // 全 pages にこれを適用する)。composite の top はリサイズ後の各フレームの開始位置 (= i * targetPageHeight) を渡す。
+  const overlay = await buildLgtmOverlay(targetWidth, targetPageHeight, 'LGTM');
+  const composites: sharp.OverlayOptions[] = [];
+  for (let i = 0; i < pages; i++) {
+    composites.push({
+      input: overlay,
+      blend: 'over',
+      top: i * targetPageHeight,
+      left: 0,
+    });
+  }
+
+  const composed = await sharp(buffer, { animated: true })
+    .resize(targetWidth, targetPageHeight, { fit: 'fill' })
+    .composite(composites)
     .webp({ quality: WEBP_QUALITY })
     .toBuffer({ resolveWithObject: true });
 
   return {
     buffer: composed.data,
     width: composed.info.width,
-    height: composed.info.height,
+    height: composed.info.pageHeight ?? composed.info.height,
     byteLength: composed.info.size,
+    isAnimated: true,
   };
 }

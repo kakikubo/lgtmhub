@@ -33,6 +33,7 @@ export const imageListItemSchema = z.object({
   uploaderId: z.string(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
+  isAnimated: z.boolean(),
   createdAt: z.string(),
 });
 

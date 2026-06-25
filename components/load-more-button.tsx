@@ -27,6 +27,7 @@ export function LoadMoreButton({ initialCursor }: { initialCursor: string }) {
         uploaderId: img.uploaderId,
         width: img.width,
         height: img.height,
+        isAnimated: img.isAnimated,
         createdAt: new Date(img.createdAt),
       }));
       setExtra((prev) => [...prev, ...restored]);
