@@ -196,7 +196,7 @@ export async function composeLgtmImage(buffer: Buffer): Promise<ComposedImage> {
   const animatedMeta = await sharp(buffer, { animated: true }).metadata();
   const pageHeight = animatedMeta.pageHeight ?? originalHeight;
   if (pageHeight <= 0) {
-    throw new BadRequestError('GIF のフレーム高さを判定できませんでした');
+    throw new BadRequestError('アニメーション画像のフレーム高さを判定できませんでした');
   }
 
   // アスペクト比は 1 フレーム単位で計算する (animatedMeta.height は縦タイル合計)。
@@ -205,7 +205,7 @@ export async function composeLgtmImage(buffer: Buffer): Promise<ComposedImage> {
     pageHeight,
   );
   if (targetPageHeight <= 0) {
-    throw new BadRequestError('GIF のフレーム高さを判定できませんでした');
+    throw new BadRequestError('アニメーション画像のフレーム高さを判定できませんでした');
   }
 
   // 1 フレーム分のオーバーレイを 1 回だけ作り、全フレームの該当位置に同一オーバーレイを重ねる。

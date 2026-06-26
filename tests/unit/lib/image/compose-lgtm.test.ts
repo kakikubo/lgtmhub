@@ -48,6 +48,44 @@ async function makeAnimatedGif(
     .toBuffer();
 }
 
+async function makeStaticWebp(width: number, height: number): Promise<Buffer> {
+  return sharp({
+    create: {
+      width,
+      height,
+      channels: 3,
+      background: { r: 30, g: 200, b: 120 },
+    },
+  })
+    .webp()
+    .toBuffer();
+}
+
+async function makeAnimatedWebp(
+  frameWidth: number,
+  frameHeight: number,
+  frameCount: number,
+): Promise<Buffer> {
+  // アニメ WebP も「縦タイル + pageHeight + animated 入力」で生成する。
+  // RGB を毎フレーム変えるのは GIF と同じ理由 (隣接同一フレーム dedup の回避)。
+  const channels = 3;
+  const stripe = Buffer.alloc(frameWidth * frameHeight * frameCount * channels);
+  for (let i = 0; i < frameCount; i++) {
+    for (let p = 0; p < frameWidth * frameHeight; p++) {
+      const offset = (i * frameWidth * frameHeight + p) * channels;
+      stripe[offset] = (i * 7) % 250;
+      stripe[offset + 1] = (i * 3) % 200;
+      stripe[offset + 2] = (i * 5) % 240;
+    }
+  }
+  const delays = new Array(frameCount).fill(100);
+  return sharp(stripe, {
+    raw: { width: frameWidth, height: frameHeight * frameCount, channels, pageHeight: frameHeight },
+  })
+    .webp({ loop: 0, delay: delays })
+    .toBuffer();
+}
+
 describe('composeLgtmImage (静止画)', () => {
   it('出力は WebP 形式で、長辺が MAX_LONG_SIDE になる (横長 1920×1080 → 400×225)', async () => {
     const input = await makeImage(1920, 1080);
@@ -169,5 +207,34 @@ describe('composeLgtmImage (アニメーション GIF, Issue #201)', () => {
     // GIF サイズは小さく (4×4) して合成コストを最小化する。
     const input = await makeAnimatedGif(4, 4, MAX_GIF_FRAMES + 1);
     await expect(composeLgtmImage(input)).rejects.toBeInstanceOf(BadRequestError);
+  });
+});
+
+describe('composeLgtmImage (WebP 入力, Issue #213)', () => {
+  it('静止 WebP 入力を WebP として出力する', async () => {
+    const input = await makeStaticWebp(800, 600);
+    const result = await composeLgtmImage(input);
+
+    expect(result.isAnimated).toBe(false);
+    expect(result.width).toBe(MAX_LONG_SIDE);
+    expect(result.height).toBe(300);
+
+    const meta = await sharp(result.buffer).metadata();
+    expect(meta.format).toBe('webp');
+  });
+
+  it('アニメ WebP 入力からアニメーション WebP (pages=N) を出力する', async () => {
+    const input = await makeAnimatedWebp(80, 60, 4);
+    const result = await composeLgtmImage(input);
+
+    expect(result.isAnimated).toBe(true);
+
+    const meta = await sharp(result.buffer, { animated: true }).metadata();
+    expect(meta.format).toBe('webp');
+    expect(meta.pages).toBe(4);
+    expect(meta.width).toBe(80);
+    expect(meta.pageHeight).toBe(60);
+    expect(result.width).toBe(80);
+    expect(result.height).toBe(60);
   });
 });
