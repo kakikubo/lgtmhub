@@ -24,10 +24,11 @@ jobs:
           # Gunzip ストリームの prematureClose を踏み、GitHub PR Files API のレスポンスを
           # 取得できず ERR_STREAM_PREMATURE_CLOSE で必ず失敗する (Issue #215)。
           # danger-js が undici 化されるまでの暫定回避として Node 22 (LTS) を固定する。
-          # 本ジョブはアプリのビルドを行わないため、`engines.node: ">=24.0.0"` の制約とは独立して下げて良い。
           node-version: "22"
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      # `package.json` の `engines.node: ">=24.0.0"` は本番アプリ実行環境 (Vercel) 向けで、
+      # 本ジョブはアプリビルド/起動を行わず danger CLI を回すだけのため engine-strict を外す。
+      - run: pnpm install --frozen-lockfile --config.engine-strict=false
       - run: pnpm exec danger ci --failOnErrors
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
