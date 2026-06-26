@@ -64,11 +64,5 @@
     "typescript": "~6.0.3",
     "vite-tsconfig-paths": "^6.0.0",
     "vitest": "^4.0.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": ["sharp"],
-    "overrides": {
-      "node-fetch@2": "npm:node-fetch-commonjs@^3.3.2"
-    }
   }
 }
