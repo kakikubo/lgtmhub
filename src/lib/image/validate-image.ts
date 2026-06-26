@@ -1,4 +1,4 @@
-import sharp, { type Metadata } from 'sharp';
+import sharp from 'sharp';
 import { BadRequestError } from '@/src/lib/errors';
 
 export const ALLOWED_IMAGE_FORMATS = ['jpeg', 'png', 'gif', 'webp'] as const;
@@ -22,7 +22,7 @@ export interface ValidatedImage {
   pages: number;
 }
 
-export function assertSupportedImageMetadata(metadata: Metadata): ValidatedImage {
+export function assertSupportedImageMetadata(metadata: sharp.Metadata): ValidatedImage {
   if (!isAllowedFormat(metadata.format)) {
     throw new BadRequestError('JPEG・PNG・GIF・WebP 形式の画像を使用してください');
   }
@@ -41,7 +41,7 @@ export function assertSupportedImageMetadata(metadata: Metadata): ValidatedImage
 }
 
 export async function validateImage(buffer: Buffer): Promise<ValidatedImage> {
-  let metadata: Metadata;
+  let metadata: sharp.Metadata;
   try {
     metadata = await sharp(buffer).metadata();
   } catch {

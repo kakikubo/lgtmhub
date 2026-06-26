@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { type Font, parse as parseFont } from 'opentype.js';
-import sharp, { type OverlayOptions } from 'sharp';
+import sharp from 'sharp';
 import { BadRequestError } from '@/src/lib/errors';
 import { MAX_GIF_FRAMES } from '@/src/lib/image/validate-image';
 
@@ -93,7 +93,7 @@ async function buildLgtmOverlay(
   const top = Math.round((canvasHeight - white.height) / 2);
   const left = Math.round((canvasWidth - white.width) / 2);
 
-  const composites: OverlayOptions[] = [];
+  const composites: sharp.OverlayOptions[] = [];
   const radiusSq = strokeWidth * strokeWidth;
   for (let dy = -strokeWidth; dy <= strokeWidth; dy++) {
     for (let dx = -strokeWidth; dx <= strokeWidth; dx++) {
@@ -213,7 +213,7 @@ export async function composeLgtmImage(buffer: Buffer): Promise<ComposedImage> {
   // resize に渡す高さは **1 フレーム分** (= targetPageHeight) で良い (sharp が内部で
   // 全 pages にこれを適用する)。composite の top はリサイズ後の各フレームの開始位置 (= i * targetPageHeight) を渡す。
   const overlay = await buildLgtmOverlay(targetWidth, targetPageHeight, 'LGTM');
-  const composites: OverlayOptions[] = [];
+  const composites: sharp.OverlayOptions[] = [];
   for (let i = 0; i < pages; i++) {
     composites.push({
       input: overlay,
