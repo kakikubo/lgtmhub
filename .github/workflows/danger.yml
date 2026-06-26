@@ -20,7 +20,12 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: "24"
+          # danger@13 が内部で依存している node-fetch@2.7.0 は Node 24 ランナー上で
+          # Gunzip ストリームの prematureClose を踏み、GitHub PR Files API のレスポンスを
+          # 取得できず ERR_STREAM_PREMATURE_CLOSE で必ず失敗する (Issue #215)。
+          # danger-js が undici 化されるまでの暫定回避として Node 22 (LTS) を固定する。
+          # 本ジョブはアプリのビルドを行わないため、`engines.node: ">=24.0.0"` の制約とは独立して下げて良い。
+          node-version: "22"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec danger ci --failOnErrors
