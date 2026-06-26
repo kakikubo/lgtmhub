@@ -95,7 +95,7 @@ export function ImageRegisterForm() {
           className="w-full border rounded px-3 py-2 text-sm disabled:bg-gray-100"
         />
         <p className="text-xs text-gray-500">
-          HTTPS の URL のみ受け付けます。JPEG / PNG / GIF (最大 10MB) に対応しています。
+          HTTPS の URL のみ受け付けます。JPEG / PNG / GIF / WebP (最大 10MB) に対応しています。
         </p>
       </div>
 

@@ -26,12 +26,12 @@ vi.mock('@/src/lib/http/safe-fetch', () => ({
   safeFetch: (...args: unknown[]) => safeFetch(...args),
   DEFAULT_MAX_FETCH_BYTES: 10 * 1024 * 1024,
   DEFAULT_FETCH_TIMEOUT_MS: 8000,
-  DEFAULT_ALLOWED_CONTENT_TYPES: ['image/jpeg', 'image/png', 'image/gif'],
+  DEFAULT_ALLOWED_CONTENT_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
 }));
 
 vi.mock('@/src/lib/image/validate-image', () => ({
   validateImage: (...args: unknown[]) => validateImage(...args),
-  ALLOWED_IMAGE_FORMATS: ['jpeg', 'png', 'gif'],
+  ALLOWED_IMAGE_FORMATS: ['jpeg', 'png', 'gif', 'webp'],
 }));
 
 vi.mock('@/src/lib/image/calculate-phash', () => ({
