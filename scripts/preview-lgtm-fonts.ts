@@ -13,7 +13,7 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { type Font, parse as parseFont } from 'opentype.js';
-import sharp from 'sharp';
+import sharp, { type OverlayOptions } from 'sharp';
 
 interface FontCandidate {
   family: string;
@@ -83,7 +83,7 @@ async function renderForFont(candidate: FontCandidate): Promise<Buffer> {
   const top = Math.round((CANVAS_HEIGHT - white.height) / 2);
   const left = Math.round((CANVAS_WIDTH - white.width) / 2);
 
-  const composites: sharp.OverlayOptions[] = [];
+  const composites: OverlayOptions[] = [];
   const radiusSq = STROKE_WIDTH * STROKE_WIDTH;
   for (let dy = -STROKE_WIDTH; dy <= STROKE_WIDTH; dy++) {
     for (let dx = -STROKE_WIDTH; dx <= STROKE_WIDTH; dx++) {

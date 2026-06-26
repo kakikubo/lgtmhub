@@ -15,6 +15,7 @@ export interface CreateLgtmImageInput {
   height: number;
   fileSizeBytes: number;
   mimeType: string;
+  isAnimated: boolean;
   status?: ImageStatus;
 }
 
@@ -39,6 +40,7 @@ function toLgtmImage(row: LgtmImageRow): LgtmImage {
     height: row.height,
     fileSizeBytes: row.file_size_bytes,
     mimeType: row.mime_type,
+    isAnimated: row.is_animated,
     // DB 側の CHECK 制約 (status in ('processing','active','deleted')) で値域は保証済み。
     // Supabase 自動生成の型は CHECK を反映しないため、ガイドライン許容例外として narrowing する。
     status: row.status as ImageStatus,
@@ -58,6 +60,7 @@ function toInsert(input: CreateLgtmImageInput): LgtmImageInsert {
     height: input.height,
     file_size_bytes: input.fileSizeBytes,
     mime_type: input.mimeType,
+    is_animated: input.isAnimated,
     status: input.status ?? 'active',
   };
 }
