@@ -68,6 +68,7 @@ export type Database = {
           height: number
           id: string
           image_url: string
+          is_animated: boolean
           mime_type: string
           original_url: string
           p_hash: string
@@ -83,6 +84,7 @@ export type Database = {
           height: number
           id?: string
           image_url: string
+          is_animated?: boolean
           mime_type?: string
           original_url: string
           p_hash: string
@@ -98,6 +100,7 @@ export type Database = {
           height?: number
           id?: string
           image_url?: string
+          is_animated?: boolean
           mime_type?: string
           original_url?: string
           p_hash?: string

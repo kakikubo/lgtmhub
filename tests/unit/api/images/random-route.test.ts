@@ -29,6 +29,7 @@ const IMAGE = {
   uploaderId: 'user-1',
   width: 266,
   height: 199,
+  isAnimated: false,
   createdAt: new Date('2026-05-18T00:00:00.000Z'),
 };
 

@@ -62,6 +62,7 @@ function toPublic(image: LgtmImage): PublicLgtmImage {
     uploaderId: image.uploaderId,
     width: image.width,
     height: image.height,
+    isAnimated: image.isAnimated,
     createdAt: image.createdAt,
   };
 }
@@ -165,6 +166,8 @@ export class ImageService {
         height: composed.height,
         fileSizeBytes: composed.byteLength,
         mimeType: 'image/webp',
+        // アニメーション WebP / 静止 WebP の判定は compose 結果に従う (Issue #201)
+        isAnimated: composed.isAnimated,
         status: 'active',
       });
     } catch (err) {

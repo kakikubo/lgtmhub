@@ -120,6 +120,7 @@ describe('listImagesResponseSchema', () => {
           uploaderId: 'user-1',
           width: 800,
           height: 600,
+          isAnimated: false,
           createdAt: '2026-05-04T12:00:00.000Z',
         },
       ],
@@ -135,6 +136,24 @@ describe('listImagesResponseSchema', () => {
           id: 'image-1',
           imageUrl: 'https://blob.example/lgtm/x.webp',
           uploaderId: 'user-1',
+          isAnimated: false,
+          createdAt: '2026-05-04T12:00:00.000Z',
+        },
+      ],
+      nextCursor: null,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('isAnimated が欠けていれば拒否する (Issue #201)', () => {
+    const result = listImagesResponseSchema.safeParse({
+      images: [
+        {
+          id: 'image-1',
+          imageUrl: 'https://blob.example/lgtm/x.webp',
+          uploaderId: 'user-1',
+          width: 800,
+          height: 600,
           createdAt: '2026-05-04T12:00:00.000Z',
         },
       ],
@@ -178,6 +197,7 @@ describe('randomImagesResponseSchema', () => {
           uploaderId: 'user-1',
           width: 800,
           height: 600,
+          isAnimated: true,
           createdAt: '2026-05-04T12:00:00.000Z',
         },
       ],

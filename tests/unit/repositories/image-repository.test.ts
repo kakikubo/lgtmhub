@@ -17,6 +17,7 @@ function buildRow(overrides: Partial<Row> = {}): Row {
     height: 600,
     file_size_bytes: 12345,
     mime_type: 'image/webp',
+    is_animated: false,
     status: 'active',
     deleted_at: null,
     created_at: '2026-05-04T00:00:00.000Z',
@@ -64,6 +65,7 @@ describe('ImageRepository.create', () => {
       height: 600,
       fileSizeBytes: 12345,
       mimeType: 'image/webp',
+      isAnimated: false,
     });
 
     expect(created.id).toBe('image-1');
@@ -88,6 +90,7 @@ describe('ImageRepository.create', () => {
         height: 600,
         fileSizeBytes: 12345,
         mimeType: 'image/webp',
+        isAnimated: false,
       }),
     ).rejects.toBeInstanceOf(DatabaseError);
   });
@@ -105,6 +108,7 @@ describe('ImageRepository.create', () => {
         height: 600,
         fileSizeBytes: 12345,
         mimeType: 'image/webp',
+        isAnimated: false,
       }),
     ).rejects.toBeInstanceOf(DatabaseError);
   });

@@ -121,6 +121,7 @@ function buildImage(overrides: Partial<LgtmImage> = {}): LgtmImage {
     height: 600,
     fileSizeBytes: 12345,
     mimeType: 'image/webp',
+    isAnimated: false,
     status: 'active',
     deletedAt: null,
     createdAt: new Date('2026-05-04T12:00:00.000Z'),
@@ -141,7 +142,7 @@ async function buildService(mocks: Mocks) {
 
 function setupHappyPathMocks(): void {
   safeFetch.mockResolvedValue({ buffer: Buffer.from('img'), contentType: 'image/jpeg' });
-  validateImage.mockResolvedValue({ format: 'jpeg', width: 800, height: 600 });
+  validateImage.mockResolvedValue({ format: 'jpeg', width: 800, height: 600, pages: 1 });
   calculatePHash.mockResolvedValue('b'.repeat(1024));
   isDuplicate.mockReturnValue(false);
   composeLgtmImage.mockResolvedValue({
@@ -149,6 +150,7 @@ function setupHappyPathMocks(): void {
     width: 400,
     height: 300,
     byteLength: 4,
+    isAnimated: false,
   });
 }
 
@@ -174,7 +176,7 @@ describe('ImageService.createImage', () => {
     ]);
 
     safeFetch.mockResolvedValue({ buffer: Buffer.from('img'), contentType: 'image/jpeg' });
-    validateImage.mockResolvedValue({ format: 'jpeg', width: 800, height: 600 });
+    validateImage.mockResolvedValue({ format: 'jpeg', width: 800, height: 600, pages: 1 });
     calculatePHash.mockResolvedValue('a'.repeat(1024));
     isDuplicate.mockReturnValueOnce(true);
 
@@ -227,9 +229,33 @@ describe('ImageService.createImage', () => {
         pHash: 'b'.repeat(1024),
         status: 'active',
         mimeType: 'image/webp',
+        isAnimated: false,
       }),
     );
     expect(mocks.blob.del).not.toHaveBeenCalled();
+  });
+
+  it('アニメーション入力の場合 imageRepo.create に isAnimated:true が渡る (Issue #201)', async () => {
+    const mocks = buildMocks();
+    setupHappyPathMocks();
+    composeLgtmImage.mockResolvedValue({
+      buffer: Buffer.from('animated-webp'),
+      width: 400,
+      height: 300,
+      byteLength: 13,
+      isAnimated: true,
+    });
+    mocks.imageRepo.create.mockResolvedValue(buildImage({ isAnimated: true }));
+
+    const service = await buildService(mocks);
+    await service.createImage('user-1', 'https://example.com/x.gif');
+
+    expect(mocks.imageRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isAnimated: true,
+        mimeType: 'image/webp',
+      }),
+    );
   });
 
   it('atomic increment が DailyLimitExceededError を throw した場合、Blob/DB は触らない (TOCTOU レース敗北)', async () => {
@@ -293,6 +319,7 @@ describe('ImageService.listImages', () => {
         uploaderId: 'user-1',
         width: 800,
         height: 600,
+        isAnimated: false,
         createdAt: new Date('2026-05-04T12:00:00.000Z'),
       },
       {
@@ -301,6 +328,7 @@ describe('ImageService.listImages', () => {
         uploaderId: 'user-1',
         width: 800,
         height: 600,
+        isAnimated: false,
         createdAt: new Date('2026-05-04T11:00:00.000Z'),
       },
     ]);
@@ -448,6 +476,7 @@ describe('ImageService.listRandomImages', () => {
       uploaderId: 'user-1',
       width: 320,
       height: 240,
+      isAnimated: false,
       createdAt: new Date('2026-05-04T12:00:00.000Z'),
     });
     expect(result).not.toHaveProperty('nextCursor');
@@ -534,6 +563,7 @@ describe('ImageService.getImage', () => {
       uploaderId: 'user-1',
       width: 1024,
       height: 768,
+      isAnimated: false,
       createdAt: new Date('2026-05-04T12:00:00.000Z'),
     });
   });

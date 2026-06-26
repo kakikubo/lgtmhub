@@ -13,6 +13,11 @@ import { createClient } from '@/src/lib/supabase/server';
 import { createImageRequestSchema, listImagesQuerySchema } from '@/src/lib/validation/image';
 import { buildImageService } from '@/src/services/image-service';
 
+// アニメーション GIF → アニメーション WebP の同期合成は最大 150 フレーム ×
+// LGTM オーバーレイで数秒〜十数秒かかる。Vercel デフォルトの 10 秒では足りないため
+// Pro プラン前提で 60 秒に拡張する (Issue #201)。
+export const maxDuration = 60;
+
 export async function GET(request: NextRequest) {
   // 空文字クエリ (`?cursor=` など) は zod の .optional() で弾けないため、事前に undefined 化する
   const cursorRaw = request.nextUrl.searchParams.get('cursor');
