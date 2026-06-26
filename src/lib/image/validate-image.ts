@@ -1,11 +1,11 @@
 import sharp from 'sharp';
 import { BadRequestError } from '@/src/lib/errors';
 
-export const ALLOWED_IMAGE_FORMATS = ['jpeg', 'png', 'gif'] as const;
+export const ALLOWED_IMAGE_FORMATS = ['jpeg', 'png', 'gif', 'webp'] as const;
 export type AllowedImageFormat = (typeof ALLOWED_IMAGE_FORMATS)[number];
 
-// アニメーション入力 (現状は GIF のみだが将来 webp / png も含めて等しく弾く)
-// の最大フレーム数。Vercel Functions の maxDuration / メモリと sharp の合成所要時間から
+// アニメーション入力 (GIF / WebP) で共有するフレーム数上限。
+// Vercel Functions の maxDuration / メモリと sharp の合成所要時間から
 // 余裕を持って 150 を上限とする (Issue #201)。
 export const MAX_GIF_FRAMES = 150;
 
@@ -24,7 +24,7 @@ export interface ValidatedImage {
 
 export function assertSupportedImageMetadata(metadata: sharp.Metadata): ValidatedImage {
   if (!isAllowedFormat(metadata.format)) {
-    throw new BadRequestError('JPEG・PNG・GIF 形式の画像を使用してください');
+    throw new BadRequestError('JPEG・PNG・GIF・WebP 形式の画像を使用してください');
   }
   const pages = metadata.pages ?? 1;
   if (pages > MAX_GIF_FRAMES) {

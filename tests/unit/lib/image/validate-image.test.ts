@@ -47,6 +47,30 @@ async function makeAnimatedGif(frameCount: number): Promise<Buffer> {
     .toBuffer();
 }
 
+async function makeAnimatedWebp(frameCount: number): Promise<Buffer> {
+  // アニメ WebP も「縦タイル + pageHeight + animated 入力」で生成する。
+  // WebP エンコーダも GIF 同様、同一フレームを deduplicate するため
+  // RGB を毎フレーム変化させて pages が想定どおりになるよう担保する。
+  const frameWidth = 16;
+  const frameHeight = 16;
+  const channels = 3;
+  const stripe = Buffer.alloc(frameWidth * frameHeight * frameCount * channels);
+  for (let i = 0; i < frameCount; i++) {
+    for (let p = 0; p < frameWidth * frameHeight; p++) {
+      const offset = (i * frameWidth * frameHeight + p) * channels;
+      stripe[offset] = (i * 7) % 250;
+      stripe[offset + 1] = (i * 3) % 200;
+      stripe[offset + 2] = (i * 5) % 240;
+    }
+  }
+  const delays = new Array(frameCount).fill(100);
+  return sharp(stripe, {
+    raw: { width: frameWidth, height: frameHeight * frameCount, channels, pageHeight: frameHeight },
+  })
+    .webp({ loop: 0, delay: delays })
+    .toBuffer();
+}
+
 function fakeMetadata(overrides: Partial<Metadata>): Metadata {
   // 必要最小限の項目のみ持つ Metadata を構築 (テストでの分岐検証用)
   return overrides as Metadata;
@@ -84,9 +108,18 @@ describe('validateImage (実 sharp 経由)', () => {
     expect(result.pages).toBe(5);
   });
 
-  it('WebP を拒否する (BadRequestError)', async () => {
+  it('静止 WebP を受理し pages=1 を返す (Issue #213)', async () => {
     const buffer = await makeBuffer('webp');
-    await expect(validateImage(buffer)).rejects.toBeInstanceOf(BadRequestError);
+    const result = await validateImage(buffer);
+    expect(result.format).toBe('webp');
+    expect(result.pages).toBe(1);
+  });
+
+  it('アニメーション WebP を受理し pages=N を返す (Issue #213)', async () => {
+    const buffer = await makeAnimatedWebp(4);
+    const result = await validateImage(buffer);
+    expect(result.format).toBe('webp');
+    expect(result.pages).toBe(4);
   });
 
   it('破損した画像を拒否する', async () => {
