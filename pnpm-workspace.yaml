@@ -1,0 +1,12 @@
+packages:
+  - "."
+
+pmOnFail: ignore
+
+allowBuilds:
+  sharp: true
+  core-js: false
+  lefthook: false
+
+overrides:
+  node-fetch@2: npm:node-fetch-commonjs@^3.3.2
