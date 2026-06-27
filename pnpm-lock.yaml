@@ -95,7 +95,7 @@ importers:
         version: 4.1.9(vitest@4.1.9)
       danger:
         specifier: ^13.0.7
-        version: 13.0.8
+        version: 13.0.10
       lefthook:
         specifier: ^2.1.6
         version: 2.1.9
@@ -1516,8 +1516,8 @@ packages:
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
-  danger@13.0.8:
-    resolution: {integrity: sha512-j2UCsgtcjTuftJ79+W9N8UGdIKBrCjTYqrjVf7rpqRaZBfi/VqKVvzWnTxFrj25Gt5YCwbRaY3+cG7tovV3Vtg==}
+  danger@13.0.10:
+    resolution: {integrity: sha512-qMa/YdfVP/a1HhuvMUsocTO0otgLphuiV5z4G5P7C4+qHvNtCSlzvZm3UuwBut2iwQ/r5NGcwcmD4t+8LjIS0A==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -1833,10 +1833,6 @@ packages:
   http-errors@2.0.1:
     resolution: {integrity: sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ==}
     engines: {node: '>= 0.8'}
-
-  http-proxy-agent@7.0.2:
-    resolution: {integrity: sha512-T1gkAiYYDWYx3V5Bmyu7HcfcvL7mUrTWiM6yOfa3PIphViJ/gFPbvidQ+veqSOHci/PxBcDabeUNCzpOODJZig==}
-    engines: {node: '>= 14'}
 
   https-proxy-agent@7.0.6:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
@@ -2339,10 +2335,6 @@ packages:
     resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
     engines: {node: '>=10.5.0'}
     deprecated: Use your platform's native DOMException instead
-
-  node-fetch-commonjs@3.3.2:
-    resolution: {integrity: sha512-VBlAiynj3VMLrotgwOS3OyECFxas5y7ltLcK4t41lMUZeaK15Ym4QRkqN0EQKAFL42q9i21EPKjzLUPfltR72A==}
-    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
   node-fetch@3.3.2:
     resolution: {integrity: sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==}
@@ -2854,6 +2846,10 @@ packages:
 
   undici-types@7.18.2:
     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
+
+  undici@6.21.1:
+    resolution: {integrity: sha512-q/1rj5D0/zayJB2FraXdaWxbhWiNKDvu8naDT2dl1yTlvJp4BLtOcp2a5BvgGNQpYYJzau7tf1WgKv3b+7mqpQ==}
+    engines: {node: '>=18.17'}
 
   undici@6.27.0:
     resolution: {integrity: sha512-YmfV3YnEDzXRC5lZ2jWtWWHKGUm1zIt8AhesR1tens+HTNv+YZlN/dp6G727LOvMJ8xjP9Be7Y2Sdr96LDm+pg==}
@@ -4258,7 +4254,7 @@ snapshots:
 
   csstype@3.2.3: {}
 
-  danger@13.0.8:
+  danger@13.0.10:
     dependencies:
       '@gitbeaker/rest': 38.12.1
       '@octokit/rest': 20.1.2
@@ -4268,8 +4264,6 @@ snapshots:
       core-js: 3.49.0
       debug: 4.4.3
       fast-json-patch: 3.1.1
-      http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6
       hyperlinker: 1.0.0
       ini: 5.0.0
       json5: 2.2.3
@@ -4282,7 +4276,6 @@ snapshots:
       memfs-or-file-map-to-github-branch: 1.3.0
       micromatch: 4.0.8
       node-cleanup: 2.1.2
-      node-fetch: node-fetch-commonjs@3.3.2
       override-require: 1.1.1
       parse-diff: 0.7.1
       parse-github-url: 1.0.4
@@ -4293,6 +4286,7 @@ snapshots:
       regenerator-runtime: 0.13.11
       require-from-string: 2.0.2
       supports-hyperlinks: 4.5.0
+      undici: 6.21.1
     transitivePeerDependencies:
       - supports-color
 
@@ -4600,13 +4594,6 @@ snapshots:
       setprototypeof: 1.2.0
       statuses: 2.0.2
       toidentifier: 1.0.1
-
-  http-proxy-agent@7.0.2:
-    dependencies:
-      agent-base: 7.1.4
-      debug: 4.4.3
-    transitivePeerDependencies:
-      - supports-color
 
   https-proxy-agent@7.0.6:
     dependencies:
@@ -4990,11 +4977,6 @@ snapshots:
   node-cleanup@2.1.2: {}
 
   node-domexception@1.0.0: {}
-
-  node-fetch-commonjs@3.3.2:
-    dependencies:
-      node-domexception: 1.0.0
-      web-streams-polyfill: 3.3.3
 
   node-fetch@3.3.2:
     dependencies:
@@ -5574,6 +5556,8 @@ snapshots:
   typescript@6.0.3: {}
 
   undici-types@7.18.2: {}
+
+  undici@6.21.1: {}
 
   undici@6.27.0: {}
 
