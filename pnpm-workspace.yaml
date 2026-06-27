@@ -10,3 +10,4 @@ allowBuilds:
 
 overrides:
   node-fetch@2: npm:node-fetch-commonjs@^3.3.2
+  undici: ">=6.27.0"
