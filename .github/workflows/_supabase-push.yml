@@ -17,6 +17,11 @@ on:
         description: 'ログ表示用のリモート名 (prod / preview)'
         required: true
         type: string
+      ref:
+        description: 'checkout する git ref。空文字なら呼び出しイベントのデフォルト (main push なら main HEAD)。PR の HEAD を適用したい場合に sha を渡す。'
+        required: false
+        type: string
+        default: ''
     secrets:
       access_token:
         required: true
@@ -41,6 +46,8 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.db_password }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: supabase/setup-cli@v2.1.1
         with:
