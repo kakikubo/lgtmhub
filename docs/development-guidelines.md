@@ -914,6 +914,21 @@ jobs:
 - `permissions: contents: read` のみ。フォーク PR からの secrets 露出を避けるため `pull_request` トリガーは持たない
 - 失敗時の手動リカバリ: ローカルから `pnpm exec supabase db push --linked`
 
+#### Preview DB へのマイグレーション適用フロー (`apply-preview-migration` ラベル)
+
+`.github/workflows/supabase-preview-migrate.yml` で、`apply-preview-migration` ラベルが付いた PR の HEAD を Preview Supabase (`mdnyanwprgtqscugnjif`) に即時 push する。main マージを待たずに Vercel Preview で DB schema を含めた動作確認をするための経路。
+
+- トリガー: `pull_request: { types: [labeled, synchronize, reopened], paths: ['supabase/migrations/**', 'supabase/config.toml'] }`
+- 動作: 既存の `_supabase-push.yml` を `remote_name: preview` + `ref: <PR HEAD sha>` で呼び出し、`supabase db push --linked` と `supabase config push --yes` を実行する
+- 必要な GitHub Secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PREVIEW_PROJECT_REF`, `SUPABASE_PREVIEW_DB_PASSWORD`, `SUPABASE_PREVIEW_GITHUB_OAUTH_CLIENT_ID`, `SUPABASE_PREVIEW_GITHUB_OAUTH_CLIENT_SECRET` (既存)
+- prod (`lgtm2`) には一切影響しない (preview project_ref のみを使う)
+
+ラベル運用ルール (Supabase Branching を使わない代償として人手で守る):
+
+1. **直列適用**: 並列 PR の schema 干渉を避けるため、Preview への適用は 1 PR ずつ完了させてから次のラベルを付ける (workflow 自体は PR 番号で concurrency 分離しているが、異なる PR 間は直列化されない)
+2. **未マージ close 時の孤立 DDL**: 破壊的 DDL (`DROP COLUMN` 等) を含む PR を merge せず閉じると、Preview DB に DDL が残る。close 前に revert マイグレーションを作成して Preview に適用する (ローカルから `supabase link --project-ref mdnyanwprgtqscugnjif && supabase db push --linked`)
+3. **main マージ後の重複適用**: マージ後は `supabase-deploy.yml` (main push trigger) が prod + Preview 両方に再適用するが、`supabase migration list` の差分照合で適用済み migration はスキップされるため安全
+
 ### package.json scripts
 
 ```json
