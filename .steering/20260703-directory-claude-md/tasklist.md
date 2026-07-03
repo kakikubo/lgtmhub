@@ -14,8 +14,8 @@
 - [x] src/CLAUDE.md を新規作成
 - [x] supabase/CLAUDE.md を新規作成
 - [x] ~~docs/repository-structure.md のパスエイリアス記述を tsconfig.json の実態に修正~~（前提誤りにより不要: 実物を確認したところ docs は既に `"@/*": ["./*"]` と正しく記載していた。調査サブエージェントの報告が誤り）
-- [ ] .steering/20260703-directory-claude-md/ をコミットに含める
-- [ ] コミット・push・PR 作成 (GHTKN_APP=C-FO/write、--body-file 使用)
+- [x] .steering/20260703-directory-claude-md/ をコミットに含める
+- [x] コミット・push・PR 作成 (GHTKN_APP=C-FO/write、--body-file 使用) → PR #230
 
 ## フェーズ2: PR 2 — doc 作成系 skill の削除
 
