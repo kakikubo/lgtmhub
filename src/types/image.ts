@@ -28,3 +28,8 @@ export interface PublicLgtmImage {
   isAnimated: boolean;
   createdAt: Date;
 }
+
+// 詳細ページ・管理者操作 (再生成) 用。一覧で不要な originalUrl を持たせるため PublicLgtmImage を継承する。
+export interface PublicLgtmImageDetail extends PublicLgtmImage {
+  originalUrl: string;
+}

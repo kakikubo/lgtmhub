@@ -69,3 +69,25 @@ export const createImageErrorResponseSchema = z.object({
 });
 
 export type CreateImageErrorResponse = z.infer<typeof createImageErrorResponseSchema>;
+
+// POST /api/images/[id]/regenerate リクエストボディ。
+// originalUrl 未指定なら既存の originalUrl を再利用する (=元画像から作り直し)。
+// createImageRequestSchema と同じ URL 検証 (HTTPS, 2048 文字上限) を適用する。
+export const regenerateImageRequestSchema = z.object({
+  originalUrl: z
+    .string()
+    .max(2048, '画像 URL が長すぎます (最大 2048 文字)')
+    .url('画像 URL の形式が正しくありません')
+    .startsWith('https://', 'HTTPS の URL を入力してください')
+    .optional(),
+});
+
+export type RegenerateImageRequest = z.infer<typeof regenerateImageRequestSchema>;
+
+// POST /api/images/[id]/regenerate の 200 レスポンス
+export const regenerateImageResponseSchema = z.object({
+  id: z.string().min(1),
+  imageUrl: z.string().url(),
+});
+
+export type RegenerateImageResponse = z.infer<typeof regenerateImageResponseSchema>;
