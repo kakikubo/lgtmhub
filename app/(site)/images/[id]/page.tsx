@@ -3,11 +3,12 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { CopyMarkdownButton } from '@/components/copy-markdown-button';
 import { ImageDetailActions } from '@/components/image-detail-actions';
+import { ImageRegenerateAction } from '@/components/image-regenerate-action';
 import { UploaderProfileRow } from '@/components/uploader-profile-row';
 import { createClient } from '@/src/lib/supabase/server';
 import { buildImageService } from '@/src/services/image-service';
 import { buildUserProfileService } from '@/src/services/user-profile-service';
-import type { PublicLgtmImage } from '@/src/types/image';
+import type { PublicLgtmImageDetail } from '@/src/types/image';
 import type { UserProfile } from '@/src/types/user';
 
 interface ImageDetailPageProps {
@@ -15,12 +16,13 @@ interface ImageDetailPageProps {
 }
 
 interface DetailViewProps {
-  image: PublicLgtmImage;
+  image: PublicLgtmImageDetail;
   uploader: UserProfile | null;
   isOwner: boolean;
+  isAdmin: boolean;
 }
 
-function DetailView({ image, uploader, isOwner }: DetailViewProps) {
+function DetailView({ image, uploader, isOwner, isAdmin }: DetailViewProps) {
   return (
     <section data-testid="image-detail-page" className="mx-auto max-w-3xl px-4 py-8 space-y-6">
       <Link
@@ -55,6 +57,9 @@ function DetailView({ image, uploader, isOwner }: DetailViewProps) {
       <CopyMarkdownButton imageUrl={image.imageUrl} />
 
       {isOwner ? <ImageDetailActions imageId={image.id} /> : null}
+      {isAdmin ? (
+        <ImageRegenerateAction imageId={image.id} currentOriginalUrl={image.originalUrl} />
+      ) : null}
     </section>
   );
 }
@@ -69,10 +74,10 @@ export default async function ImageDetailPage({ params }: ImageDetailPageProps) 
   const supabase = await createClient();
   const [imageResult, userResult] = await Promise.all([
     buildImageService(supabase)
-      .getImage(id)
+      .getImageDetail(id)
       .catch((err: unknown) => {
         console.error('[ImageDetailPage] failed to load image', err);
-        return null as PublicLgtmImage | null;
+        return null as PublicLgtmImageDetail | null;
       }),
     supabase.auth.getUser(),
   ]);
@@ -81,19 +86,27 @@ export default async function ImageDetailPage({ params }: ImageDetailPageProps) 
     notFound();
   }
 
-  // 投稿者プロフィールは画像取得後にしか uploaderId が分からないため逐次取得する。
+  // 投稿者プロフィールと閲覧者プロフィール (is_admin 判定) を並列取得する。
   // 詳細ページは 1 件のみなので findById で十分 (N+1 を避けるための findManyByIds は不要)。
-  // 取得失敗時は null へ degrade し、UploaderProfileRow 側で Unknown + デフォルトアバター表示にフォールバックする
-  const uploader = await buildUserProfileService(supabase)
-    .findById(imageResult.uploaderId)
-    .catch((err: unknown) => {
+  // 取得失敗時は null / false へ degrade する
+  const user = userResult.data.user;
+  const profileService = buildUserProfileService(supabase);
+  const [uploader, viewerProfile] = await Promise.all([
+    profileService.findById(imageResult.uploaderId).catch((err: unknown) => {
       console.error('[ImageDetailPage] failed to load uploader profile', err);
       return null;
-    });
+    }),
+    user
+      ? profileService.findById(user.id).catch((err: unknown) => {
+          console.error('[ImageDetailPage] failed to load viewer profile', err);
+          return null;
+        })
+      : Promise.resolve(null),
+  ]);
 
-  // 所有者判定だけクライアントに渡す。認証情報そのものは流さない
-  const user = userResult.data.user;
+  // 所有者判定・管理者判定だけクライアントに渡す。認証情報そのものは流さない
   const isOwner = !!user && user.id === imageResult.uploaderId;
+  const isAdmin = viewerProfile?.isAdmin === true;
 
-  return <DetailView image={imageResult} uploader={uploader} isOwner={isOwner} />;
+  return <DetailView image={imageResult} uploader={uploader} isOwner={isOwner} isAdmin={isAdmin} />;
 }
