@@ -356,6 +356,50 @@ DELETE /api/images/:id
 
 ---
 
+### 画像再生成（管理者限定 / Issue #195）
+
+```
+POST /api/images/:id/regenerate
+```
+
+**認証**: 必須（`user_profiles.is_admin = true` のみ）。認可は `src/lib/auth/require-admin.ts` の `requireAdmin(supabase)` 共通ゲートで行い、非管理者は 403 に倒す。将来の管理者機能（PRD 機能6 の管理者削除など）でも同じヘルパーを共有する。
+
+**リクエスト**:
+```json
+{
+  "originalUrl": "https://example.com/replaced.jpg"
+}
+```
+
+- `originalUrl` を省略すると既存の `original_url` から再取得する（元画像の作り直し）。
+- 指定すると元画像 URL の差し替えとして扱い、`original_url` も更新する。
+
+**処理フロー**:
+
+1. `findActiveById` で対象存在確認。無ければ 404。
+2. `safeFetch` → `validateImage` → `calculatePHash` → 重複判定（**自レコード ID を除外**）→ `composeLgtmImage` → 新 Blob キーで `put`。
+3. `updateAfterRegenerate` で DB を更新（`image_url`, `p_hash`, `width`, `height`, `file_size_bytes`, `is_animated`, `updated_at` を必ず、`original_url` は差し替え時のみ）。失敗時は新 Blob を best-effort `del` してロールバック。
+4. 更新成功後、旧 Blob を best-effort `del`（失敗時は warning ログを残し、日次クリーンアップに委ねる）。
+5. `revalidateTag(HOME_IMAGES_CACHE_TAG, 'max')` で一覧・詳細のキャッシュを破棄。
+6. `console.info` で `requesterId` / `imageId` / `urlChanged` / `previousImageUrl` / `newImageUrl` を監査ログ出力（監査カラムは追加しない）。
+
+**日次アップロード上限は加算しない**（新規投稿ではなく既存の作り直しのため）。
+
+**レスポンス**: `200 OK`
+```json
+{ "id": "<uuid>", "imageUrl": "https://blob.example/lgtm/<new-uuid>.webp" }
+```
+
+**エラーレスポンス**:
+- 400 Bad Request: 画像 ID が UUID 形式でない / `originalUrl` バリデーション NG / 取得・検証失敗（`safeFetch` / `validateImage`）
+- 401 Unauthorized: 未ログイン
+- 403 Forbidden: 非管理者
+- 404 Not Found: 画像が存在しない / 論理削除済み
+- 409 Conflict: 差し替え先が他の active 画像と実質同一（重複判定は自レコードを除外）
+- 500 Internal Server Error: それ以外
+
+---
+
 ### お気に入り追加（PRD機能 4-A）
 
 ```
@@ -784,6 +828,7 @@ CREATE POLICY "users can manage own favorites"
 
 - `POST /api/images`: 正常登録・重複検出・上限超過・SSRF・未ログイン
 - `DELETE /api/images/:id`: 本人削除・他人削除（403）・管理者削除
+- `POST /api/images/:id/regenerate`: 管理者による再生成・非管理者 403・URL 差し替え・重複判定で自己除外・daily count 非加算・取得失敗時の無傷性
 - `POST /api/favorites` / `DELETE /api/favorites/:id`: 追加・解除・重複追加（409）
 
 ### E2Eテスト
