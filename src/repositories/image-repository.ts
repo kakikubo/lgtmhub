@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { DatabaseError } from '@/src/lib/errors';
+import { DatabaseError, NotFoundError } from '@/src/lib/errors';
 import type { Database } from '@/src/types/database.types';
 import type { ImageStatus, LgtmImage } from '@/src/types/image';
 
@@ -27,6 +27,17 @@ export interface ActivePHashEntry {
 export interface ListImagesOptions {
   cursor?: string;
   limit: number;
+}
+
+export interface UpdateAfterRegenerateInput {
+  imageUrl: string;
+  pHash: string;
+  width: number;
+  height: number;
+  fileSizeBytes: number;
+  isAnimated: boolean;
+  // 差し替え時のみ設定。未指定なら DB の originalUrl は据え置き
+  originalUrl?: string;
 }
 
 function toLgtmImage(row: LgtmImageRow): LgtmImage {
@@ -128,6 +139,53 @@ export class ImageRepository {
 
     if (error) throw new DatabaseError(error.message);
     return (data ?? []).map((row) => ({ id: row.id, pHash: row.p_hash }));
+  }
+
+  /**
+   * 管理者による再生成時の重複検出用に、指定 id を除外した閲覧可能画像の pHash 一覧を返す。
+   * 自レコード ID を除外することで「同一 URL を再取得しても自己衝突しない」を実現する。
+   */
+  async listActivePHashesExcept(excludeId: string): Promise<ActivePHashEntry[]> {
+    const { data, error } = await this.supabase
+      .from('lgtm_images')
+      .select('id, p_hash')
+      .eq('status', 'active')
+      .neq('id', excludeId);
+
+    if (error) throw new DatabaseError(error.message);
+    return (data ?? []).map((row) => ({ id: row.id, pHash: row.p_hash }));
+  }
+
+  /**
+   * 管理者による再生成後の DB 更新。status='active' な行のみ更新し、
+   * 論理削除済み/存在しない場合は NotFoundError に倒す。
+   * `originalUrl` は差し替え時のみ更新する (undefined なら据え置き)。
+   */
+  async updateAfterRegenerate(id: string, patch: UpdateAfterRegenerateInput): Promise<LgtmImage> {
+    const update: Database['public']['Tables']['lgtm_images']['Update'] = {
+      image_url: patch.imageUrl,
+      p_hash: patch.pHash,
+      width: patch.width,
+      height: patch.height,
+      file_size_bytes: patch.fileSizeBytes,
+      is_animated: patch.isAnimated,
+      updated_at: new Date().toISOString(),
+    };
+    if (patch.originalUrl !== undefined) {
+      update.original_url = patch.originalUrl;
+    }
+
+    const { data, error } = await this.supabase
+      .from('lgtm_images')
+      .update(update)
+      .eq('id', id)
+      .eq('status', 'active')
+      .select('*')
+      .maybeSingle();
+
+    if (error) throw new DatabaseError(error.message);
+    if (!data) throw new NotFoundError('画像', id);
+    return toLgtmImage(data);
   }
 
   /**
