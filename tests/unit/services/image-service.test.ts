@@ -834,4 +834,28 @@ describe('ImageService.regenerateImage', () => {
 
     warnSpy.mockRestore();
   });
+
+  it('options.skipOldBlobDeletion=true なら旧 Blob を削除せず、info ログを残して成功する', async () => {
+    // Preview 環境で Production と Blob store 共有時の副作用回避 (Issue #195)
+    const mocks = buildMocks();
+    setupRegenerateHappyPath(mocks);
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    const service = await buildService(mocks);
+    const result = await service.regenerateImage('image-1', undefined, {
+      skipOldBlobDeletion: true,
+    });
+
+    expect(result.image.imageUrl).toBe('https://blob.example/lgtm/new.webp');
+    expect(mocks.blob.del).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledWith(
+      '[regenerateImage] skipped previous blob delete',
+      expect.objectContaining({
+        imageId: 'image-1',
+        previousImageUrl: 'https://blob.example/lgtm/old.webp',
+      }),
+    );
+
+    infoSpy.mockRestore();
+  });
 });

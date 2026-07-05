@@ -231,33 +231,22 @@ export class ImageService {
   }
 
   /**
-   * 管理者による LGTM 画像の再生成 (Issue #195)。
-   *
-   * `createImage` と異なり:
-   *   - 認可は呼び出し元 (Route Handler の `requireAdmin`) で通過済みが前提。
-   *   - 日次アップロード数はカウントしない (既存の作り直し扱い)。
-   *   - 重複判定は自レコードを除外する (自己衝突回避)。
-   *   - 新 Blob キーで put し、DB を更新後に旧 Blob を best-effort で削除する
-   *     (immutable Blob 設計を維持し、CDN/ブラウザ 1 年キャッシュ問題を回避)。
+   * 管理者による LGTM 画像の再生成 (Issue #195)。認可は Route Handler で `requireAdmin` 通過済み前提。
    *
    * 順序の意図:
    *   1. `findActiveById` で対象存在確認 (無ければ NotFound)。
-   *   2. `buildLgtmVariant` で取得 → 検証 → 重複判定 → 合成 → 新 Blob put。
-   *      この段階で失敗しても既存 Blob / 行には触れていないので「無傷でエラー」を満たす。
-   *   3. `updateAfterRegenerate` で DB を更新。失敗したら新 Blob を best-effort del。
-   *   4. DB 更新が成功したら旧 Blob を best-effort del。失敗しても孤児 Blob をログに残し
-   *      日次クリーンアップに委ねる (2 フェーズコミットしない)。
+   *   2. `buildLgtmVariant` で取得 → 検証 → 重複判定 (自レコード除外) → 合成 → 新 Blob put。
+   *      ここで失敗しても既存 Blob / 行には触れていないので「無傷でエラー」を満たす。
+   *   3. `updateAfterRegenerate` で DB 更新。失敗したら新 Blob を best-effort del。
+   *   4. `skipOldBlobDeletion=false` のとき旧 Blob を best-effort del (Production 用)。
+   *      Preview は Production と Blob store 共有のため true にして削除しない。
    *
-   * 監査ログはこの Service では出さず、Route Handler 層で `console.info` する
-   * (誰が実行したかは Handler が `requireAdmin` から知っているため)。
-   *
-   * @throws NotFoundError - 対象画像が存在しない / 論理削除済み
-   * @throws DuplicateImageError - 差し替え先が他の active 画像と実質同一
-   * @throws BadRequestError - safeFetch / validateImage の失敗
+   * 日次アップロード数は加算しない (既存の作り直し扱い)。監査ログは Route 層で出力。
    */
   async regenerateImage(
     imageId: string,
     overrideOriginalUrl: string | undefined,
+    options: { skipOldBlobDeletion?: boolean } = {},
   ): Promise<{ image: LgtmImage; previousImageUrl: string; urlChanged: boolean }> {
     const existing = await this.imageRepo.findActiveById(imageId);
     if (!existing) {
@@ -286,6 +275,15 @@ export class ImageService {
       // DB 更新失敗時は新 Blob をロールバック。旧 Blob / 行はそのまま。
       await this.blob.del(variant.blobUrl).catch(() => undefined);
       throw err;
+    }
+
+    // Preview は Production と Blob store 共有のため削除しない (Issue #195 副作用対策)。
+    if (options.skipOldBlobDeletion) {
+      console.info('[regenerateImage] skipped previous blob delete', {
+        imageId,
+        previousImageUrl: existing.imageUrl,
+      });
+      return { image: updated, previousImageUrl: existing.imageUrl, urlChanged };
     }
 
     // DB 更新成功後の旧 Blob 削除は best-effort。失敗しても DB 上は新 URL を指しているため

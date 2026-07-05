@@ -45,6 +45,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { image, previousImageUrl, urlChanged } = await service.regenerateImage(
       parsedParams.data.id,
       parsedBody.data.originalUrl,
+      { skipOldBlobDeletion: process.env.VERCEL_ENV === 'preview' },
     );
 
     revalidateTag(HOME_IMAGES_CACHE_TAG, 'max');

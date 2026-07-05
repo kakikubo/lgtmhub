@@ -99,7 +99,7 @@ describe('POST /api/images/[id]/regenerate', () => {
     const res = await callRegenerate(VALID_UUID, {});
 
     expect(res.status).toBe(200);
-    expect(regenerateImage).toHaveBeenCalledWith(VALID_UUID, undefined);
+    expect(regenerateImage).toHaveBeenCalledWith(VALID_UUID, undefined, expect.any(Object));
     expect(revalidateTag).toHaveBeenCalledWith('lgtm-images:list');
     expect(consoleInfoSpy).toHaveBeenCalled();
 
@@ -125,7 +125,11 @@ describe('POST /api/images/[id]/regenerate', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(regenerateImage).toHaveBeenCalledWith(VALID_UUID, 'https://example.com/new-source.jpg');
+    expect(regenerateImage).toHaveBeenCalledWith(
+      VALID_UUID,
+      'https://example.com/new-source.jpg',
+      expect.any(Object),
+    );
 
     consoleInfoSpy.mockRestore();
   });
@@ -156,8 +160,52 @@ describe('POST /api/images/[id]/regenerate', () => {
     const res = await callRegenerate(VALID_UUID);
 
     expect(res.status).toBe(200);
-    expect(regenerateImage).toHaveBeenCalledWith(VALID_UUID, undefined);
+    expect(regenerateImage).toHaveBeenCalledWith(VALID_UUID, undefined, expect.any(Object));
 
+    consoleInfoSpy.mockRestore();
+  });
+
+  it('VERCEL_ENV=preview のとき Service に skipOldBlobDeletion=true を渡す (Issue #195 副作用対策)', async () => {
+    createClient.mockResolvedValue({});
+    requireAdmin.mockResolvedValue({ userId: 'admin-1' });
+    const regenerateImage = vi.fn().mockResolvedValue({
+      image: { id: VALID_UUID, imageUrl: 'https://blob.example/lgtm/new.webp' },
+      previousImageUrl: 'https://blob.example/lgtm/old.webp',
+      urlChanged: false,
+    });
+    buildImageService.mockReturnValue({ regenerateImage });
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    const consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    await callRegenerate(VALID_UUID, {});
+
+    expect(regenerateImage).toHaveBeenCalledWith(VALID_UUID, undefined, {
+      skipOldBlobDeletion: true,
+    });
+
+    vi.unstubAllEnvs();
+    consoleInfoSpy.mockRestore();
+  });
+
+  it('VERCEL_ENV=production のとき Service に skipOldBlobDeletion=false を渡す', async () => {
+    createClient.mockResolvedValue({});
+    requireAdmin.mockResolvedValue({ userId: 'admin-1' });
+    const regenerateImage = vi.fn().mockResolvedValue({
+      image: { id: VALID_UUID, imageUrl: 'https://blob.example/lgtm/new.webp' },
+      previousImageUrl: 'https://blob.example/lgtm/old.webp',
+      urlChanged: false,
+    });
+    buildImageService.mockReturnValue({ regenerateImage });
+    vi.stubEnv('VERCEL_ENV', 'production');
+    const consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    await callRegenerate(VALID_UUID, {});
+
+    expect(regenerateImage).toHaveBeenCalledWith(VALID_UUID, undefined, {
+      skipOldBlobDeletion: false,
+    });
+
+    vi.unstubAllEnvs();
     consoleInfoSpy.mockRestore();
   });
 
