@@ -1,6 +1,6 @@
 {
   "name": "lgtmhub",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:4-24",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:5-24",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:4": {}
   },
