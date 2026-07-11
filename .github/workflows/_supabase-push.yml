@@ -49,7 +49,7 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - uses: supabase/setup-cli@v2.1.1
+      - uses: supabase/setup-cli@v3.0.0
         with:
           # ローカル開発環境および ci.yml の e2e ジョブと揃える
           version: 2.98.0
