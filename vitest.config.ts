@@ -11,7 +11,11 @@ export default defineConfig({
       provider: 'v8',
       // lcov: Codecov が解釈する標準フォーマット (coverage/lcov.info を生成)
       reporter: ['text', 'json', 'html', 'lcov'],
-      include: ['src/**/*.ts', 'src/**/*.tsx'],
+      // app/api/** も計測対象。tests/unit/api/ が route handler をカバーしているが
+      // include が src/** のみだったため成果が集計に現れていなかった (Issue #255)。
+      // app/(site)/** は RSC で node 環境の unit テストから import されず、実際は
+      // e2e がカバーしている。e2e カバレッジ未収集の現状で含めると恒久 0% になるため除く。
+      include: ['src/**/*.ts', 'src/**/*.tsx', 'app/api/**/*.ts'],
       exclude: ['src/types/**', 'src/**/*.test.ts'],
       // 閾値は CI を含め常時ゲート。v8 の function 計測は Node マイナー差で
       // 約 12〜13pt 下振れする (ローカル services 100% / lib 90.9% に対し
