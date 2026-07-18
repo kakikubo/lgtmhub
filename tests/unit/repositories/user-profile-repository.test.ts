@@ -37,6 +37,22 @@ function createInStub(result: ManyResult) {
   };
 }
 
+function createUpdateStub(result: MaybeSingleResult) {
+  const single = vi.fn().mockResolvedValue(result);
+  const select = vi.fn().mockReturnValue({ single });
+  const eq = vi.fn().mockReturnValue({ select });
+  const update = vi.fn().mockReturnValue({ eq });
+  const from = vi.fn().mockReturnValue({ update });
+  return {
+    supabase: { from } as unknown as SupabaseClient<Database>,
+    from,
+    update,
+    eq,
+    select,
+    single,
+  };
+}
+
 describe('UserProfileRepository', () => {
   describe('findById', () => {
     it('行が存在する場合は UserProfile を camelCase で返す', async () => {
@@ -201,6 +217,75 @@ describe('UserProfileRepository', () => {
 
       expect(profiles).toHaveLength(1);
       expect(profiles[0]?.id).toBe('user-1');
+    });
+  });
+
+  describe('updateAuthFields', () => {
+    it('avatar_url / display_name を snake_case に変換して該当行を UPDATE する', async () => {
+      const stub = createUpdateStub({
+        data: {
+          id: 'user-1',
+          github_login: 'octocat',
+          display_name: 'New Name',
+          avatar_url: 'https://avatars.example.com/new.png',
+          is_admin: false,
+          created_at: '2026-05-03T00:00:00.000Z',
+          updated_at: '2026-07-18T00:00:00.000Z',
+        },
+        error: null,
+      });
+      const repo = new UserProfileRepository(stub.supabase);
+
+      const profile = await repo.updateAuthFields('user-1', {
+        avatarUrl: 'https://avatars.example.com/new.png',
+        displayName: 'New Name',
+      });
+
+      expect(stub.from).toHaveBeenCalledWith('user_profiles');
+      expect(stub.update).toHaveBeenCalledWith({
+        avatar_url: 'https://avatars.example.com/new.png',
+        display_name: 'New Name',
+      });
+      expect(stub.eq).toHaveBeenCalledWith('id', 'user-1');
+      expect(profile).toMatchObject({
+        id: 'user-1',
+        displayName: 'New Name',
+        avatarUrl: 'https://avatars.example.com/new.png',
+        updatedAt: new Date('2026-07-18T00:00:00.000Z'),
+      });
+    });
+
+    it('undefined のフィールドは patch に含めない (部分更新)', async () => {
+      const stub = createUpdateStub({
+        data: {
+          id: 'user-1',
+          github_login: 'octocat',
+          display_name: 'The Octocat',
+          avatar_url: 'https://avatars.example.com/new.png',
+          is_admin: false,
+          created_at: '2026-05-03T00:00:00.000Z',
+          updated_at: '2026-07-18T00:00:00.000Z',
+        },
+        error: null,
+      });
+      const repo = new UserProfileRepository(stub.supabase);
+
+      await repo.updateAuthFields('user-1', {
+        avatarUrl: 'https://avatars.example.com/new.png',
+      });
+
+      expect(stub.update).toHaveBeenCalledWith({
+        avatar_url: 'https://avatars.example.com/new.png',
+      });
+    });
+
+    it('Supabase が error を返したら DatabaseError を throw する', async () => {
+      const stub = createUpdateStub({ data: null, error: { message: 'connection failed' } });
+      const repo = new UserProfileRepository(stub.supabase);
+
+      await expect(repo.updateAuthFields('user-1', { displayName: 'New Name' })).rejects.toThrow(
+        DatabaseError,
+      );
     });
   });
 });

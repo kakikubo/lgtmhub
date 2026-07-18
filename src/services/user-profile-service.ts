@@ -1,10 +1,28 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { UserProfileRepository } from '@/src/repositories/user-profile-repository';
+import {
+  type UserProfileAuthFields,
+  UserProfileRepository,
+} from '@/src/repositories/user-profile-repository';
 import type { Database } from '@/src/types/database.types';
 import type { UserProfile } from '@/src/types/user';
 
 export interface UserProfileServiceDeps {
   userProfileRepo: UserProfileRepository;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * OAuth の user_metadata (信頼できない unknown) から非空 string 値を安全に取り出す。
+ * object でない / 該当キーが string でない / 空文字の場合は undefined を返す
+ * (空文字は「未設定」寄りの値とみなし、既存値を空で上書きしない)。
+ */
+function readString(meta: unknown, key: string): string | undefined {
+  if (!isRecord(meta)) return undefined;
+  const value = meta[key];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 export class UserProfileService {
@@ -35,6 +53,27 @@ export class UserProfileService {
     if (ids.length === 0) return [];
     const unique = Array.from(new Set(ids));
     return this.userProfileRepo.findManyByIds(unique);
+  }
+
+  /**
+   * OAuth ログイン時に GitHub 側の最新値でプロフィールを差分同期する (Issue #11)。
+   *
+   * - `meta` は `user.user_metadata` (信頼できない unknown) を想定し、型ガードで string のみ抽出する
+   * - `displayName` は handle_new_user トリガと同じ優先順位 (`full_name → name → user_name`) で導出する
+   * - 抽出できたフィールドのみを部分更新し、更新対象が 1 件も無ければ Repository を呼ばず `null` を返す
+   *   (該当キーが無いプロバイダや不正な meta で既存値を空文字などに上書きしないため)
+   */
+  async syncFromAuth(userId: string, meta: unknown): Promise<UserProfile | null> {
+    const avatarUrl = readString(meta, 'avatar_url');
+    const displayName =
+      readString(meta, 'full_name') ?? readString(meta, 'name') ?? readString(meta, 'user_name');
+
+    const fields: UserProfileAuthFields = {};
+    if (avatarUrl !== undefined) fields.avatarUrl = avatarUrl;
+    if (displayName !== undefined) fields.displayName = displayName;
+
+    if (Object.keys(fields).length === 0) return null;
+    return this.userProfileRepo.updateAuthFields(userId, fields);
   }
 }
 

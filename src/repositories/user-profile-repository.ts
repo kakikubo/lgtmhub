@@ -4,6 +4,13 @@ import type { Database } from '@/src/types/database.types';
 import type { UserProfile } from '@/src/types/user';
 
 type UserProfileRow = Database['public']['Tables']['user_profiles']['Row'];
+type UserProfileUpdate = Database['public']['Tables']['user_profiles']['Update'];
+
+/** OAuth の最新値でプロフィールを差分同期する際に更新しうるフィールド (camelCase) */
+export interface UserProfileAuthFields {
+  avatarUrl?: string;
+  displayName?: string;
+}
 
 function toUserProfile(row: UserProfileRow): UserProfile {
   return {
@@ -50,5 +57,26 @@ export class UserProfileRepository {
 
     if (error) throw new DatabaseError(error.message);
     return (data ?? []).map(toUserProfile);
+  }
+
+  /**
+   * OAuth の最新値でプロフィールを部分更新する (GitHub 側のアバター/表示名変更の差分同期用)。
+   * 渡された `fields` のうち `undefined` でないものだけを snake_case に変換して UPDATE する。
+   * 対象行は RLS (auth.uid() = id) で自分の行に限定され、`updated_at` は DB トリガで自動更新される。
+   */
+  async updateAuthFields(userId: string, fields: UserProfileAuthFields): Promise<UserProfile> {
+    const patch: UserProfileUpdate = {};
+    if (fields.avatarUrl !== undefined) patch.avatar_url = fields.avatarUrl;
+    if (fields.displayName !== undefined) patch.display_name = fields.displayName;
+
+    const { data, error } = await this.supabase
+      .from('user_profiles')
+      .update(patch)
+      .eq('id', userId)
+      .select('*')
+      .single();
+
+    if (error) throw new DatabaseError(error.message);
+    return toUserProfile(data);
   }
 }
