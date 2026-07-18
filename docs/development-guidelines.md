@@ -691,12 +691,16 @@ describe('ImageService.createImage', () => {
 ```typescript
 // vitest.config.ts — 閾値は CI を含め常時ゲート
 coverage: {
+  // 計測対象。app/api/** は tests/unit/api/ がカバーする route handler (Issue #255)
+  include: ['src/**/*.ts', 'src/**/*.tsx', 'app/api/**/*.ts'],
   thresholds: {
     'src/services/**': { branches: 90, functions: 85, lines: 90, statements: 90 },
     'src/lib/**': { branches: 80, functions: 75, lines: 80, statements: 80 },
   }
 }
 ```
+
+`thresholds` の glob は `src/services/**` / `src/lib/**` のみで、グローバル閾値は設定していない。したがって計測対象に含めた `app/api/**` はゲート対象にはならず、**計測と可視化のみ**の扱いになる（閾値を設けるかは CI 実測値が貯まってから別途判断する）。
 
 この `thresholds` は **CI を含め常に有効なゲート**（ローカル / devcontainer / CI のいずれでも `pnpm run test:coverage` で適用）。v8 の `functions` 計測は Node のマイナーバージョン差で約 12〜13pt 下振れする（ローカル `src/services/**` 100% / `src/lib/**` 90.9% に対し CI(ubuntu/Node 24.x) では 88.23% / 77.5%）ため、`functions` のみ CI 実測フロアの下にバッファを取った値（services 85 / lib 75）へ引き下げて env 差を吸収している。`branches`/`lines`/`statements` は v8-to-istanbul でソースレンジにマップされ安定し CI 実測でも 90/80 を通過するため据え置く。閾値未達は `vitest` が非 0 終了するため `test` ジョブのゲートとなる。Codecov は別途**可視化**（PR コメント・時系列・バッジ）に用いる。採用アプローチと却下理由は Issue #113 / `.steering/20260517-coverage-threshold-ci-gate/` を参照。詳細は「CI/CDパイプライン > Codecov」も参照。
 
@@ -897,7 +901,7 @@ jobs:
 
 - **可視化が責務（ゲートは vitest 側）**: カバレッジ閾値は `vitest.config.ts` の `thresholds` で **CI を含め常時ゲート**（`src/services/**` は branches/lines/statements 90% ・ functions 85%、`src/lib/**` は branches/lines/statements 80% ・ functions 75%）。v8 の `functions` 計測は Node のマイナーバージョン差で約 12〜13pt 下振れするため、`functions` のみ CI 実測フロア（services 88.23% / lib 77.5%）の下にバッファを取った値へ引き下げて env 差を吸収している（採用アプローチと却下案は Issue #113 を参照。Node patch 固定／functions 除外／istanbul 化は却下し、CI 実測ベースの閾値調整を採用）。Codecov は閾値ゲートを持たず可視化に専念し、`codecov.yml` の project / patch ステータスも `informational: true`（二重ゲートにしない）。なお**閾値未達・テスト失敗いずれも `vitest` が非 0 終了するため、`test` ジョブのゲートとして機能する**。
 - **token は任意**: public リポジトリのため `CODECOV_TOKEN` 未設定でも tokenless でアップロードできる。レート制限回避のため設定する場合は GitHub Secrets に `CODECOV_TOKEN` を登録する。アップロード失敗で `test` ジョブを落とさないよう `fail_ci_if_error: false`。
-- **集計対象**: `codecov.yml` の `ignore` を `vitest.config.ts` の `coverage.exclude`（`src/types/**` / `*.test.ts`）と整合させている。
+- **集計対象**: 計測範囲は `vitest.config.ts` の `coverage.include`（`src/**` + `app/api/**`）で決まる。`codecov.yml` の `ignore` は `coverage.exclude`（`src/types/**` / `*.test.ts`）と整合させ、型定義とテストコードを Codecov 側でも母数から外す。`app/(site)/**` は計測対象に含めていない — RSC のページ/レイアウトは `environment: 'node'` の unit テストから import されず、実際には e2e (Playwright) がカバーしているため、e2e カバレッジを収集していない現状で include に加えるとテスト済みのコードが恒久的に 0% と表示されてしまう（Issue #255）。
 - **バージョン管理**: `codecov/codecov-action` は `renovate.json` の `github-actions` グループで自動更新対象（固定運用ではない）。
 - **初回の手動セットアップ（リポジトリ管理者作業）**: Codecov (codecov.io) に GitHub アカウントでサインインし `kakikubo/lgtmhub` を有効化する。これにより PR コメントとダッシュボードが有効になる。必要に応じて `CODECOV_TOKEN` を GitHub Secrets に登録する。
 
