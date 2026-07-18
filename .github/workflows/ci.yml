@@ -53,11 +53,15 @@ jobs:
       # public リポジトリのため CODECOV_TOKEN が未設定でも tokenless で動作する。
       # 可視化が目的でアップロード可否を CI のゲートにしないため
       # fail_ci_if_error: false とし、Codecov 側の一時障害で test を落とさない。
+      # disable_search: files は「絞り込み」ではなく「自動探索の結果への追加」で、
+      # 単独では coverage-final.json も送られてしまう (Issue #261)。lcov のみを
+      # 送る意図を表すため探索を止める。
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info
+          disable_search: true
           fail_ci_if_error: false
 
   e2e:
