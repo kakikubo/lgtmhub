@@ -40,8 +40,9 @@ Issue #257 — `components/` を unit テストし、カバレッジ計測対象
 ## フェーズ5: ドキュメント / PR
 
 - [x] `docs/development-guidelines.md` に components 計測・projects 分離・app/(site) 除外理由を追記
-- [ ] コミット・push・PR 作成（`Closes #257`）
-- [ ] CI グリーン + Codecov 実測確認
+- [x] コミット・push・PR 作成（PR #267、`Closes #257`、base=`chore/issue-259-app-api-thresholds` にスタック）
+- [x] CI グリーン（全 11 チェック pass、happy-dom プロジェクトが CI でも動作）+ Codecov 実測確認
+  - CI 実測: Coverage 93.62% → **93.89%（+0.26%）**、Files +11、Lines +242、Hits +229、`All modified and coverable lines are covered by tests`
 
 ## 計測結果（ローカル）
 
