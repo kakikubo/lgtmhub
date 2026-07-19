@@ -53,6 +53,16 @@ jobs:
       # public リポジトリのため CODECOV_TOKEN が未設定でも tokenless で動作する。
       # 可視化が目的でアップロード可否を CI のゲートにしないため
       # fail_ci_if_error: false とし、Codecov 側の一時障害で test を落とさない。
+      #
+      # 【重要】lcov.info と coverage-final.json の 2 ファイルが送られるが、これは意図的。
+      # files は「絞り込み」ではなく「自動探索の結果への追加」であり (codecov-action の
+      # action.yml 参照)、vitest の reporter に json と lcov の両方があるため探索が
+      # coverage-final.json も拾う。disable_search: true で lcov のみに絞ると
+      # Codecov の集計値が Lines 675 → 583・Partials 0 → 31 と変化し、カバレッジが
+      # 89.48% → 84.56% (-4.92pt) へ乖離する (PR #262 で実測)。ローカル vitest の
+      # 実測 89.63% と一致するのは 2 ファイル送信の方であり、lcov 単独では BRDA 由来の
+      # 部分実行行が partials として減点されて vitest の thresholds と数値がズレる。
+      # 送信量は約 30KB 増えるが、集計値の正確さを優先して現状を維持する (Issue #261)。
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
