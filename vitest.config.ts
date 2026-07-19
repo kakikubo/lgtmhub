@@ -23,9 +23,18 @@ export default defineConfig({
       // フロアの下にバッファを取った値へ引き下げる (services 85 / lib 75)。
       // branches/lines/statements は v8-to-istanbul でソースレンジにマップされ
       // 安定し CI 実測でも 90/80 を通過するため据え置く (Issue #113)。
+      // app/api/images/** の閾値は CI 実測 (statements 95.49 / branches 85 /
+      // functions 100 / lines 95.41) の下にバッファを取った値 (Issue #259)。
+      // glob 閾値はマッチしたファイル群の「集計」に対して効く (ファイル単位ではない)。
+      // app/api/auth/** に閾値を置かないのは意図的。両 route の未カバー関数は
+      // createServerClient に渡す cookie アダプタ (getAll/setAll) で、unit テストでは
+      // @supabase/ssr をモックするため呼ばれようがなく、集計 functions が 36.36% に
+      // 沈む。ここを閾値化しても到達不能コードに引きずられた数値を固定するだけで
+      // ゲートとして機能しない (実際に呼ばれる経路は e2e が担保する)。
       thresholds: {
         'src/services/**': { branches: 90, functions: 85, lines: 90, statements: 90 },
         'src/lib/**': { branches: 80, functions: 75, lines: 80, statements: 80 },
+        'app/api/images/**': { branches: 80, functions: 95, lines: 90, statements: 90 },
       },
     },
   },
