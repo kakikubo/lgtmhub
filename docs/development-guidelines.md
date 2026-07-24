@@ -696,11 +696,16 @@ coverage: {
   thresholds: {
     'src/services/**': { branches: 90, functions: 85, lines: 90, statements: 90 },
     'src/lib/**': { branches: 80, functions: 75, lines: 80, statements: 80 },
+    'app/api/images/**': { branches: 80, functions: 95, lines: 90, statements: 90 },
   }
 }
 ```
 
-`thresholds` の glob は `src/services/**` / `src/lib/**` のみで、グローバル閾値は設定していない。したがって計測対象に含めた `app/api/**` はゲート対象にはならず、**計測と可視化のみ**の扱いになる（閾値を設けるかは CI 実測値が貯まってから別途判断する）。
+glob 閾値は**マッチしたファイル群の集計**に対して効く（ファイル単位ではない）。グローバル閾値は設定していないため、上記 3 つの glob にマッチしないファイルはゲート対象外になる。
+
+`app/api/images/**` の値は CI 実測（statements 95.49% / branches 85% / functions 100% / lines 95.41%）の下にバッファを取ったもの（Issue #259）。
+
+一方 `app/api/auth/**` に閾値を置いていないのは意図的。`app/api/auth/callback/route.ts` と `app/api/auth/test-signin/route.ts` の未カバー関数は `createServerClient` に渡す cookie アダプタ（`getAll` / `setAll`）で、unit テストでは `@supabase/ssr` をモックするため呼ばれようがなく、集計 functions が 36.36% に沈む。ここを閾値化しても到達不能コードに引きずられた数値を固定するだけでゲートとして機能しない（実際に呼ばれる経路は e2e が担保する）。
 
 この `thresholds` は **CI を含め常に有効なゲート**（ローカル / devcontainer / CI のいずれでも `pnpm run test:coverage` で適用）。v8 の `functions` 計測は Node のマイナーバージョン差で約 12〜13pt 下振れする（ローカル `src/services/**` 100% / `src/lib/**` 90.9% に対し CI(ubuntu/Node 24.x) では 88.23% / 77.5%）ため、`functions` のみ CI 実測フロアの下にバッファを取った値（services 85 / lib 75）へ引き下げて env 差を吸収している。`branches`/`lines`/`statements` は v8-to-istanbul でソースレンジにマップされ安定し CI 実測でも 90/80 を通過するため据え置く。閾値未達は `vitest` が非 0 終了するため `test` ジョブのゲートとなる。Codecov は別途**可視化**（PR コメント・時系列・バッジ）に用いる。採用アプローチと却下理由は Issue #113 / `.steering/20260517-coverage-threshold-ci-gate/` を参照。詳細は「CI/CDパイプライン > Codecov」も参照。
 
