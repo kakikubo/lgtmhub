@@ -4,9 +4,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
-    // node と jsdom を projects で分離する。大半のテスト (repositories/services/lib/
+    // node と happy-dom を projects で分離する。大半のテスト (repositories/services/lib/
     // route handler) は node で動くが、components/ のクライアント/サーバコンポーネントは
-    // DOM が要るため jsdom で動かす (Issue #257)。environmentMatchGlobs は vitest 4 で
+    // DOM が要るため happy-dom で動かす (Issue #257)。environmentMatchGlobs は vitest 4 で
     // deprecated のため projects を採用。coverage はトップレベルに置きプロジェクト横断で集計する。
     projects: [
       {

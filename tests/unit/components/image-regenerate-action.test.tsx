@@ -44,6 +44,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // テスト内で張った console spy を assertion 失敗時にも必ず戻す (後続テストの出力汚染防止)
+  vi.restoreAllMocks();
 });
 
 async function confirmRegenerate() {
@@ -104,7 +106,6 @@ describe('ImageRegenerateAction', () => {
 
     expect(warnSpy).toHaveBeenCalled();
     expect(refresh).toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 
   it('通信例外なら汎用エラーを表示する', async () => {
