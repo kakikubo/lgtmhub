@@ -11,3 +11,11 @@ allowBuilds:
 overrides:
   node-fetch@2: npm:node-fetch-commonjs@^3.3.2
   undici: ">=6.27.0"
+  # 以下は pnpm audit --audit-level high を通すための推移依存の引き上げ。
+  # next は postcss を 8.4.31 に、sharp を ^0.34.5 に固定ピンしており next を
+  # 最新 (16.2.12) にしても解消しないため override で揃える。
+  # fast-uri / brace-expansion は devDep の shadcn 配下のみ (ajv / ts-morph>minimatch)。
+  postcss: ^8.5.18 # GHSA sourceMappingURL 経由の任意ファイル読み取り / パストラバーサル
+  sharp: ^0.35.3 # libvips 由来 CVE-2026-33327/33328/35590/35591 (直接依存は既に 0.35 系)
+  fast-uri: ^3.1.4 # バックスラッシュ authority 区切りによる host confusion
+  brace-expansion: ^5.0.8 # 展開長が無制限で OOM クラッシュする DoS
