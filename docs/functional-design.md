@@ -220,7 +220,7 @@ GET /api/images
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|----|-----------|----|
 | `cursor` | string | - | ページネーション用カーソル（`createdAt` ISO文字列） |
-| `limit` | number | 20 | 取得件数（最大50） |
+| `limit` | number | 16 | 取得件数（最大50、デフォルトは `LIST_IMAGES_DEFAULT_LIMIT`） |
 
 **レスポンス**:
 ```json
@@ -301,6 +301,43 @@ GET /api/images/search?q={keyword}&page={n}
 
 ---
 
+### 画像ランダム取得（Issue #109）
+
+```
+GET /api/images/random
+```
+
+全 `active` 画像からサーバーサイドでランダムに最大 `LIST_IMAGES_DEFAULT_LIMIT`（16）枚を抽出して返す。一覧画面先頭の「ランダム表示」ボタンが押下時のみ呼び出す。
+
+**クエリパラメータ**: なし（抽出件数は #108 の共通定数 `LIST_IMAGES_DEFAULT_LIMIT` に固定）
+
+**レスポンス**:
+```json
+{
+  "images": [
+    {
+      "id": "uuid",
+      "imageUrl": "https://...",
+      "uploaderId": "uuid",
+      "width": 266,
+      "height": 199,
+      "createdAt": "2026-05-02T00:00:00Z"
+    }
+  ]
+}
+```
+
+**設計メモ**:
+- ランダム表示は 16 枚で完結するため `nextCursor` を返さない（カーソルは `created_at` 基準でランダム順と不整合）。「もっと読み込む」は UI 側でも描画しない。
+- 抽出方式は「全 active id を取得 → サーバーで Fisher-Yates シャッフル → 先頭 N 件の本体を取得」。新規 migration / DB 型再生成が不要で影響範囲が最小。データ規模が 10 万件超に達した場合は RPC（`order by random()`）/ pgvector ベースへの移行を検討する（pHash 全件比較と同じ判断基準）。
+- 押下のたびに別の組み合わせを返すため、ルート単位・レスポンス双方でキャッシュさせない（`Cache-Control: no-store` / `dynamic = 'force-dynamic'`）。
+- ランダム状態はクライアントの一時状態。リロード・再訪問で通常表示（新着順 16 枚 + もっと読み込む）へ自動的に戻る。
+
+**エラーレスポンス**:
+- 500 Internal Server Error: サーバー内部エラー
+
+---
+
 ### 画像登録
 
 ```
@@ -322,7 +359,7 @@ POST /api/images
 2. 当日の登録枚数チェック（10枚以上なら 429）
 3. 外部URL取得・SSRF検証・フォーマット/サイズ検証（失敗なら 400）
 4. pHash計算 → DB全件と比較し重複検出（重複なら 409・`existingImageId`を返却）
-5. LGTM文字合成 + WebP変換 + 長辺 800px にリサイズ（元アスペクト比保持）
+5. LGTM文字合成 + WebP変換 + 長辺 400px にリサイズ（元アスペクト比保持）。アニメーションGIF / アニメーションWebP入力 (フレーム数 ≤ 150) は全フレームに同じ LGTM 文字を焼き込んだアニメーション WebP として保存し、`is_animated = true` で記録する
 6. Vercel Blob にアップロード
 7. `lgtm_images` レコード作成 + `daily_upload_counts` を atomic にインクリメント
 
@@ -369,6 +406,50 @@ DELETE /api/images/:id
 - 403 Forbidden: 自分の画像でない（管理者以外）
 - 404 Not Found: 画像が存在しない
 - 500 Internal Server Error: 管理者削除時のBlob物理削除に失敗（DBの論理削除はロールバックする）
+
+---
+
+### 画像再生成（管理者限定 / Issue #195）
+
+```
+POST /api/images/:id/regenerate
+```
+
+**認証**: 必須（`user_profiles.is_admin = true` のみ）。認可は `src/lib/auth/require-admin.ts` の `requireAdmin(supabase)` 共通ゲートで行い、非管理者は 403 に倒す。将来の管理者機能（PRD 機能6 の管理者削除など）でも同じヘルパーを共有する。
+
+**リクエスト**:
+```json
+{
+  "originalUrl": "https://example.com/replaced.jpg"
+}
+```
+
+- `originalUrl` を省略すると既存の `original_url` から再取得する（元画像の作り直し）。
+- 指定すると元画像 URL の差し替えとして扱い、`original_url` も更新する。
+
+**処理フロー**:
+
+1. `findActiveById` で対象存在確認。無ければ 404。
+2. `safeFetch` → `validateImage` → `calculatePHash` → 重複判定（**自レコード ID を除外**）→ `composeLgtmImage` → 新 Blob キーで `put`。
+3. `updateAfterRegenerate` で DB を更新（`image_url`, `p_hash`, `width`, `height`, `file_size_bytes`, `is_animated`, `updated_at` を必ず、`original_url` は差し替え時のみ）。失敗時は新 Blob を best-effort `del` してロールバック。
+4. 更新成功後、旧 Blob を best-effort `del`（失敗時は warning ログを残し、日次クリーンアップに委ねる）。
+5. `revalidateTag(HOME_IMAGES_CACHE_TAG, 'max')` で一覧・詳細のキャッシュを破棄。
+6. `console.info` で `requesterId` / `imageId` / `urlChanged` / `previousImageUrl` / `newImageUrl` を監査ログ出力（監査カラムは追加しない）。
+
+**日次アップロード上限は加算しない**（新規投稿ではなく既存の作り直しのため）。
+
+**レスポンス**: `200 OK`
+```json
+{ "id": "<uuid>", "imageUrl": "https://blob.example/lgtm/<new-uuid>.webp" }
+```
+
+**エラーレスポンス**:
+- 400 Bad Request: 画像 ID が UUID 形式でない / `originalUrl` バリデーション NG / 取得・検証失敗（`safeFetch` / `validateImage`）
+- 401 Unauthorized: 未ログイン
+- 403 Forbidden: 非管理者
+- 404 Not Found: 画像が存在しない / 論理削除済み
+- 409 Conflict: 差し替え先が他の active 画像と実質同一（重複判定は自レコードを除外）
+- 500 Internal Server Error: それ以外
 
 ---
 
@@ -489,7 +570,7 @@ sequenceDiagram
         API-->>FE: 409 Conflict { existingImageId }
         FE-->>U: 既存画像ページへリダイレクト
     end
-    API->>Sharp: LGTM文字合成 + WebP変換 + 長辺 800px リサイズ（元アスペクト比保持）
+    API->>Sharp: LGTM文字合成 + WebP変換 + 長辺 400px リサイズ（元アスペクト比保持）
     Sharp-->>API: 合成済み画像バッファ
     API->>Blob: 画像をアップロード
     Blob-->>API: 公開URL
@@ -564,7 +645,7 @@ DBには全ての`pHash`を保存し、新規登録時に **`status='active'` �
 > 実装詳細は `src/lib/image/compose-lgtm.ts` を参照。以下は概要を示す擬似コード。
 
 ```typescript
-const MAX_LONG_SIDE = 800;
+const MAX_LONG_SIDE = 400;
 
 async function composeLgtmImage(imageBuffer: Buffer): Promise<Buffer> {
   // 1. 原画サイズを取得
@@ -697,7 +778,7 @@ app/
 ```typescript
 interface ListImagesParams {
   cursor?: string;       // 前ページ末尾の createdAt (ISO 8601 / UTC)
-  limit?: number;        // デフォルト 20、最大 50
+  limit?: number;        // デフォルト 16 (LIST_IMAGES_DEFAULT_LIMIT)、最大 50
 }
 
 interface ListImagesResult {
@@ -742,7 +823,7 @@ class FavoriteService {
 | 脅威 | 対策 |
 |------|------|
 | SSRF（外部URL取得時） | プライベートIPレンジ（10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8）へのリクエストをブロック |
-| 不正な画像形式 | Sharpのメタデータ検証でMIMEタイプを確認（JPEG/PNG/GIFのみ許可） |
+| 不正な画像形式 | Sharpのメタデータ検証でMIMEタイプを確認（JPEG/PNG/GIF/WebPのみ許可） |
 | 他ユーザーの画像削除 | APIレベルで `uploaderId === requesterId` を検証（Supabase RLSでも二重チェック） |
 | 1日10枚制限の回避 | `daily_upload_counts` をDB側でatomicにインクリメント |
 | セッション偽装 | Supabase Auth JWTを全APIルートで検証 |
@@ -796,7 +877,8 @@ CREATE POLICY "users can manage own favorites"
 | エラー種別 | 処理 | ユーザーへの表示 |
 |-----------|------|-----------------|
 | 画像URLが無効（404等） | 処理中断 | 「画像を取得できませんでした。URLを確認してください」 |
-| 非対応フォーマット | 処理中断 | 「JPEG・PNG・GIF形式の画像URLを入力してください」 |
+| 非対応フォーマット | 処理中断 | 「JPEG・PNG・GIF・WebP 形式の画像 URL を入力してください」 |
+| アニメGIF / アニメWebPのフレーム数超過（150フレーム超） | 処理中断 | 「フレーム数が多すぎます (150 フレーム以下にしてください)」 |
 | ファイルサイズ超過（10MB超） | 処理中断 | 「10MB以下の画像を使用してください」 |
 | 重複画像 | 既存画像へリダイレクト | 「同じ画像がすでに登録されています」 |
 | 1日の登録上限超過 | 処理中断 | 「本日の登録上限（10枚）に達しました。明日また試してください」 |
@@ -812,13 +894,14 @@ CREATE POLICY "users can manage own favorites"
 
 - `calculatePHash()`: 同一画像と異なる画像でのハッシュ比較
 - `hammingDistance()`: ビット列の差異計算
-- `composeLgtmImage()`: 合成画像のメタデータ検証（WebP形式、長辺 800px・元アスペクト比保持、原画 < 800px は拡大しない）
+- `composeLgtmImage()`: 合成画像のメタデータ検証（WebP形式、長辺 400px・元アスペクト比保持、原画 < 400px は拡大しない）
 - SSRF検証ロジック: プライベートIPがブロックされること
 
 ### 統合テスト
 
 - `POST /api/images`: 正常登録・重複検出・上限超過・SSRF・未ログイン
 - `DELETE /api/images/:id`: 本人削除・他人削除（403）・管理者削除
+- `POST /api/images/:id/regenerate`: 管理者による再生成・非管理者 403・URL 差し替え・重複判定で自己除外・daily count 非加算・取得失敗時の無傷性
 - `POST /api/favorites` / `DELETE /api/favorites/:id`: 追加・解除・重複追加（409）
 
 ### E2Eテスト

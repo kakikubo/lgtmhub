@@ -1,0 +1,47 @@
+name: Supabase Preview Migrate (label trigger)
+
+# `apply-preview-migration` ラベルが付いた PR の HEAD で、Preview Supabase に
+# migrations と config を即時 push する。main マージを待たずに Vercel Preview で
+# DB schema を含めた動作確認をするための経路。
+#
+# 暗黙起動は避け、ラベル付与で人間の判断を介在させる設計:
+# - 並列 PR の schema 干渉 / 未マージ close 時の孤立 DDL は人手回避前提
+#   (運用ルールは docs/development-guidelines.md を参照)。
+# - prod (lgtm2) には一切影響しない (preview project_ref のみを使う)。
+#
+# 安全側の設計:
+# - pull_request イベントは fork PR に secrets を渡さないので採用。
+#   念のため head.repo.full_name で同一リポ条件を二重ガード。
+# - migrations / config 以外の変更しか無い PR では起動しない (paths filter)。
+# - 同一 PR の連続 push は concurrency で直列化。実行中に殺すと schema_migrations が
+#   部分適用になるため cancel-in-progress: false。
+
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/config.toml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-preview-migrate-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  push:
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'apply-preview-migration')
+      && github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/_supabase-push.yml
+    with:
+      remote_name: preview
+      ref: ${{ github.event.pull_request.head.sha }}
+    secrets:
+      access_token: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      project_ref: ${{ secrets.SUPABASE_PREVIEW_PROJECT_REF }}
+      db_password: ${{ secrets.SUPABASE_PREVIEW_DB_PASSWORD }}
+      gh_oauth_id: ${{ secrets.SUPABASE_PREVIEW_GITHUB_OAUTH_CLIENT_ID }}
+      gh_oauth_secret: ${{ secrets.SUPABASE_PREVIEW_GITHUB_OAUTH_CLIENT_SECRET }}

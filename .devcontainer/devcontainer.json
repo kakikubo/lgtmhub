@@ -1,11 +1,11 @@
 {
   "name": "lgtmhub",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:4-24",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:5-24",
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {}
   },
   "forwardPorts": [3000, 54321, 54322, 54323],
-  "postCreateCommand": "npm install",
+  "postCreateCommand": "corepack enable && pnpm install",
   "customizations": {
     "vscode": {
       "extensions": ["biomejs.biome", "bradlc.vscode-tailwindcss", "denoland.vscode-deno"],

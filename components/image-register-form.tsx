@@ -47,6 +47,9 @@ export function ImageRegisterForm() {
           setErrorMessage(CREATE_IMAGE_FALLBACK_MESSAGE);
           return;
         }
+        // cacheComponents 下では navigation をまたいでクライアント state が保持され得るため、
+        // 再訪時に古い URL が入力欄へ残らないよう明示的にリセットする。
+        setImageUrl('');
         // /(site)/page.tsx の Server Component キャッシュを破棄して
         // 登録した画像が一覧の先頭に出る状態でトップに戻す
         router.refresh();
@@ -92,7 +95,7 @@ export function ImageRegisterForm() {
           className="w-full border rounded px-3 py-2 text-sm disabled:bg-gray-100"
         />
         <p className="text-xs text-gray-500">
-          HTTPS の URL のみ受け付けます。JPEG / PNG / GIF (最大 10MB) に対応しています。
+          HTTPS の URL のみ受け付けます。JPEG / PNG / GIF / WebP (最大 10MB) に対応しています。
         </p>
       </div>
 

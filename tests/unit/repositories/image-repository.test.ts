@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { describe, expect, it, vi } from 'vitest';
-import { DatabaseError } from '@/src/lib/errors';
+import { DatabaseError, NotFoundError } from '@/src/lib/errors';
 import { ImageRepository } from '@/src/repositories/image-repository';
 import type { Database } from '@/src/types/database.types';
 
@@ -17,6 +17,7 @@ function buildRow(overrides: Partial<Row> = {}): Row {
     height: 600,
     file_size_bytes: 12345,
     mime_type: 'image/webp',
+    is_animated: false,
     status: 'active',
     deleted_at: null,
     created_at: '2026-05-04T00:00:00.000Z',
@@ -64,6 +65,7 @@ describe('ImageRepository.create', () => {
       height: 600,
       fileSizeBytes: 12345,
       mimeType: 'image/webp',
+      isAnimated: false,
     });
 
     expect(created.id).toBe('image-1');
@@ -88,6 +90,7 @@ describe('ImageRepository.create', () => {
         height: 600,
         fileSizeBytes: 12345,
         mimeType: 'image/webp',
+        isAnimated: false,
       }),
     ).rejects.toBeInstanceOf(DatabaseError);
   });
@@ -105,6 +108,7 @@ describe('ImageRepository.create', () => {
         height: 600,
         fileSizeBytes: 12345,
         mimeType: 'image/webp',
+        isAnimated: false,
       }),
     ).rejects.toBeInstanceOf(DatabaseError);
   });
@@ -295,6 +299,288 @@ function createListStub(result: ListResult): ListStub {
   const client = { from } as unknown as SupabaseClient<Database>;
   return { client, spies: { from, select, eq, order, limit, lt } };
 }
+
+interface ActiveIdsResult {
+  data: { id: string }[] | null;
+  error: { message: string } | null;
+}
+
+interface ActiveIdsStub {
+  client: SupabaseClient<Database>;
+  spies: {
+    from: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+  };
+}
+
+function createActiveIdsStub(result: ActiveIdsResult): ActiveIdsStub {
+  const eq = vi.fn().mockResolvedValue(result);
+  const select = vi.fn().mockReturnValue({ eq });
+  const from = vi.fn().mockReturnValue({ select });
+  const client = { from } as unknown as SupabaseClient<Database>;
+  return { client, spies: { from, select, eq } };
+}
+
+describe('ImageRepository.listActiveIds', () => {
+  it('status=active の id 配列を返す', async () => {
+    const stub = createActiveIdsStub({
+      data: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      error: null,
+    });
+    const repo = new ImageRepository(stub.client);
+
+    const ids = await repo.listActiveIds();
+
+    expect(stub.spies.from).toHaveBeenCalledWith('lgtm_images');
+    expect(stub.spies.select).toHaveBeenCalledWith('id');
+    expect(stub.spies.eq).toHaveBeenCalledWith('status', 'active');
+    expect(ids).toEqual(['a', 'b', 'c']);
+  });
+
+  it('行が空のときは空配列を返す', async () => {
+    const stub = createActiveIdsStub({ data: [], error: null });
+    const repo = new ImageRepository(stub.client);
+    expect(await repo.listActiveIds()).toEqual([]);
+  });
+
+  it('error 時は DatabaseError を throw する', async () => {
+    const stub = createActiveIdsStub({ data: null, error: { message: 'oops' } });
+    const repo = new ImageRepository(stub.client);
+    await expect(repo.listActiveIds()).rejects.toBeInstanceOf(DatabaseError);
+  });
+});
+
+interface FindManyResult {
+  data: Row[] | null;
+  error: { message: string } | null;
+}
+
+interface FindManyStub {
+  client: SupabaseClient<Database>;
+  spies: {
+    from: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+    inFn: ReturnType<typeof vi.fn>;
+  };
+}
+
+function createFindManyStub(result: FindManyResult): FindManyStub {
+  const inFn = vi.fn().mockResolvedValue(result);
+  const eq = vi.fn().mockReturnValue({ in: inFn });
+  const select = vi.fn().mockReturnValue({ eq });
+  const from = vi.fn().mockReturnValue({ select });
+  const client = { from } as unknown as SupabaseClient<Database>;
+  return { client, spies: { from, select, eq, inFn } };
+}
+
+describe('ImageRepository.findManyActiveByIds', () => {
+  it('ids が空のときは Supabase を呼ばず空配列を返す (空配列ガード)', async () => {
+    const stub = createFindManyStub({ data: [], error: null });
+    const repo = new ImageRepository(stub.client);
+
+    expect(await repo.findManyActiveByIds([])).toEqual([]);
+    expect(stub.spies.from).not.toHaveBeenCalled();
+  });
+
+  it('status=active を id in (...) で取得し camelCase で返す', async () => {
+    const stub = createFindManyStub({
+      data: [buildRow({ id: 'image-1' }), buildRow({ id: 'image-2' })],
+      error: null,
+    });
+    const repo = new ImageRepository(stub.client);
+
+    const results = await repo.findManyActiveByIds(['image-1', 'image-2']);
+
+    expect(stub.spies.from).toHaveBeenCalledWith('lgtm_images');
+    expect(stub.spies.select).toHaveBeenCalledWith('*');
+    expect(stub.spies.eq).toHaveBeenCalledWith('status', 'active');
+    expect(stub.spies.inFn).toHaveBeenCalledWith('id', ['image-1', 'image-2']);
+    expect(results.map((r) => r.id)).toEqual(['image-1', 'image-2']);
+    expect(results[0]?.createdAt).toEqual(new Date('2026-05-04T00:00:00.000Z'));
+  });
+
+  it('行が空のときは空配列を返す', async () => {
+    const stub = createFindManyStub({ data: [], error: null });
+    const repo = new ImageRepository(stub.client);
+    expect(await repo.findManyActiveByIds(['x'])).toEqual([]);
+  });
+
+  it('error 時は DatabaseError を throw する', async () => {
+    const stub = createFindManyStub({ data: null, error: { message: 'oops' } });
+    const repo = new ImageRepository(stub.client);
+    await expect(repo.findManyActiveByIds(['x'])).rejects.toBeInstanceOf(DatabaseError);
+  });
+});
+
+interface NeqStub {
+  client: SupabaseClient<Database>;
+  spies: {
+    from: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+    neq: ReturnType<typeof vi.fn>;
+  };
+}
+
+function createListActivePHashesExceptStub(result: SelectListResult): NeqStub {
+  const neq = vi.fn().mockResolvedValue(result);
+  const eq = vi.fn().mockReturnValue({ neq });
+  const select = vi.fn().mockReturnValue({ eq });
+  const from = vi.fn().mockReturnValue({ select });
+  const client = { from } as unknown as SupabaseClient<Database>;
+  return { client, spies: { from, select, eq, neq } };
+}
+
+describe('ImageRepository.listActivePHashesExcept', () => {
+  it('excludeId を neq で除外し、id + pHash を camelCase で返す', async () => {
+    const stub = createListActivePHashesExceptStub({
+      data: [{ id: 'b', p_hash: '1'.repeat(1024) }],
+      error: null,
+    });
+    const repo = new ImageRepository(stub.client);
+
+    const result = await repo.listActivePHashesExcept('a');
+
+    expect(stub.spies.from).toHaveBeenCalledWith('lgtm_images');
+    expect(stub.spies.eq).toHaveBeenCalledWith('status', 'active');
+    expect(stub.spies.neq).toHaveBeenCalledWith('id', 'a');
+    expect(result).toEqual([{ id: 'b', pHash: '1'.repeat(1024) }]);
+  });
+
+  it('行が空のときは空配列', async () => {
+    const stub = createListActivePHashesExceptStub({ data: [], error: null });
+    const repo = new ImageRepository(stub.client);
+    expect(await repo.listActivePHashesExcept('a')).toEqual([]);
+  });
+
+  it('error 時は DatabaseError', async () => {
+    const stub = createListActivePHashesExceptStub({ data: null, error: { message: 'oops' } });
+    const repo = new ImageRepository(stub.client);
+    await expect(repo.listActivePHashesExcept('a')).rejects.toBeInstanceOf(DatabaseError);
+  });
+});
+
+interface UpdateAfterRegenerateResult {
+  data: Row | null;
+  error: { message: string } | null;
+}
+
+interface UpdateAfterRegenerateStub {
+  client: SupabaseClient<Database>;
+  spies: {
+    from: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    eqId: ReturnType<typeof vi.fn>;
+    eqStatus: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    maybeSingle: ReturnType<typeof vi.fn>;
+  };
+}
+
+function createUpdateAfterRegenerateStub(
+  result: UpdateAfterRegenerateResult,
+): UpdateAfterRegenerateStub {
+  const maybeSingle = vi.fn().mockResolvedValue(result);
+  const select = vi.fn().mockReturnValue({ maybeSingle });
+  const eqStatus = vi.fn().mockReturnValue({ select });
+  const eqId = vi.fn().mockReturnValue({ eq: eqStatus });
+  const update = vi.fn().mockReturnValue({ eq: eqId });
+  const from = vi.fn().mockReturnValue({ update });
+  const client = { from } as unknown as SupabaseClient<Database>;
+  return { client, spies: { from, update, eqId, eqStatus, select, maybeSingle } };
+}
+
+describe('ImageRepository.updateAfterRegenerate', () => {
+  it('正常系: id + status=active で絞り、更新後の行を camelCase で返す', async () => {
+    const stub = createUpdateAfterRegenerateStub({
+      data: buildRow({ id: 'image-1', image_url: 'https://blob.example/new.webp' }),
+      error: null,
+    });
+    const repo = new ImageRepository(stub.client);
+
+    const updated = await repo.updateAfterRegenerate('image-1', {
+      imageUrl: 'https://blob.example/new.webp',
+      pHash: 'b'.repeat(1024),
+      width: 400,
+      height: 300,
+      fileSizeBytes: 4,
+      isAnimated: false,
+    });
+
+    expect(stub.spies.from).toHaveBeenCalledWith('lgtm_images');
+    const updateArg = stub.spies.update.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(updateArg.image_url).toBe('https://blob.example/new.webp');
+    expect(updateArg.p_hash).toBe('b'.repeat(1024));
+    expect(updateArg.width).toBe(400);
+    expect(updateArg.height).toBe(300);
+    expect(updateArg.file_size_bytes).toBe(4);
+    expect(updateArg.is_animated).toBe(false);
+    expect(typeof updateArg.updated_at).toBe('string');
+    // originalUrl 未指定なら original_url は Update に含めない
+    expect(updateArg.original_url).toBeUndefined();
+    expect(stub.spies.eqId).toHaveBeenCalledWith('id', 'image-1');
+    expect(stub.spies.eqStatus).toHaveBeenCalledWith('status', 'active');
+    expect(updated.imageUrl).toBe('https://blob.example/new.webp');
+  });
+
+  it('originalUrl 指定時は Update に original_url が含まれる', async () => {
+    const stub = createUpdateAfterRegenerateStub({
+      data: buildRow({ original_url: 'https://example.com/replaced.jpg' }),
+      error: null,
+    });
+    const repo = new ImageRepository(stub.client);
+
+    await repo.updateAfterRegenerate('image-1', {
+      imageUrl: 'https://blob.example/new.webp',
+      pHash: 'b'.repeat(1024),
+      width: 400,
+      height: 300,
+      fileSizeBytes: 4,
+      isAnimated: false,
+      originalUrl: 'https://example.com/replaced.jpg',
+    });
+
+    const updateArg = stub.spies.update.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(updateArg.original_url).toBe('https://example.com/replaced.jpg');
+  });
+
+  it('該当行が無い (status=deleted / 存在しない) なら NotFoundError', async () => {
+    const stub = createUpdateAfterRegenerateStub({ data: null, error: null });
+    const repo = new ImageRepository(stub.client);
+
+    await expect(
+      repo.updateAfterRegenerate('image-1', {
+        imageUrl: 'https://blob.example/new.webp',
+        pHash: 'b'.repeat(1024),
+        width: 400,
+        height: 300,
+        fileSizeBytes: 4,
+        isAnimated: false,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('error 時は DatabaseError', async () => {
+    const stub = createUpdateAfterRegenerateStub({
+      data: null,
+      error: { message: 'rls violation' },
+    });
+    const repo = new ImageRepository(stub.client);
+
+    await expect(
+      repo.updateAfterRegenerate('image-1', {
+        imageUrl: 'https://blob.example/new.webp',
+        pHash: 'b'.repeat(1024),
+        width: 400,
+        height: 300,
+        fileSizeBytes: 4,
+        isAnimated: false,
+      }),
+    ).rejects.toBeInstanceOf(DatabaseError);
+  });
+});
 
 describe('ImageRepository.list', () => {
   it('cursor 無し: status=active を created_at desc で limit 件取得する', async () => {

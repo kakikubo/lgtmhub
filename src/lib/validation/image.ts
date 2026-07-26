@@ -11,7 +11,7 @@ export const createImageRequestSchema = z.object({
 
 export type CreateImageRequest = z.infer<typeof createImageRequestSchema>;
 
-export const LIST_IMAGES_DEFAULT_LIMIT = 20;
+export const LIST_IMAGES_DEFAULT_LIMIT = 16;
 export const LIST_IMAGES_MAX_LIMIT = 50;
 
 export const listImagesQuerySchema = z.object({
@@ -26,23 +26,33 @@ export const listImagesQuerySchema = z.object({
 
 export type ListImagesQuery = z.infer<typeof listImagesQuerySchema>;
 
+// 一覧系 API レスポンスの image 1 件分。通常一覧 / ランダム表示で共有する。
+export const imageListItemSchema = z.object({
+  id: z.string(),
+  imageUrl: z.string(),
+  uploaderId: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  isAnimated: z.boolean(),
+  createdAt: z.string(),
+});
+
 // クライアントが GET /api/images のレスポンスを fetch().json() で受けたときに、
 // any の握り潰しを避けて runtime バリデーションするためのスキーマ
 export const listImagesResponseSchema = z.object({
-  images: z.array(
-    z.object({
-      id: z.string(),
-      imageUrl: z.string(),
-      uploaderId: z.string(),
-      width: z.number().int().positive(),
-      height: z.number().int().positive(),
-      createdAt: z.string(),
-    }),
-  ),
+  images: z.array(imageListItemSchema),
   nextCursor: z.string().nullable(),
 });
 
 export type ListImagesResponse = z.infer<typeof listImagesResponseSchema>;
+
+// GET /api/images/random のレスポンス。ランダム表示は 16 枚で完結し
+// ページネーションを持たないため nextCursor を含まない。
+export const randomImagesResponseSchema = z.object({
+  images: z.array(imageListItemSchema),
+});
+
+export type RandomImagesResponse = z.infer<typeof randomImagesResponseSchema>;
 
 // POST /api/images の 201 レスポンス
 export const createImageResponseSchema = z.object({
@@ -59,3 +69,25 @@ export const createImageErrorResponseSchema = z.object({
 });
 
 export type CreateImageErrorResponse = z.infer<typeof createImageErrorResponseSchema>;
+
+// POST /api/images/[id]/regenerate リクエストボディ。
+// originalUrl 未指定なら既存の originalUrl を再利用する (=元画像から作り直し)。
+// createImageRequestSchema と同じ URL 検証 (HTTPS, 2048 文字上限) を適用する。
+export const regenerateImageRequestSchema = z.object({
+  originalUrl: z
+    .string()
+    .max(2048, '画像 URL が長すぎます (最大 2048 文字)')
+    .url('画像 URL の形式が正しくありません')
+    .startsWith('https://', 'HTTPS の URL を入力してください')
+    .optional(),
+});
+
+export type RegenerateImageRequest = z.infer<typeof regenerateImageRequestSchema>;
+
+// POST /api/images/[id]/regenerate の 200 レスポンス
+export const regenerateImageResponseSchema = z.object({
+  id: z.string().min(1),
+  imageUrl: z.string().url(),
+});
+
+export type RegenerateImageResponse = z.infer<typeof regenerateImageResponseSchema>;

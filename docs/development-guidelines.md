@@ -6,7 +6,7 @@
 |--------|-----------|------|
 | Node.js | v24.11.0 | CLAUDE.mdで指定 |
 | TypeScript | 6.x | バージョン詳細は `docs/architecture.md`「依存関係管理 > バージョン管理方針」を参照 |
-| npm | 11.x | Node.js v24に同梱 |
+| pnpm | 10.x | Corepack 経由(`corepack enable`)。バージョンは `package.json` の `packageManager` で固定 |
 
 開発環境は devcontainer での起動を前提とする（CLAUDE.md 参照）。
 
@@ -98,6 +98,32 @@ export function CopyMarkdownButton({ imageUrl }: { imageUrl: string }) {
   // ...
 }
 ```
+
+**一覧画面での関連エンティティ取得 (N+1 防止)**:
+
+一覧 (例: `HomeContent` の画像グリッド) で各行に紐づくエンティティ (例: 投稿者プロフィール) を表示する場合、
+**リクエスト内で `findManyByIds` を 1 回だけ呼ぶ**。`ImageCard` ごとに `findById` を呼んではならない。
+取得結果は `Map<string, T>` に変換し、子コンポーネントには plain object として props で渡す。
+
+```typescript
+// ✅ components/home-content.tsx
+const images = await getHomeImagesInitial();
+const profiles = await buildUserProfileService(supabase).findManyByIds(
+  images.map((i) => i.uploaderId),
+);
+const profileMap = new Map(profiles.map((p) => [p.id, p]));
+
+return <ImageGrid images={images} profiles={profileMap} />;
+
+// ❌ ImageCard 内で findById を呼ぶ (= N+1)
+// async function ImageCard({ image }) {
+//   const profile = await userProfileService.findById(image.uploaderId); // NG
+// }
+```
+
+`findManyByIds` を提供するのは Service 層 (`UserProfileService.findManyByIds` 等)。
+入力が空配列のときは Repository を呼ばないガードを Service / Repository の両層に置くこと
+(契約と実装の二重防衛)。
 
 **Route Handler のパターン**:
 
@@ -376,18 +402,18 @@ const image = await imageRepository.findById(id);
   - `style.noNonNullAssertion: "off"` — `process.env.X!` のような環境変数アクセスを許容
   - `tests/**` 配下は `suspicious.noThenProperty: "off"` — Supabase クエリビルダーモックの thenable を許容
 - Next.js 固有の Web Vitals チェック(`next/core-web-vitals` 由来)は `next build` の警告と PR レビューで担保する
-- 変更前に `npm run lint` をローカル実行する。自動修正可能なルールは `npm run check` で一括適用できる
+- 変更前に `pnpm run lint` をローカル実行する。自動修正可能なルールは `pnpm run check` で一括適用できる
 
-CI で `npm run lint` を実行し、エラー検出時は失敗扱いとする。
+CI で `pnpm run lint` を実行し、エラー検出時は失敗扱いとする。
 
 **コミット時の自動実行 (lefthook)**:
 
 `lefthook` 経由で `git commit` 時にステージ済みファイルへ Biome の lint/format を自動実行する。設定は `lefthook.yml` を参照する。
 
-- `npm install` 直後に `prepare` スクリプト(`lefthook install`)が走り、`.git/hooks/pre-commit` がフレッシュリポジトリでは自動配置される
+- `pnpm install` 直後に `prepare` スクリプト(`lefthook install`)が走り、`.git/hooks/pre-commit` がフレッシュリポジトリでは自動配置される
 - 対象拡張子: `*.{js,jsx,ts,tsx,json,jsonc,css}`(Biome がサポートする拡張子のみ)
 - 整形可能な差分は `biome check --write` により自動修正され、`stage_fixed: true` で再ステージされたうえでコミットに含まれる
-- 修正不能な lint エラーが残った場合、コミットは失敗する(`biome.json` のルール設定は CI の `npm run lint` と同一。CI 側は format チェックを行わないため、format 違反は pre-commit の自動修正でのみ解消される)
+- 修正不能な lint エラーが残った場合、コミットは失敗する(`biome.json` のルール設定は CI の `pnpm run lint` と同一。CI 側は format チェックを行わないため、format 違反は pre-commit の自動修正でのみ解消される)
 - 上記対象外の拡張子のみのコミットでは、`biome-check` ジョブはスキップされコミットがそのまま成立する
 - 緊急回避が必要な場合のみ `git commit --no-verify` でフックをバイパスできる。通常運用では使用しない
 
@@ -399,10 +425,10 @@ CI で `npm run lint` を実行し、エラー検出時は失敗扱いとする�
 # 既存の core.hooksPath を残し、その配下に lefthook を上書き配置する
 # (既存の pre-commit は lefthook によって `pre-commit.old` にリネームされる。
 #  必要であれば `lefthook.yml` の jobs として `.old` を再呼び出しするように移行する)
-npx lefthook install --force
+pnpm exec lefthook install --force
 
 # あるいは、不要になった core.hooksPath 設定を解除して lefthook 標準の場所に置く
-npx lefthook install --reset-hooks-path
+pnpm exec lefthook install --reset-hooks-path
 ```
 
 `--force` を選んだ場合、保存された `pre-commit.old` を `lefthook.yml` の job として再呼び出しに移行することで既存ツール(git-secrets 等)との共存が可能。
@@ -482,6 +508,22 @@ GitHub OAuth App の Authorization callback URL は Supabase の固定 URL（`ht
 
 `src/lib/auth/actions.ts` の `buildOrigin` が、`Origin` ヘッダ → `x-forwarded-proto` / `host` の順に Preview の origin を動的算出する。Server Action は POST のため `Origin` が付き、Vercel が `x-forwarded-*` を付与するため Preview 環境でも正しい `redirectTo` が組み立てられる。**コード側の追加対応は不要**で、Supabase 側に Preview ワイルドカードが登録されていれば動作する。
 
+### 本番 DB / Preview DB の分離構成
+
+Issue #20 で、Vercel の Production / Preview デプロイが参照する Supabase プロジェクトを分離した。
+
+| | Supabase プロジェクト | Vercel env スコープ |
+|---|---|---|
+| 本番 | `lgtm2`(`qbkoalhilwtjydpscrye`, 東京) | Production |
+| Preview | `lgtmhub-preview`(東京) | Preview |
+
+- アプリは `NEXT_PUBLIC_SUPABASE_URL` 等をランタイム参照するだけで、参照先 DB は **Vercel 環境変数のスコープ分け**で決まる(コード変更不要)
+- Vercel の Preview スコープには **Preview プロジェクトの値のみ**を設定する。本番の `SUPABASE_SERVICE_ROLE_KEY` を Preview に絶対入れない(事故防止)
+- migrations / config.toml は `supabase-deploy.yml` が main マージ時に prod・preview 両方へ自動 push する(`config.toml` の `[remotes.prod]` / `[remotes.preview]` が project_id 一致で適用)
+- Preview プロジェクトは **独自の GitHub OAuth App** と **独自の URL Configuration** を持つ。上記ワイルドカードは Preview プロジェクト側の Additional Redirect URLs に登録し、Site URL も Preview ドメインにする(本番プロジェクトの設定とは独立)
+- 本番 → Preview のデータ初期コピーは一度きりのスナップショット。`auth.users` 含むフルコピーで、リストア時は `set session_replication_role = replica` で `handle_new_user` トリガを無効化する(二重 insert 回避)
+- 作業手順の詳細は `.steering/20260623-split-preview-db/` を参照
+
 ---
 
 ## Git運用ルール
@@ -525,7 +567,7 @@ main（本番環境）
 LGTM文字合成ロジックを実装
 
 - Sharp SVGオーバーレイで白文字+黒縁のLGTM文字を合成
-- WebP変換と長辺 800px へのリサイズ（元アスペクト比保持）を実施
+- WebP変換と長辺 400px へのリサイズ（元アスペクト比保持）を実施
 - 合成後の画像バッファをunit testで検証
 ```
 
@@ -553,33 +595,36 @@ LGTM文字合成ロジックを実装
 
 **PRの大きさの目安**:
 - 変更ファイル数: 10ファイル以内を推奨
-- 変更行数: 300行以内を推奨
+- 変更行数: 500行以内（500行を超えると Danger が CI を失敗させる）
 
 **計測対象**:
 - プロダクションコード（`app/`、`src/`、`components/`）の追加・変更行数で判定する
 - 以下は計測対象に含めない:
   - テストコード（`tests/`）
   - 自動生成ファイル（`src/types/database.types.ts` など）
-  - lockfile（`package-lock.json`）
+  - lockfile（`pnpm-lock.yaml`）
   - マイグレーションSQL（`supabase/migrations/`）
+  - markdown ファイル（`*.md` / `*.mdx`）
 
 確認方法:
 
 ```bash
-# プロダクションコード変更行数の確認例
+# プロダクションコード変更行数の確認例（あくまで目安。正確な集計は dangerfile.ts に従う）
+# tests/ ・ pnpm-lock.yaml ・ supabase/migrations/ は対象パス指定で既に除外される
 git diff --stat main...HEAD -- 'app/' 'src/' 'components/' \
-  ':(exclude)src/types/database.types.ts'
+  ':(exclude)src/types/database.types.ts' \
+  ':(exclude)*.md' ':(exclude)*.mdx'
 ```
 
-300行を超える場合は分割を検討する。例外を認める場合はPR説明欄に理由を記載する。
+500行を超える場合は関心事ごとに分割する。
 
 **自動チェック（Danger）**:
 
-PR の作成・更新時に GitHub Actions（`.github/workflows/danger.yml`）が `dangerfile.ts` を実行し、上記閾値を超過した場合に PR コメントで warning を出す。
+PR の作成・更新時に GitHub Actions（`.github/workflows/danger.yml`）が `dangerfile.ts` を実行し、行数閾値を超過した場合に Danger ジョブを**失敗（CI エラー）**させる。
 
-- 行数閾値（300行）または ファイル数閾値（10ファイル）を超えた場合のみコメントが付く
-- ブロックではなく warning なので、例外運用（PR 説明欄に理由を記載してマージ）はそのまま継続できる
-- 計測対象・除外ルールは `dangerfile.ts` の `INCLUDE_PREFIXES` / `EXCLUDE_PATTERNS` に集約し、本ドキュメントと同期する
+- 行数閾値（500行）を超えた場合は `fail()` となり、`pnpm exec danger ci --failOnErrors` により Danger ジョブが赤くなる（ブロッキング）
+- ファイル数閾値（10ファイル）超過は `warn()`（コメント警告のみ、ブロックしない）
+- 計測対象・除外ルール（markdown 除外を含む）は `dangerfile.ts` の `INCLUDE_PREFIXES` / `EXCLUDE_PATTERNS` に集約し、本ドキュメントと同期する
 
 ---
 
@@ -644,14 +689,25 @@ describe('ImageService.createImage', () => {
 
 **カバレッジ目標**:
 ```typescript
-// vitest.config.ts
+// vitest.config.ts — 閾値は CI を含め常時ゲート
 coverage: {
+  // 計測対象。app/api/** は tests/unit/api/ がカバーする route handler (Issue #255)
+  include: ['src/**/*.ts', 'src/**/*.tsx', 'app/api/**/*.ts'],
   thresholds: {
-    'src/services/**': { branches: 90, functions: 90, lines: 90 },
-    'src/lib/**': { branches: 80, functions: 80, lines: 80 },
+    'src/services/**': { branches: 90, functions: 85, lines: 90, statements: 90 },
+    'src/lib/**': { branches: 80, functions: 75, lines: 80, statements: 80 },
+    'app/api/images/**': { branches: 80, functions: 95, lines: 90, statements: 90 },
   }
 }
 ```
+
+glob 閾値は**マッチしたファイル群の集計**に対して効く（ファイル単位ではない）。グローバル閾値は設定していないため、上記 3 つの glob にマッチしないファイルはゲート対象外になる。
+
+`app/api/images/**` の値は CI 実測（statements 95.49% / branches 85% / functions 100% / lines 95.41%）の下にバッファを取ったもの（Issue #259）。
+
+一方 `app/api/auth/**` に閾値を置いていないのは意図的。`app/api/auth/callback/route.ts` と `app/api/auth/test-signin/route.ts` の未カバー関数は `createServerClient` に渡す cookie アダプタ（`getAll` / `setAll`）で、unit テストでは `@supabase/ssr` をモックするため呼ばれようがなく、集計 functions が 36.36% に沈む。ここを閾値化しても到達不能コードに引きずられた数値を固定するだけでゲートとして機能しない（実際に呼ばれる経路は e2e が担保する）。
+
+この `thresholds` は **CI を含め常に有効なゲート**（ローカル / devcontainer / CI のいずれでも `pnpm run test:coverage` で適用）。v8 の `functions` 計測は Node のマイナーバージョン差で約 12〜13pt 下振れする（ローカル `src/services/**` 100% / `src/lib/**` 90.9% に対し CI(ubuntu/Node 24.x) では 88.23% / 77.5%）ため、`functions` のみ CI 実測フロアの下にバッファを取った値（services 85 / lib 75）へ引き下げて env 差を吸収している。`branches`/`lines`/`statements` は v8-to-istanbul でソースレンジにマップされ安定し CI 実測でも 90/80 を通過するため据え置く。閾値未達は `vitest` が非 0 終了するため `test` ジョブのゲートとなる。Codecov は別途**可視化**（PR コメント・時系列・バッジ）に用いる。採用アプローチと却下理由は Issue #113 / `.steering/20260517-coverage-threshold-ci-gate/` を参照。詳細は「CI/CDパイプライン > Codecov」も参照。
 
 ### 統合テスト (Vitest + Supabase Local)
 
@@ -733,6 +789,8 @@ GitHub OAuth 全体を E2E に含めるのは外部 IDP に依存して不安定
 
 ### GitHub Actions
 
+> 以下は構成を説明するためのサンプル。`actions/*` などのバージョンは `renovate.json` の `github-actions` グループで自動更新されるため、**常に実際の `.github/workflows/ci.yml` を正**とする（サンプルのバージョン表記をそのままコピーしない）。
+
 ```yaml
 # .github/workflows/ci.yml
 name: CI
@@ -747,19 +805,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm run typecheck
 
   test:
     runs-on: ubuntu-latest
     # 設計意図: CI 上では Supabase CLI（Docker）の起動コストを避け、
     # 統合テストの DB 接続先として素の Postgres コンテナを使用する。
-    # RLS ポリシーの検証はローカル開発時の `npm run db:start`（Supabase Local）で行い、
+    # RLS ポリシーの検証はローカル開発時の `pnpm run db:start`（Supabase Local）で行い、
     # CI ではテーブル制約・トランザクション・SQL 互換性のみを検証する方針。
     services:
       postgres:
@@ -768,30 +827,46 @@ jobs:
           POSTGRES_PASSWORD: postgres
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run test:unit
-      - run: npm run test:integration
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      # test:unit / test:integration の 2 回実行をやめ、test:coverage
+      # (= vitest run --coverage) の 1 パスに統合。include/exclude により
+      # unit + integration をまとめて実行し (e2e は対象外)、カバレッジを計測する。
+      # カバレッジ閾値は vitest.config.ts で CI を含め常時ゲート。v8 の function
+      # 計測の Node マイナー差は functions 閾値を CI 実測ベースに調整して吸収済み。
+      # 閾値未達・テスト失敗いずれも vitest が非 0 終了し test ジョブのゲートとなる。
+      - run: pnpm run test:coverage
+      # カバレッジを Codecov にアップロードして PR / main で可視化する。
+      # public リポジトリのため CODECOV_TOKEN 未設定でも tokenless で動作し、
+      # アップロード可否を CI のゲートにしない (fail_ci_if_error: false)。
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
 
   e2e:
     runs-on: ubuntu-latest
     # 設計意図: e2e ジョブは supabase/setup-cli + supabase start で本物の
     # PostgreSQL + PostgREST + Auth + Storage を Docker で立ち上げ、Server Component
     # / Route Handler が実 DB を叩けるようにする。NEXT_PUBLIC_* は build 時に
-    # インライン化されるため、必ず `npm run build` の前に `$GITHUB_ENV` 経由で注入する。
+    # インライン化されるため、必ず `pnpm run build` の前に `$GITHUB_ENV` 経由で注入する。
     env:
       GITHUB_OAUTH_CLIENT_ID: ''
       GITHUB_OAUTH_CLIENT_SECRET: ''
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
-      - run: npm ci
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
       - uses: supabase/setup-cli@v1
         with:
           version: 2.98.0
@@ -802,9 +877,9 @@ jobs:
           status=$(supabase status -o json)
           echo "NEXT_PUBLIC_SUPABASE_URL=$(echo "$status" | jq -er '.API_URL')" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(echo "$status" | jq -er '.ANON_KEY')" >> "$GITHUB_ENV"
-      - run: npx playwright install --with-deps chromium
-      - run: npm run build
-      - run: npm run test:e2e
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run build
+      - run: pnpm run test:e2e
       - if: always()
         run: supabase stop --no-backup
 
@@ -812,32 +887,58 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm audit --audit-level=high
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level high
 ```
 
-#### Danger（PR サイズ警告）
+#### Danger（PR サイズチェック）
 
-`.github/workflows/danger.yml` で `pull_request` イベントごとに `npx danger ci` を実行する。判定ロジックは `dangerfile.ts` に集約しており、「PRの大きさの目安」セクションの閾値超過時に PR コメントで warning を出す。既存 `ci.yml` とは独立した workflow とし、API 書き込みの副作用が他ジョブに波及しないようにしている。
+`.github/workflows/danger.yml` で `pull_request` イベントごとに `pnpm exec danger ci --failOnErrors` を実行する。判定ロジックは `dangerfile.ts` に集約しており、「PRの大きさの目安」セクションの行数閾値（500行）を超過した場合は `fail()` となり、`--failOnErrors` により Danger ジョブが失敗（CI エラー）する。ファイル数閾値（10ファイル）超過は `warn()`（コメント警告のみ）。markdown ファイル（`*.md` / `*.mdx`）は集計対象外。既存 `ci.yml` とは独立した workflow とし、API 書き込みの副作用が他ジョブに波及しないようにしている。
+
+#### Codecov（カバレッジ可視化）
+
+`ci.yml` の `test` ジョブで `pnpm run test:coverage` を実行し、生成された `coverage/lcov.info` を `codecov/codecov-action@v5` で Codecov にアップロードする。`test` ジョブは `push: [main]` と `pull_request` 両方で走るため、**PR と main マージ後の双方**でカバレッジが Codecov に記録され、PR には差分コメントが付く。README のカバレッジバッジも Codecov を参照する。
+
+- **可視化が責務（ゲートは vitest 側）**: カバレッジ閾値は `vitest.config.ts` の `thresholds` で **CI を含め常時ゲート**（`src/services/**` は branches/lines/statements 90% ・ functions 85%、`src/lib/**` は branches/lines/statements 80% ・ functions 75%）。v8 の `functions` 計測は Node のマイナーバージョン差で約 12〜13pt 下振れするため、`functions` のみ CI 実測フロア（services 88.23% / lib 77.5%）の下にバッファを取った値へ引き下げて env 差を吸収している（採用アプローチと却下案は Issue #113 を参照。Node patch 固定／functions 除外／istanbul 化は却下し、CI 実測ベースの閾値調整を採用）。Codecov は閾値ゲートを持たず可視化に専念し、`codecov.yml` の project / patch ステータスも `informational: true`（二重ゲートにしない）。なお**閾値未達・テスト失敗いずれも `vitest` が非 0 終了するため、`test` ジョブのゲートとして機能する**。
+- **token は任意**: public リポジトリのため `CODECOV_TOKEN` 未設定でも tokenless でアップロードできる。レート制限回避のため設定する場合は GitHub Secrets に `CODECOV_TOKEN` を登録する。アップロード失敗で `test` ジョブを落とさないよう `fail_ci_if_error: false`。
+- **集計対象**: 計測範囲は `vitest.config.ts` の `coverage.include`（`src/**` + `app/api/**`）で決まる。`codecov.yml` の `ignore` は `coverage.exclude`（`src/types/**` / `*.test.ts`）と整合させ、型定義とテストコードを Codecov 側でも母数から外す。`app/(site)/**` は計測対象に含めていない — RSC のページ/レイアウトは `environment: 'node'` の unit テストから import されず、実際には e2e (Playwright) がカバーしているため、e2e カバレッジを収集していない現状で include に加えるとテスト済みのコードが恒久的に 0% と表示されてしまう（Issue #255）。
+- **バージョン管理**: `codecov/codecov-action` は `renovate.json` の `github-actions` グループで自動更新対象（固定運用ではない）。
+- **初回の手動セットアップ（リポジトリ管理者作業）**: Codecov (codecov.io) に GitHub アカウントでサインインし `kakikubo/lgtmhub` を有効化する。これにより PR コメントとダッシュボードが有効になる。必要に応じて `CODECOV_TOKEN` を GitHub Secrets に登録する。
 
 #### Supabase Migrations Auto Deploy
 
-`.github/workflows/supabase-deploy.yml` で main マージ時に `supabase/migrations/**` の差分をリモート Supabase (`lgtmdb`) に自動 push する。
+`.github/workflows/supabase-deploy.yml` で main マージ時に `supabase/migrations/**` の差分をリモート Supabase (`lgtm2`) に自動 push する。
 
 - トリガー: `push: branches: [main]` + `paths: ['supabase/migrations/**']`、および `workflow_dispatch`（手動再実行用）
 - 必要な GitHub Secrets:
   - `SUPABASE_ACCESS_TOKEN`: Supabase アカウント個人アクセストークン (CLI 認証)
   - `SUPABASE_DB_PASSWORD`: リモート DB 接続パスワード
-  - `SUPABASE_PROJECT_REF`: リンク先プロジェクト ref (`szjjdsagnitpmzbbtfoy`)
+  - `SUPABASE_PROJECT_REF`: リンク先プロジェクト ref (`qbkoalhilwtjydpscrye`)
 - `concurrency: { group: supabase-db-push, cancel-in-progress: false }` で直列化（部分適用防止のため実行中を殺さず queue する）
 - `permissions: contents: read` のみ。フォーク PR からの secrets 露出を避けるため `pull_request` トリガーは持たない
-- 失敗時の手動リカバリ: ローカルから `npx supabase db push --linked`
+- 失敗時の手動リカバリ: ローカルから `pnpm exec supabase db push --linked`
 
-### npm scripts
+#### Preview DB へのマイグレーション適用フロー (`apply-preview-migration` ラベル)
+
+`.github/workflows/supabase-preview-migrate.yml` で、`apply-preview-migration` ラベルが付いた PR の HEAD を Preview Supabase (`mdnyanwprgtqscugnjif`) に即時 push する。main マージを待たずに Vercel Preview で DB schema を含めた動作確認をするための経路。
+
+- トリガー: `pull_request: { types: [labeled, synchronize, reopened], paths: ['supabase/migrations/**', 'supabase/config.toml'] }`
+- 動作: 既存の `_supabase-push.yml` を `remote_name: preview` + `ref: <PR HEAD sha>` で呼び出し、`supabase db push --linked` と `supabase config push --yes` を実行する
+- 必要な GitHub Secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PREVIEW_PROJECT_REF`, `SUPABASE_PREVIEW_DB_PASSWORD`, `SUPABASE_PREVIEW_GITHUB_OAUTH_CLIENT_ID`, `SUPABASE_PREVIEW_GITHUB_OAUTH_CLIENT_SECRET` (既存)
+- prod (`lgtm2`) には一切影響しない (preview project_ref のみを使う)
+
+ラベル運用ルール (Supabase Branching を使わない代償として人手で守る):
+
+1. **直列適用**: 並列 PR の schema 干渉を避けるため、Preview への適用は 1 PR ずつ完了させてから次のラベルを付ける (workflow 自体は PR 番号で concurrency 分離しているが、異なる PR 間は直列化されない)
+2. **未マージ close 時の孤立 DDL**: 破壊的 DDL (`DROP COLUMN` 等) を含む PR を merge せず閉じると、Preview DB に DDL が残る。close 前に revert マイグレーションを作成して Preview に適用する (ローカルから `supabase link --project-ref mdnyanwprgtqscugnjif && supabase db push --linked`)
+3. **main マージ後の重複適用**: マージ後は `supabase-deploy.yml` (main push trigger) が prod + Preview 両方に再適用するが、`supabase migration list` の差分照合で適用済み migration はスキップされるため安全
+
+### package.json scripts
 
 ```json
 {
@@ -857,6 +958,7 @@ jobs:
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
+    "db:nuke": "supabase stop --no-backup",
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --local > src/types/database.types.ts"
   }
@@ -867,7 +969,7 @@ jobs:
 
 ## 依存関係管理 (Renovate)
 
-依存関係（npm パッケージ / GitHub Actions / devcontainer の base image）は [Renovate](https://docs.renovatebot.com/) で自動更新する。設定はリポジトリルートの `renovate.json` を正とし、変更は通常の PR フローで行う。
+依存関係（依存パッケージ / GitHub Actions / devcontainer の base image）は [Renovate](https://docs.renovatebot.com/) で自動更新する。設定はリポジトリルートの `renovate.json` を正とし、変更は通常の PR フローで行う。
 
 ### スケジュールと自動マージ方針
 
@@ -875,7 +977,7 @@ jobs:
 |------|------|-----------|------|
 | minor / patch | `next 15.5.15 → 15.5.16` | ✅ (CI green 時) | `platformAutomerge` で GitHub の auto-merge を利用 |
 | GitHub Actions の更新 | `actions/checkout@v4 → v5` | ✅ (CI green 時) | `github-actions` グループにまとめる |
-| `lockFileMaintenance` | `package-lock.json` の週次更新 | ✅ | 月曜午前 |
+| `lockFileMaintenance` | `pnpm-lock.yaml` の週次更新 | ✅ | 月曜午前 |
 | major | `react 19 → 20` | ❌ (手動レビュー) | `dependencies` / `major` ラベル付き |
 | vulnerability alerts | GitHub Security Advisory 由来 | ❌ (手動レビュー) | スケジュールを無視して即時 PR |
 | `engines.node` | Node のメジャー更新 | 無効化 | devcontainer / `actions/setup-node` / `engines.node` を手動で同期 |
@@ -911,7 +1013,7 @@ PR は **月曜の朝（Asia/Tokyo 9 時前）** にまとめて立ち、`chore(
 `renovate.json` の妥当性は以下のコマンドでローカル検証できる:
 
 ```bash
-npx --yes --package renovate -- renovate-config-validator renovate.json
+pnpm --package=renovate dlx renovate-config-validator renovate.json
 ```
 
 ### major / vulnerability の運用
@@ -932,36 +1034,36 @@ Node.js のメジャーは、`package.json` の `engines.node`、`actions/setup-
 
 ```bash
 # 1. 依存パッケージのインストール
-npm install
+pnpm install
 
 # 2. 環境変数の設定
 cp .env.example .env.local
 # .env.local を編集（Supabase / Vercel Blob / GitHub OAuth の設定を記入）
 
 # 3. Supabase Localの起動
-npm run db:start
+pnpm run db:start
 
 # 4. マイグレーションの適用
-npm run db:reset
+pnpm run db:reset
 
 # 5. 型定義の生成
-npm run db:types
+pnpm run db:types
 
 # 6. 開発サーバーの起動
-npm run dev
+pnpm run dev
 ```
 
 ### 日常的な開発コマンド
 
 ```bash
 # 型エラーをウォッチ（別ターミナルで起動）
-npm run typecheck -- --watch
+pnpm run typecheck -- --watch
 
 # Vitest ウォッチモード（保存時に対象テストのみ再実行）
-npm run test -- --watch
+pnpm run test -- --watch
 
 # Playwright UI モード（E2Eテストをブラウザで対話的に実行）
-npx playwright test --ui
+pnpm exec playwright test --ui
 
 # Supabase スキーマ差分の確認（マイグレーション作成前）
 supabase db diff
@@ -970,20 +1072,20 @@ supabase db diff
 supabase status
 
 # DBの初期化（マイグレーションを最初から再適用）
-npm run db:reset
+pnpm run db:reset
 
 # 型定義の再生成（マイグレーション変更後に必須）
-npm run db:types
+pnpm run db:types
 ```
 
 開発フロー上の用途:
 
 | シーン | 推奨コマンド |
 |--------|-------------|
-| ロジック修正中 | `npm run test -- --watch` で対象テストを常時実行 |
-| API実装中 | `npm run dev` + `npm run typecheck -- --watch` を別ターミナルで併用 |
-| E2Eシナリオ検証 | `npx playwright test --ui` でステップを目視確認 |
-| マイグレーション追加後 | `npm run db:reset` → `npm run db:types` → 型エラー解消 |
+| ロジック修正中 | `pnpm run test -- --watch` で対象テストを常時実行 |
+| API実装中 | `pnpm run dev` + `pnpm run typecheck -- --watch` を別ターミナルで併用 |
+| E2Eシナリオ検証 | `pnpm exec playwright test --ui` でステップを目視確認 |
+| マイグレーション追加後 | `pnpm run db:reset` → `pnpm run db:types` → 型エラー解消 |
 
 ### 環境変数一覧
 
@@ -1023,9 +1125,9 @@ PRを作成する前に以下を確認する:
 **テスト**:
 - [ ] ビジネスロジックにユニットテストが追加されているか
 - [ ] 新規APIエンドポイントに統合テストが追加されているか
-- [ ] `npm run test` がパスするか
-- [ ] `npm run typecheck` がパスするか
-- [ ] `npm run lint` がパスするか
+- [ ] `pnpm run test` がパスするか
+- [ ] `pnpm run typecheck` がパスするか
+- [ ] `pnpm run lint` がパスするか
 
 **ドキュメント**:
 - [ ] WHYが非自明な箇所にコメントがあるか
@@ -1047,9 +1149,9 @@ PRを作成する前に以下を確認する:
 ### マイグレーション追加時
 
 1. `supabase db diff` で差分を確認してからマイグレーションファイルを作成
-2. ローカルで `npm run db:reset` して正常適用を確認
+2. ローカルで `pnpm run db:reset` して正常適用を確認
 3. RLSポリシーを必ず設定する
    - SELECT ポリシーが状態カラム (例: `lgtm_images.status`) に依存する場合、UPDATE で状態遷移する経路を必ず洗い出す
    - 新状態が SELECT ポリシーの `USING` を満たさないと PostgreSQL の post-update visibility check で `new row violates row-level security policy` が発生する。所有者・管理者用の追加 SELECT ポリシーで救うのが定石（`supabase/migrations/20260506000000_extend_lgtm_images_select_policy.sql` を参照）
-4. `npm run db:types` で型定義を再生成してコミットに含める
-5. PR をマージするとリモート Supabase には `.github/workflows/supabase-deploy.yml` が自動で反映する。失敗時は Actions ログを確認し、ローカルから `npx supabase db push --linked` で手動リカバリ
+4. `pnpm run db:types` で型定義を再生成してコミットに含める
+5. PR をマージするとリモート Supabase には `.github/workflows/supabase-deploy.yml` が自動で反映する。失敗時は Actions ログを確認し、ローカルから `pnpm exec supabase db push --linked` で手動リカバリ

@@ -15,7 +15,12 @@ const PRIVATE_IPV6_PREFIXES: string[] = ['::1', 'fc', 'fd', 'fe80', '::ffff:'];
 
 export const DEFAULT_MAX_FETCH_BYTES = 10 * 1024 * 1024;
 export const DEFAULT_FETCH_TIMEOUT_MS = 8_000;
-export const DEFAULT_ALLOWED_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/gif'] as const;
+export const DEFAULT_ALLOWED_CONTENT_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+] as const;
 
 export interface SafeFetchOptions {
   maxBytes?: number;
@@ -91,7 +96,7 @@ export async function safeFetch(
 
   const contentType = normalizeContentType(response.headers.get('content-type'));
   if (!allowedContentTypes.includes(contentType)) {
-    throw new BadRequestError('JPEG・PNG・GIF 形式の画像 URL を入力してください');
+    throw new BadRequestError('JPEG・PNG・GIF・WebP 形式の画像 URL を入力してください');
   }
 
   const declaredLength = Number(response.headers.get('content-length') ?? Number.NaN);

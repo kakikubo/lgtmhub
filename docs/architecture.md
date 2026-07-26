@@ -6,16 +6,16 @@
 
 | 技術 | バージョン | 選定理由 |
 |------|-----------|----------|
-| Node.js | v24.11.0 | CLAUDE.mdで指定。Next.js 15のサポート対象、非同期I/Oに優れSharpの画像処理を高速に実行可能 |
+| Node.js | v24.11.0 | CLAUDE.mdで指定。Next.js 16のサポート対象、非同期I/Oに優れSharpの画像処理を高速に実行可能 |
 | TypeScript | 6.x | CLAUDE.mdで指定。静的型付けでバグを早期検出、Supabase / Next.jsの型生成が充実 |
-| npm | 11.x | CLAUDE.mdで指定。Node.js v24に標準搭載で追加インストール不要 |
+| pnpm | 10.x | CLAUDE.mdで指定。Corepack 経由で利用し、`package.json` の `packageManager` でバージョンを固定 |
 
 ### フレームワーク・ライブラリ
 
 | 技術 | バージョン | 用途 | 選定理由 |
 |------|-----------|------|----------|
-| Next.js | 15.x | フルスタックフレームワーク | App Router採用でSSR・APIルート・画像最適化を統合的に提供。Vercelとの親和性が最高 |
-| React | 19.x | UIライブラリ | Next.js 15が要求。Server Components対応 |
+| Next.js | 16.x | フルスタックフレームワーク | App Router採用でSSR・APIルート・画像最適化を統合的に提供。Vercelとの親和性が最高 |
+| React | 19.x | UIライブラリ | Next.js 16が要求。Server Components対応 |
 | Tailwind CSS | 4.x | スタイリング | ユーティリティクラスで高速にUI構築、デザイントークンの一元管理が容易 |
 | Sharp | 0.34.x | 画像処理 | LGTM文字合成・WebP変換・リサイズ・pHash計算をNode.js上で高速処理 |
 | @supabase/supabase-js | 2.x | DB・認証クライアント | Supabase公式SDK、TypeScript型生成と統合 |
@@ -28,7 +28,7 @@
 | 技術 | バージョン | 用途 | 選定理由 |
 |------|-----------|------|----------|
 | Biome | 2.x | リンター + フォーマッター | Rust 実装で高速、設定一元化(`biome.json` 1 ファイル)、ESLint + Prettier の責務を統合 |
-| lefthook | 2.x | Git hooks マネージャー | `npm install` 時の `prepare` スクリプトで自動配置、`pre-commit` で staged ファイルに Biome を自動実行(`lefthook.yml` で設定) |
+| lefthook | 2.x | Git hooks マネージャー | `pnpm install` 時の `prepare` スクリプトで自動配置、`pre-commit` で staged ファイルに Biome を自動実行(`lefthook.yml` で設定) |
 | Vitest | 3.x | ユニットテストフレームワーク | Viteベースで高速、Jestと互換APIで学習コスト低 |
 | Playwright | 1.5x | E2Eテスト | モダンなブラウザ自動化、Vercelプレビュー環境でも動作 |
 | supabase CLI | 2.x | ローカルDB・マイグレーション管理 | ローカルでSupabaseスタックをDocker起動、マイグレーションをコード管理 |
@@ -101,7 +101,14 @@ Presentation → API → Service → Data
 - **GitHub → Vercel自動連携**: `main` ブランチへのpushで本番デプロイ、PR作成でプレビューデプロイ
 - **マイグレーション**: `supabase db push` をGitHub Actionsで `main` マージ時に実行
 
-> CI/CD の詳細設定（GitHub Actions の jobs / steps、npm scripts、テスト戦略）は [`docs/development-guidelines.md`](./development-guidelines.md)「CI/CDパイプライン」を正典とする。本セクションはデプロイフローの概要のみを扱う。
+> CI/CD の詳細設定（GitHub Actions の jobs / steps、package.json scripts、テスト戦略）は [`docs/development-guidelines.md`](./development-guidelines.md)「CI/CDパイプライン」を正典とする。本セクションはデプロイフローの概要のみを扱う。
+
+### 実行リージョン
+
+- **Vercel 関数リージョン**: `vercel.json` の `regions` で `hnd1`（東京）に固定する。Vercel のデフォルトは `iad1`（US 東海岸）のため、明示しないと全 Route Handler / SSR が US 東海岸で実行され、日本のユーザー・Supabase（`ap-northeast-1` 想定）との RTT が無駄に伸びる。`regions` は全 Vercel 関数のデフォルトリージョンを設定する（単一リージョン指定は全プランで利用可）。
+- **Edge Middleware**: `regions` の対象外。常にユーザー近傍の Edge で実行される。
+- **確認方法**: レスポンスヘッダ `x-vercel-id`（`<edge>::<function>::<reqid>`）の Function 部が `hnd1` であることで実行リージョンを判定できる。
+- **Supabase リージョン**: `ap-northeast-1`（東京）で揃えることを前提とする。関数を東京にしても DB が遠隔だと往復が遠回りになるため、両者を東京で揃える。
 
 ---
 
@@ -140,7 +147,7 @@ Presentation → API → Service → Data
 
 | 操作 | 目標時間 | 測定指標 | 測定環境 | 測定方法 |
 |------|---------|----------|---------|----------|
-| 画像一覧の初期表示（20件） | 3秒以内 | **LCP（Largest Contentful Paint）** | Vercel Edge Network、3G相当回線 | Lighthouse / Vercel Analytics |
+| 画像一覧の初期表示（16件） | 3秒以内 | **LCP（Largest Contentful Paint）** | Vercel Edge Network、3G相当回線 | Lighthouse / Vercel Analytics |
 | マークダウンリンクのコピー | 100ms以内 | 操作完了時間 | クライアント側 | クリック→クリップボード書き込み完了までの計測 |
 | 画像登録処理（ダウンロード〜CDN保存） | 10秒以内 | サーバー処理時間 | Vercel Function（リージョン: hnd1） | サーバーログでstart/end計測 |
 | API応答（一覧取得） | 500ms以内（p95） | TTFB相当 | Vercel Function | Vercel Analytics |
@@ -165,7 +172,7 @@ Presentation → API → Service → Data
 
 - **転送時暗号化**: 全通信HTTPS（VercelおよびSupabaseが自動でTLS終端）
 - **保存時暗号化**: Supabase / Vercel Blob ともにストレージレベルで暗号化（AES-256）
-- **レスポンスヘッダ**: `vercel.json` の `headers` で `X-Content-Type-Options` / `X-Frame-Options` / `Referrer-Policy` / `Permissions-Policy` を全パスに適用。`Strict-Transport-Security` は Vercel が自動付与するため二重指定しない。CSP は Next.js の動的 nonce が必要なため middleware ベースで別途検討（未着手）
+- **レスポンスヘッダ**: `vercel.json` の `headers` で `X-Content-Type-Options` / `X-Frame-Options` / `Referrer-Policy` / `Permissions-Policy` を全パスに適用。`Strict-Transport-Security` は Vercel が自動付与するため二重指定しない。CSP は Next.js の動的 nonce が必要なため proxy ベースで別途検討（未着手）
 - **アクセス制御**:
   - Supabase Row Level Security（RLS）を全テーブルで有効化
   - クライアントから直接Supabaseに接続せず、Next.js Route Handler を経由
@@ -239,11 +246,28 @@ async function safeImageFetch(url: string): Promise<Response> {
 - **画像処理拡張**: Sharpパイプラインに合成ステップを追加（フォントカスタマイズ等）
 - **認証プロバイダー追加**: Supabase Auth設定で Google / Twitter 等を追加可能（MVP外）
 
+### レンダリング戦略（Cache Components / Partial Prerendering）
+
+Next.js 16 の **Cache Components**（Next.js 15 までの実験的 PPR を安定化・再設計したもの）を採用し、トップページを Partial Prerender 化する（Issue #54）。
+
+- **有効化**: `next.config.ts` で `cacheComponents: true`（グローバルフラグ。Next.js 15 の `experimental.ppr` / ルート単位の `experimental_ppr` は廃止）
+- **トップページ（`app/(site)/`）**: ページ骨格・ヒーロー文言・グリッドスケルトンを静的シェルとしてビルド時にプリレンダーし、エッジキャッシュから即時配信する。`Header`（認証依存・動的）と `HomeContent`（画像一覧）は `<Suspense>` 境界でストリーミングする
+- **初期画像一覧のキャッシュ**: `src/lib/cache/list-home-images.ts` の `getHomeImagesInitial` を `'use cache'` ディレクティブ化する。
+  - `cacheTag('lgtm-images:list')` でタグ付け、`cacheLife('max')` で寿命を最長化
+  - 無効化は `revalidateTag('lgtm-images:list', 'max')` に委ねる（第2引数のプロファイル必須）
+  - `'use cache'` 配下では `cookies()` を呼べないため、Cookie 非依存の `createAnonClient` を採用
+  - RLS の `"anyone can view active images"` ポリシーで匿名 SELECT を担保
+- **`cacheComponents` 互換のための準拠**: `export const dynamic = 'force-dynamic'` はグローバルフラグと非互換のため、動的化が必要なルートは `connection()` で明示的に prerender を抑止する（`app/api/images/random/route.ts`）。dynamic なページ（`/images/[id]`・`/images/new`）には `loading.tsx` で Suspense 境界（静的シェル）を用意する
+- **proxy 化**: Next.js 16 で `middleware.ts` → `proxy.ts` にリネーム（ファイル名に加え、エクスポート関数名も `middleware` → `proxy` に変更）。`proxy.ts` は Node.js runtime 前提で `runtime: 'edge'` 指定は非対応（エラー）。本プロジェクトの `@supabase/ssr` `createServerClient` は Node.js runtime デフォルトで影響なし
+
+> 本番計測（2026-06-09, `hnd1`）: `x-nextjs-prerender: 1` / `x-vercel-cache: HIT` で静的シェルのエッジ配信を確認。LCP 中央値 89ms・TTFB（エッジ HIT）10〜70ms・CLS 0.00 と Core Web Vitals はすべて Good 圏内（Issue #54 完了）。
+
 ### キャッシュ戦略
 
 - **静的アセット**: Next.js / Vercel Edge Network が自動でCDNキャッシュ
 - **画像本体（Vercel Blob）**: Cache-Control: `public, max-age=31536000, immutable`（URL変更時は再生成）
 - **画像一覧API**: `Cache-Control: s-maxage=60, stale-while-revalidate=300`（60秒キャッシュ＋5分リバリデート）
+- **画像ランダム取得API（`GET /api/images/random`）**: `Cache-Control: no-store` ＋ `connection()` による動的化。押下のたびに別の 16 枚を返す要件のため、ルート単位・レスポンス双方でキャッシュしない（Issue #109）。`cacheComponents` 有効化に伴い `dynamic = 'force-dynamic'` から `connection()` へ移行（Issue #54）
 
 #### 論理削除とキャッシュの関係
 
@@ -343,7 +367,7 @@ async function safeImageFetch(url: string): Promise<Response> {
 ```json
 {
   "dependencies": {
-    "next": "~15.5.15",                // パッチ固定（マイナー以上は手動アップデート）
+    "next": "~16.2.0",                 // パッチ固定（マイナー以上は手動アップデート）
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "@supabase/supabase-js": "^2.45.0",
@@ -365,10 +389,10 @@ async function safeImageFetch(url: string): Promise<Response> {
 ```
 
 **方針**:
-- ランタイム依存は `^` でマイナーアップを許容、Next.jsのみパッチ固定（`~15.5.15`）
+- ランタイム依存は `^` でマイナーアップを許容、Next.jsのみパッチ固定（`~16.2.0`）
 - TypeScript はパッチのみ自動更新（`~`）
 - 依存関係の更新 PR は Renovate App が自動で作成する（`renovate.json` 参照、運用ポリシーは `docs/development-guidelines.md`「依存関係管理 (Renovate)」セクション）
-- npm audit を CI で実行し、High 以上の脆弱性検出時は失敗扱い
+- pnpm audit を CI で実行し、High 以上の脆弱性検出時は失敗扱い
 
 **注意事項（メジャーバージョンが古いドキュメント想定から更新されたパッケージ）**:
 - `@supabase/ssr` v0.10 系: Cookie ハンドラが `getAll/setAll` ベース（旧 `get/set/remove` から変更）

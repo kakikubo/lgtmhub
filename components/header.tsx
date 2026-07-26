@@ -2,7 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { signInWithGithub, signOut } from '@/src/lib/auth/actions';
 import { createClient } from '@/src/lib/supabase/server';
-import { UserProfileRepository } from '@/src/repositories/user-profile-repository';
+import { buildUserProfileService } from '@/src/services/user-profile-service';
 
 export async function Header() {
   const supabase = await createClient();
@@ -10,7 +10,7 @@ export async function Header() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const profile = user ? await new UserProfileRepository(supabase).findById(user.id) : null;
+  const profile = user ? await buildUserProfileService(supabase).findById(user.id) : null;
 
   return (
     <header className="border-b">

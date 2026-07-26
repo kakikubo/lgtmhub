@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { DatabaseError } from '@/src/lib/errors';
+import { DatabaseError, NotFoundError } from '@/src/lib/errors';
 import type { Database } from '@/src/types/database.types';
 import type { ImageStatus, LgtmImage } from '@/src/types/image';
 
@@ -15,6 +15,7 @@ export interface CreateLgtmImageInput {
   height: number;
   fileSizeBytes: number;
   mimeType: string;
+  isAnimated: boolean;
   status?: ImageStatus;
 }
 
@@ -28,6 +29,17 @@ export interface ListImagesOptions {
   limit: number;
 }
 
+export interface UpdateAfterRegenerateInput {
+  imageUrl: string;
+  pHash: string;
+  width: number;
+  height: number;
+  fileSizeBytes: number;
+  isAnimated: boolean;
+  // 差し替え時のみ設定。未指定なら DB の originalUrl は据え置き
+  originalUrl?: string;
+}
+
 function toLgtmImage(row: LgtmImageRow): LgtmImage {
   return {
     id: row.id,
@@ -39,6 +51,7 @@ function toLgtmImage(row: LgtmImageRow): LgtmImage {
     height: row.height,
     fileSizeBytes: row.file_size_bytes,
     mimeType: row.mime_type,
+    isAnimated: row.is_animated,
     // DB 側の CHECK 制約 (status in ('processing','active','deleted')) で値域は保証済み。
     // Supabase 自動生成の型は CHECK を反映しないため、ガイドライン許容例外として narrowing する。
     status: row.status as ImageStatus,
@@ -58,6 +71,7 @@ function toInsert(input: CreateLgtmImageInput): LgtmImageInsert {
     height: input.height,
     file_size_bytes: input.fileSizeBytes,
     mime_type: input.mimeType,
+    is_animated: input.isAnimated,
     status: input.status ?? 'active',
   };
 }
@@ -125,6 +139,86 @@ export class ImageRepository {
 
     if (error) throw new DatabaseError(error.message);
     return (data ?? []).map((row) => ({ id: row.id, pHash: row.p_hash }));
+  }
+
+  /**
+   * 管理者による再生成時の重複検出用に、指定 id を除外した閲覧可能画像の pHash 一覧を返す。
+   * 自レコード ID を除外することで「同一 URL を再取得しても自己衝突しない」を実現する。
+   */
+  async listActivePHashesExcept(excludeId: string): Promise<ActivePHashEntry[]> {
+    const { data, error } = await this.supabase
+      .from('lgtm_images')
+      .select('id, p_hash')
+      .eq('status', 'active')
+      .neq('id', excludeId);
+
+    if (error) throw new DatabaseError(error.message);
+    return (data ?? []).map((row) => ({ id: row.id, pHash: row.p_hash }));
+  }
+
+  /**
+   * 管理者による再生成後の DB 更新。status='active' な行のみ更新し、
+   * 論理削除済み/存在しない場合は NotFoundError に倒す。
+   * `originalUrl` は差し替え時のみ更新する (undefined なら据え置き)。
+   */
+  async updateAfterRegenerate(id: string, patch: UpdateAfterRegenerateInput): Promise<LgtmImage> {
+    const update: Database['public']['Tables']['lgtm_images']['Update'] = {
+      image_url: patch.imageUrl,
+      p_hash: patch.pHash,
+      width: patch.width,
+      height: patch.height,
+      file_size_bytes: patch.fileSizeBytes,
+      is_animated: patch.isAnimated,
+      updated_at: new Date().toISOString(),
+    };
+    if (patch.originalUrl !== undefined) {
+      update.original_url = patch.originalUrl;
+    }
+
+    const { data, error } = await this.supabase
+      .from('lgtm_images')
+      .update(update)
+      .eq('id', id)
+      .eq('status', 'active')
+      .select('*')
+      .maybeSingle();
+
+    if (error) throw new DatabaseError(error.message);
+    if (!data) throw new NotFoundError('画像', id);
+    return toLgtmImage(data);
+  }
+
+  /**
+   * ランダム抽出の母集合用に、閲覧可能な (status='active') 画像の id を全件取得する。
+   * 本体カラムを引かないため `listActivePHashes()` (id + p_hash 全件) より遥かに軽量。
+   * 件数が 10 万件超に達したら RPC / pgvector 化を検討する (architecture.md と同基準)。
+   */
+  async listActiveIds(): Promise<string[]> {
+    const { data, error } = await this.supabase
+      .from('lgtm_images')
+      .select('id')
+      .eq('status', 'active');
+
+    if (error) throw new DatabaseError(error.message);
+    return (data ?? []).map((row) => row.id);
+  }
+
+  /**
+   * 指定 id 群のうち閲覧可能な (status='active') 画像を取得する。
+   * `.in` の返却順は不定なため、表示順は呼び出し元 (Service) で整列する。
+   * ids が空のときは Supabase を呼ばず空配列を返す (空配列ガード)。
+   */
+  async findManyActiveByIds(ids: string[]): Promise<LgtmImage[]> {
+    if (ids.length === 0) return [];
+
+    const { data, error } = await this.supabase
+      .from('lgtm_images')
+      .select('*')
+      .eq('status', 'active')
+      .in('id', ids);
+
+    if (error) throw new DatabaseError(error.message);
+    return (data ?? []).map(toLgtmImage);
   }
 
   /**

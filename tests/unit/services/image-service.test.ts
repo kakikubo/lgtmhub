@@ -7,9 +7,10 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '@/src/lib/errors';
+import { LIST_IMAGES_DEFAULT_LIMIT } from '@/src/lib/validation/image';
 import type { DailyUploadCountRepository } from '@/src/repositories/daily-upload-count-repository';
 import type { ImageRepository } from '@/src/repositories/image-repository';
-import { BLOB_CACHE_CONTROL_MAX_AGE_SECONDS } from '@/src/services/image-service';
+import { BLOB_CACHE_CONTROL_MAX_AGE_SECONDS, type BlobClient } from '@/src/services/image-service';
 import type { Database } from '@/src/types/database.types';
 import type { LgtmImage } from '@/src/types/image';
 
@@ -25,12 +26,12 @@ vi.mock('@/src/lib/http/safe-fetch', () => ({
   safeFetch: (...args: unknown[]) => safeFetch(...args),
   DEFAULT_MAX_FETCH_BYTES: 10 * 1024 * 1024,
   DEFAULT_FETCH_TIMEOUT_MS: 8000,
-  DEFAULT_ALLOWED_CONTENT_TYPES: ['image/jpeg', 'image/png', 'image/gif'],
+  DEFAULT_ALLOWED_CONTENT_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
 }));
 
 vi.mock('@/src/lib/image/validate-image', () => ({
   validateImage: (...args: unknown[]) => validateImage(...args),
-  ALLOWED_IMAGE_FORMATS: ['jpeg', 'png', 'gif'],
+  ALLOWED_IMAGE_FORMATS: ['jpeg', 'png', 'gif', 'webp'],
 }));
 
 vi.mock('@/src/lib/image/calculate-phash', () => ({
@@ -43,7 +44,7 @@ vi.mock('@/src/lib/image/calculate-phash', () => ({
 
 vi.mock('@/src/lib/image/compose-lgtm', () => ({
   composeLgtmImage: (...args: unknown[]) => composeLgtmImage(...args),
-  MAX_LONG_SIDE: 800,
+  MAX_LONG_SIDE: 400,
   WEBP_QUALITY: 85,
 }));
 
@@ -70,12 +71,19 @@ interface Mocks {
   imageRepo: {
     create: ReturnType<typeof vi.fn>;
     listActivePHashes: ReturnType<typeof vi.fn>;
+    listActivePHashesExcept: ReturnType<typeof vi.fn>;
+    updateAfterRegenerate: ReturnType<typeof vi.fn>;
     list: ReturnType<typeof vi.fn>;
     findActiveById: ReturnType<typeof vi.fn>;
     softDelete: ReturnType<typeof vi.fn>;
+    listActiveIds: ReturnType<typeof vi.fn>;
+    findManyActiveByIds: ReturnType<typeof vi.fn>;
   };
   countRepo: { getCount: ReturnType<typeof vi.fn>; increment: ReturnType<typeof vi.fn> };
-  blob: { put: ReturnType<typeof vi.fn>; del: ReturnType<typeof vi.fn> };
+  blob: {
+    put: ReturnType<typeof vi.fn<BlobClient['put']>>;
+    del: ReturnType<typeof vi.fn<BlobClient['del']>>;
+  };
   clock: () => Date;
 }
 
@@ -84,17 +92,23 @@ function buildMocks(): Mocks {
     imageRepo: {
       create: vi.fn(),
       listActivePHashes: vi.fn().mockResolvedValue([]),
+      listActivePHashesExcept: vi.fn().mockResolvedValue([]),
+      updateAfterRegenerate: vi.fn(),
       list: vi.fn().mockResolvedValue([]),
       findActiveById: vi.fn(),
       softDelete: vi.fn(),
+      listActiveIds: vi.fn().mockResolvedValue([]),
+      findManyActiveByIds: vi.fn().mockResolvedValue([]),
     },
     countRepo: {
       getCount: vi.fn().mockResolvedValue(0),
       increment: vi.fn().mockResolvedValue(1),
     },
     blob: {
-      put: vi.fn().mockResolvedValue({ url: 'https://blob.example/lgtm/x.webp' }),
-      del: vi.fn().mockResolvedValue(undefined),
+      put: vi
+        .fn<BlobClient['put']>()
+        .mockResolvedValue({ url: 'https://blob.example/lgtm/x.webp' }),
+      del: vi.fn<BlobClient['del']>().mockResolvedValue(undefined),
     },
     clock: () => new Date('2026-05-04T12:00:00.000Z'),
   };
@@ -111,6 +125,7 @@ function buildImage(overrides: Partial<LgtmImage> = {}): LgtmImage {
     height: 600,
     fileSizeBytes: 12345,
     mimeType: 'image/webp',
+    isAnimated: false,
     status: 'active',
     deletedAt: null,
     createdAt: new Date('2026-05-04T12:00:00.000Z'),
@@ -131,14 +146,15 @@ async function buildService(mocks: Mocks) {
 
 function setupHappyPathMocks(): void {
   safeFetch.mockResolvedValue({ buffer: Buffer.from('img'), contentType: 'image/jpeg' });
-  validateImage.mockResolvedValue({ format: 'jpeg', width: 800, height: 600 });
+  validateImage.mockResolvedValue({ format: 'jpeg', width: 800, height: 600, pages: 1 });
   calculatePHash.mockResolvedValue('b'.repeat(1024));
   isDuplicate.mockReturnValue(false);
   composeLgtmImage.mockResolvedValue({
     buffer: Buffer.from('webp'),
-    width: 800,
-    height: 600,
+    width: 400,
+    height: 300,
     byteLength: 4,
+    isAnimated: false,
   });
 }
 
@@ -164,7 +180,7 @@ describe('ImageService.createImage', () => {
     ]);
 
     safeFetch.mockResolvedValue({ buffer: Buffer.from('img'), contentType: 'image/jpeg' });
-    validateImage.mockResolvedValue({ format: 'jpeg', width: 800, height: 600 });
+    validateImage.mockResolvedValue({ format: 'jpeg', width: 800, height: 600, pages: 1 });
     calculatePHash.mockResolvedValue('a'.repeat(1024));
     isDuplicate.mockReturnValueOnce(true);
 
@@ -180,7 +196,8 @@ describe('ImageService.createImage', () => {
     expect(mocks.imageRepo.create).not.toHaveBeenCalled();
   });
 
-  it('正常系: increment → Blob 保存 → DB 登録 の順で実行する', async () => {
+  it('正常系: Blob 保存 → increment → DB 登録 の順で実行する', async () => {
+    // Blob put を先に済ませることで、合成失敗時に daily 枠を無駄消費しない
     const mocks = buildMocks();
     setupHappyPathMocks();
     mocks.imageRepo.create.mockResolvedValue(buildImage());
@@ -203,7 +220,7 @@ describe('ImageService.createImage', () => {
     const result = await service.createImage('user-1', 'https://example.com/x.jpg');
 
     expect(result.id).toBe('image-1');
-    expect(callOrder).toEqual(['increment', 'blob.put', 'imageRepo.create']);
+    expect(callOrder).toEqual(['blob.put', 'increment', 'imageRepo.create']);
     expect(mocks.blob.put).toHaveBeenCalledWith(
       expect.stringMatching(/^lgtm\/[0-9a-f-]+\.webp$/),
       Buffer.from('webp'),
@@ -217,12 +234,37 @@ describe('ImageService.createImage', () => {
         pHash: 'b'.repeat(1024),
         status: 'active',
         mimeType: 'image/webp',
+        isAnimated: false,
       }),
     );
     expect(mocks.blob.del).not.toHaveBeenCalled();
   });
 
-  it('atomic increment が DailyLimitExceededError を throw した場合、Blob/DB は触らない (TOCTOU レース敗北)', async () => {
+  it('アニメーション入力の場合 imageRepo.create に isAnimated:true が渡る (Issue #201)', async () => {
+    const mocks = buildMocks();
+    setupHappyPathMocks();
+    composeLgtmImage.mockResolvedValue({
+      buffer: Buffer.from('animated-webp'),
+      width: 400,
+      height: 300,
+      byteLength: 13,
+      isAnimated: true,
+    });
+    mocks.imageRepo.create.mockResolvedValue(buildImage({ isAnimated: true }));
+
+    const service = await buildService(mocks);
+    await service.createImage('user-1', 'https://example.com/x.gif');
+
+    expect(mocks.imageRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isAnimated: true,
+        mimeType: 'image/webp',
+      }),
+    );
+  });
+
+  it('atomic increment が DailyLimitExceededError を throw した場合、DB は触らず新 Blob は del でロールバックする (TOCTOU レース敗北)', async () => {
+    // Blob put は増分カウント前に走るため、TOCTOU 敗北時は del で孤児を回収する
     const mocks = buildMocks();
     setupHappyPathMocks();
     mocks.countRepo.getCount.mockResolvedValue(9);
@@ -233,9 +275,9 @@ describe('ImageService.createImage', () => {
       DailyLimitExceededError,
     );
 
-    expect(mocks.blob.put).not.toHaveBeenCalled();
+    expect(mocks.blob.put).toHaveBeenCalled();
     expect(mocks.imageRepo.create).not.toHaveBeenCalled();
-    expect(mocks.blob.del).not.toHaveBeenCalled();
+    expect(mocks.blob.del).toHaveBeenCalledWith('https://blob.example/lgtm/x.webp');
   });
 
   it('DB 登録に失敗したら Blob を del() でロールバックして例外を再 throw する', async () => {
@@ -265,7 +307,7 @@ describe('buildImageService', () => {
 });
 
 describe('ImageService.listImages', () => {
-  it('limit 未指定なら 20 件で repository を呼び、PublicLgtmImage に絞り込んで返す', async () => {
+  it('limit 未指定なら 16 件で repository を呼び、PublicLgtmImage に絞り込んで返す', async () => {
     const mocks = buildMocks();
     mocks.imageRepo.list.mockResolvedValue([
       buildImage({ id: 'image-1', createdAt: new Date('2026-05-04T12:00:00.000Z') }),
@@ -275,7 +317,7 @@ describe('ImageService.listImages', () => {
     const service = await buildService(mocks);
     const result = await service.listImages();
 
-    expect(mocks.imageRepo.list).toHaveBeenCalledWith({ cursor: undefined, limit: 20 });
+    expect(mocks.imageRepo.list).toHaveBeenCalledWith({ cursor: undefined, limit: 16 });
     expect(result.images).toEqual([
       {
         id: 'image-1',
@@ -283,6 +325,7 @@ describe('ImageService.listImages', () => {
         uploaderId: 'user-1',
         width: 800,
         height: 600,
+        isAnimated: false,
         createdAt: new Date('2026-05-04T12:00:00.000Z'),
       },
       {
@@ -291,10 +334,11 @@ describe('ImageService.listImages', () => {
         uploaderId: 'user-1',
         width: 800,
         height: 600,
+        isAnimated: false,
         createdAt: new Date('2026-05-04T11:00:00.000Z'),
       },
     ]);
-    // limit (20) ちょうどでないので nextCursor は null
+    // limit (16) ちょうどでないので nextCursor は null
     expect(result.nextCursor).toBeNull();
   });
 
@@ -353,6 +397,110 @@ describe('ImageService.listImages', () => {
   });
 });
 
+describe('ImageService.listRandomImages', () => {
+  it('active が 0 件なら findManyActiveByIds を呼ばず空配列を返す', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.listActiveIds.mockResolvedValue([]);
+
+    const service = await buildService(mocks);
+    const result = await service.listRandomImages();
+
+    expect(result).toEqual({ images: [] });
+    expect(mocks.imageRepo.findManyActiveByIds).not.toHaveBeenCalled();
+  });
+
+  it('limit 未指定なら LIST_IMAGES_DEFAULT_LIMIT 件に切り詰めて取得する', async () => {
+    const mocks = buildMocks();
+    const ids = Array.from({ length: 30 }, (_, i) => `id-${i}`);
+    mocks.imageRepo.listActiveIds.mockResolvedValue(ids);
+    mocks.imageRepo.findManyActiveByIds.mockResolvedValue([]);
+
+    const service = await buildService(mocks);
+    await service.listRandomImages();
+
+    const sampled = mocks.imageRepo.findManyActiveByIds.mock.calls[0]?.[0] as string[];
+    expect(sampled).toHaveLength(LIST_IMAGES_DEFAULT_LIMIT);
+    // 抽出は母集団 (全 active id) の部分集合であること
+    expect(sampled.every((id) => ids.includes(id))).toBe(true);
+    expect(new Set(sampled).size).toBe(LIST_IMAGES_DEFAULT_LIMIT);
+  });
+
+  it('総件数が limit 以下なら全件を返す', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.listActiveIds.mockResolvedValue(['a', 'b']);
+    mocks.imageRepo.findManyActiveByIds.mockImplementation(async (ids: string[]) =>
+      ids.map((id) => buildImage({ id })),
+    );
+
+    const service = await buildService(mocks);
+    const result = await service.listRandomImages();
+
+    expect(result.images).toHaveLength(2);
+    expect(result.images.map((i) => i.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('明示 limit で抽出件数を絞れる', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.listActiveIds.mockResolvedValue(['a', 'b', 'c', 'd', 'e']);
+    mocks.imageRepo.findManyActiveByIds.mockResolvedValue([]);
+
+    const service = await buildService(mocks);
+    await service.listRandomImages(2);
+
+    const sampled = mocks.imageRepo.findManyActiveByIds.mock.calls[0]?.[0] as string[];
+    expect(sampled).toHaveLength(2);
+  });
+
+  it('findManyActiveByIds の返却順に依らず、抽出 (シャッフル) 順で整列して返す', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.listActiveIds.mockResolvedValue(['a', 'b', 'c']);
+    // 要求した順 (sampled) と逆順で返しても、Service が sampled 順へ再整列する
+    mocks.imageRepo.findManyActiveByIds.mockImplementation(async (ids: string[]) =>
+      [...ids].reverse().map((id) => buildImage({ id })),
+    );
+
+    const service = await buildService(mocks);
+    const result = await service.listRandomImages();
+
+    const sampled = mocks.imageRepo.findManyActiveByIds.mock.calls[0]?.[0] as string[];
+    expect(result.images.map((i) => i.id)).toEqual(sampled);
+  });
+
+  it('PublicLgtmImage に絞り込んで返す (pHash 等の内部フィールドを含まない)', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.listActiveIds.mockResolvedValue(['a']);
+    mocks.imageRepo.findManyActiveByIds.mockResolvedValue([
+      buildImage({ id: 'a', width: 320, height: 240 }),
+    ]);
+
+    const service = await buildService(mocks);
+    const result = await service.listRandomImages();
+
+    expect(result.images[0]).toEqual({
+      id: 'a',
+      imageUrl: 'https://blob.example/lgtm/x.webp',
+      uploaderId: 'user-1',
+      width: 320,
+      height: 240,
+      isAnimated: false,
+      createdAt: new Date('2026-05-04T12:00:00.000Z'),
+    });
+    expect(result).not.toHaveProperty('nextCursor');
+  });
+
+  it('抽出と取得の間に行が消えて一部 id が欠落しても、取得できた分だけ返す', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.listActiveIds.mockResolvedValue(['a', 'b']);
+    // b は findManyActiveByIds の時点で active でなくなり返ってこない
+    mocks.imageRepo.findManyActiveByIds.mockResolvedValue([buildImage({ id: 'a' })]);
+
+    const service = await buildService(mocks);
+    const result = await service.listRandomImages();
+
+    expect(result.images.map((i) => i.id)).toEqual(['a']);
+  });
+});
+
 describe('default BlobClient (@vercel/blob 委譲)', () => {
   it('blob を未注入で createImage を呼ぶと、@vercel/blob の put / del が利用される', async () => {
     const mocks = buildMocks();
@@ -404,15 +552,20 @@ describe('default BlobClient (@vercel/blob 委譲)', () => {
   });
 });
 
-describe('ImageService.getImage', () => {
-  it('Repository が LgtmImage を返したら PublicLgtmImage に整形して返す', async () => {
+describe('ImageService.getImageDetail', () => {
+  it('Repository が LgtmImage を返したら originalUrl 込みの PublicLgtmImageDetail に整形して返す', async () => {
     const mocks = buildMocks();
     mocks.imageRepo.findActiveById.mockResolvedValue(
-      buildImage({ id: 'image-42', width: 1024, height: 768 }),
+      buildImage({
+        id: 'image-42',
+        width: 1024,
+        height: 768,
+        originalUrl: 'https://example.com/detail-source.jpg',
+      }),
     );
 
     const service = await buildService(mocks);
-    const result = await service.getImage('image-42');
+    const result = await service.getImageDetail('image-42');
 
     expect(mocks.imageRepo.findActiveById).toHaveBeenCalledWith('image-42');
     expect(result).toEqual({
@@ -421,7 +574,9 @@ describe('ImageService.getImage', () => {
       uploaderId: 'user-1',
       width: 1024,
       height: 768,
+      isAnimated: false,
       createdAt: new Date('2026-05-04T12:00:00.000Z'),
+      originalUrl: 'https://example.com/detail-source.jpg',
     });
   });
 
@@ -430,7 +585,7 @@ describe('ImageService.getImage', () => {
     mocks.imageRepo.findActiveById.mockResolvedValue(null);
 
     const service = await buildService(mocks);
-    expect(await service.getImage('missing')).toBeNull();
+    expect(await service.getImageDetail('missing')).toBeNull();
   });
 
   it('Repository が throw したらそのまま伝播する (Page 側で notFound() に変換する責務)', async () => {
@@ -438,7 +593,7 @@ describe('ImageService.getImage', () => {
     mocks.imageRepo.findActiveById.mockRejectedValue(new DatabaseError('boom'));
 
     const service = await buildService(mocks);
-    await expect(service.getImage('image-1')).rejects.toBeInstanceOf(DatabaseError);
+    await expect(service.getImageDetail('image-1')).rejects.toBeInstanceOf(DatabaseError);
   });
 });
 
@@ -481,5 +636,226 @@ describe('ImageService.deleteImage', () => {
 
     const service = await buildService(mocks);
     await expect(service.deleteImage('image-1', 'user-1')).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('ImageService.regenerateImage', () => {
+  function setupRegenerateHappyPath(mocks: Mocks) {
+    setupHappyPathMocks();
+    mocks.imageRepo.findActiveById.mockResolvedValue(
+      buildImage({
+        id: 'image-1',
+        originalUrl: 'https://example.com/original.jpg',
+        imageUrl: 'https://blob.example/lgtm/old.webp',
+      }),
+    );
+    mocks.blob.put.mockResolvedValue({ url: 'https://blob.example/lgtm/new.webp' });
+    mocks.imageRepo.updateAfterRegenerate.mockResolvedValue(
+      buildImage({
+        id: 'image-1',
+        imageUrl: 'https://blob.example/lgtm/new.webp',
+      }),
+    );
+  }
+
+  it('対象画像が存在しなければ NotFoundError を throw し、以降の処理は一切走らない', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.findActiveById.mockResolvedValue(null);
+
+    const service = await buildService(mocks);
+    await expect(service.regenerateImage('image-missing', undefined)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+
+    expect(safeFetch).not.toHaveBeenCalled();
+    expect(mocks.blob.put).not.toHaveBeenCalled();
+    expect(mocks.imageRepo.updateAfterRegenerate).not.toHaveBeenCalled();
+    expect(mocks.blob.del).not.toHaveBeenCalled();
+  });
+
+  it('overrideOriginalUrl 未指定なら既存の originalUrl から再取得する (差し替えなし)', async () => {
+    const mocks = buildMocks();
+    setupRegenerateHappyPath(mocks);
+
+    const service = await buildService(mocks);
+    const result = await service.regenerateImage('image-1', undefined);
+
+    expect(safeFetch).toHaveBeenCalledWith('https://example.com/original.jpg');
+    // originalUrl は据え置き (Repository には渡さない)
+    expect(mocks.imageRepo.updateAfterRegenerate).toHaveBeenCalledWith(
+      'image-1',
+      expect.objectContaining({
+        imageUrl: 'https://blob.example/lgtm/new.webp',
+        pHash: 'b'.repeat(1024),
+      }),
+    );
+    const patch = mocks.imageRepo.updateAfterRegenerate.mock.calls[0]?.[1] as {
+      originalUrl?: string;
+    };
+    expect(patch.originalUrl).toBeUndefined();
+    expect(result.urlChanged).toBe(false);
+    expect(result.previousImageUrl).toBe('https://blob.example/lgtm/old.webp');
+  });
+
+  it('overrideOriginalUrl 指定 (差し替え) なら新 URL で取得し、Repository に originalUrl を渡す', async () => {
+    const mocks = buildMocks();
+    setupRegenerateHappyPath(mocks);
+
+    const service = await buildService(mocks);
+    const result = await service.regenerateImage('image-1', 'https://example.com/replaced.jpg');
+
+    expect(safeFetch).toHaveBeenCalledWith('https://example.com/replaced.jpg');
+    expect(mocks.imageRepo.updateAfterRegenerate).toHaveBeenCalledWith(
+      'image-1',
+      expect.objectContaining({
+        originalUrl: 'https://example.com/replaced.jpg',
+      }),
+    );
+    expect(result.urlChanged).toBe(true);
+  });
+
+  it('overrideOriginalUrl が既存 originalUrl と同一なら urlChanged=false になる', async () => {
+    const mocks = buildMocks();
+    setupRegenerateHappyPath(mocks);
+
+    const service = await buildService(mocks);
+    const result = await service.regenerateImage('image-1', 'https://example.com/original.jpg');
+
+    expect(result.urlChanged).toBe(false);
+  });
+
+  it('重複判定は自レコード ID を除外する (listActivePHashesExcept を呼ぶ)', async () => {
+    const mocks = buildMocks();
+    setupRegenerateHappyPath(mocks);
+
+    const service = await buildService(mocks);
+    await service.regenerateImage('image-1', undefined);
+
+    expect(mocks.imageRepo.listActivePHashesExcept).toHaveBeenCalledWith('image-1');
+    expect(mocks.imageRepo.listActivePHashes).not.toHaveBeenCalled();
+  });
+
+  it('日次アップロードカウントは加算しない (既存の作り直しのため)', async () => {
+    const mocks = buildMocks();
+    setupRegenerateHappyPath(mocks);
+
+    const service = await buildService(mocks);
+    await service.regenerateImage('image-1', undefined);
+
+    expect(mocks.countRepo.increment).not.toHaveBeenCalled();
+    expect(mocks.countRepo.getCount).not.toHaveBeenCalled();
+  });
+
+  it('別の active 画像と pHash が重複したら DuplicateImageError を throw し、Blob put / DB update は呼ばれない', async () => {
+    const mocks = buildMocks();
+    setupRegenerateHappyPath(mocks);
+    mocks.imageRepo.listActivePHashesExcept.mockResolvedValue([
+      { id: 'other-1', pHash: 'a'.repeat(1024) },
+    ]);
+    calculatePHash.mockResolvedValue('a'.repeat(1024));
+    isDuplicate.mockReturnValueOnce(true);
+
+    const service = await buildService(mocks);
+    await expect(service.regenerateImage('image-1', undefined)).rejects.toBeInstanceOf(
+      DuplicateImageError,
+    );
+
+    expect(mocks.blob.put).not.toHaveBeenCalled();
+    expect(mocks.imageRepo.updateAfterRegenerate).not.toHaveBeenCalled();
+    expect(mocks.blob.del).not.toHaveBeenCalled();
+  });
+
+  it('取得 / 検証失敗時は既存レコード・Blob に一切触れない', async () => {
+    const mocks = buildMocks();
+    setupRegenerateHappyPath(mocks);
+    safeFetch.mockRejectedValue(new Error('fetch failed'));
+
+    const service = await buildService(mocks);
+    await expect(service.regenerateImage('image-1', undefined)).rejects.toThrow('fetch failed');
+
+    expect(mocks.blob.put).not.toHaveBeenCalled();
+    expect(mocks.imageRepo.updateAfterRegenerate).not.toHaveBeenCalled();
+    expect(mocks.blob.del).not.toHaveBeenCalled();
+  });
+
+  it('正常系: 新 Blob に put → DB update → 旧 Blob を best-effort で del の順で実行する', async () => {
+    const mocks = buildMocks();
+    setupRegenerateHappyPath(mocks);
+
+    const callOrder: string[] = [];
+    mocks.blob.put.mockImplementation(async () => {
+      callOrder.push('blob.put');
+      return { url: 'https://blob.example/lgtm/new.webp' };
+    });
+    mocks.imageRepo.updateAfterRegenerate.mockImplementation(async () => {
+      callOrder.push('updateAfterRegenerate');
+      return buildImage({ id: 'image-1', imageUrl: 'https://blob.example/lgtm/new.webp' });
+    });
+    mocks.blob.del.mockImplementation(async (url: string) => {
+      callOrder.push(`blob.del:${url}`);
+    });
+
+    const service = await buildService(mocks);
+    const result = await service.regenerateImage('image-1', undefined);
+
+    expect(callOrder).toEqual([
+      'blob.put',
+      'updateAfterRegenerate',
+      'blob.del:https://blob.example/lgtm/old.webp',
+    ]);
+    expect(result.image.imageUrl).toBe('https://blob.example/lgtm/new.webp');
+  });
+
+  it('DB 更新失敗時は新 Blob を del してロールバックし、旧 Blob は触らない', async () => {
+    const mocks = buildMocks();
+    setupRegenerateHappyPath(mocks);
+    mocks.imageRepo.updateAfterRegenerate.mockRejectedValue(new DatabaseError('update failed'));
+
+    const service = await buildService(mocks);
+    await expect(service.regenerateImage('image-1', undefined)).rejects.toBeInstanceOf(
+      DatabaseError,
+    );
+
+    expect(mocks.blob.del).toHaveBeenCalledTimes(1);
+    expect(mocks.blob.del).toHaveBeenCalledWith('https://blob.example/lgtm/new.webp');
+  });
+
+  it('旧 Blob 削除失敗はログ warning のみで、再生成成功として resolve する (best-effort)', async () => {
+    const mocks = buildMocks();
+    setupRegenerateHappyPath(mocks);
+    mocks.blob.del.mockRejectedValue(new Error('blob del failed'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const service = await buildService(mocks);
+    const result = await service.regenerateImage('image-1', undefined);
+
+    expect(result.image.imageUrl).toBe('https://blob.example/lgtm/new.webp');
+    expect(warnSpy).toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
+
+  it('options.skipOldBlobDeletion=true なら旧 Blob を削除せず、info ログを残して成功する', async () => {
+    // Preview 環境で Production と Blob store 共有時の副作用回避 (Issue #195)
+    const mocks = buildMocks();
+    setupRegenerateHappyPath(mocks);
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    const service = await buildService(mocks);
+    const result = await service.regenerateImage('image-1', undefined, {
+      skipOldBlobDeletion: true,
+    });
+
+    expect(result.image.imageUrl).toBe('https://blob.example/lgtm/new.webp');
+    expect(mocks.blob.del).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledWith(
+      '[regenerateImage] skipped previous blob delete',
+      expect.objectContaining({
+        imageId: 'image-1',
+        previousImageUrl: 'https://blob.example/lgtm/old.webp',
+      }),
+    );
+
+    infoSpy.mockRestore();
   });
 });

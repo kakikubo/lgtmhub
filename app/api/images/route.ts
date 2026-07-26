@@ -8,9 +8,15 @@ import {
   DuplicateImageError,
   UnauthorizedError,
 } from '@/src/lib/errors';
+import { createAnonClient } from '@/src/lib/supabase/anon';
 import { createClient } from '@/src/lib/supabase/server';
 import { createImageRequestSchema, listImagesQuerySchema } from '@/src/lib/validation/image';
 import { buildImageService } from '@/src/services/image-service';
+
+// アニメーション GIF → アニメーション WebP の同期合成は最大 150 フレーム ×
+// LGTM オーバーレイで数秒〜十数秒かかる。Vercel デフォルトの 10 秒では足りないため
+// Pro プラン前提で 60 秒に拡張する (Issue #201)。
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   // 空文字クエリ (`?cursor=` など) は zod の .optional() で弾けないため、事前に undefined 化する
@@ -28,12 +34,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // ログインは不要だが、RLS ポリシー (anyone can view active images) を経由して
-    // SELECT するため anon key の Supabase クライアントを生成する
-    const supabase = await createClient();
+    // Cookie 連携の createClient() を使うと Set-Cookie がレスポンスに乗り Vercel CDN が
+    // キャッシュを諦めるため、anon ロールで読み取り RLS の "anyone can view active images" を通す。
+    // architecture.md の Cache-Control 方針 (Issue #46 案 #3) を実効化するための前提条件。
+    const supabase = createAnonClient();
     const service = buildImageService(supabase);
     const result = await service.listImages(parsed.data);
-    return NextResponse.json(result, { status: 200 });
+
+    return NextResponse.json(result, {
+      status: 200,
+      headers: {
+        'Cache-Control': 's-maxage=60, stale-while-revalidate=300',
+      },
+    });
   } catch (err) {
     console.error('[GET /api/images]', err);
     return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });
@@ -59,7 +72,7 @@ export async function POST(request: NextRequest) {
   try {
     const service = buildImageService(supabase);
     const image = await service.createImage(user.id, parsed.data.imageUrl);
-    revalidateTag(HOME_IMAGES_CACHE_TAG);
+    revalidateTag(HOME_IMAGES_CACHE_TAG, 'max');
     return NextResponse.json({ id: image.id, imageUrl: image.imageUrl }, { status: 201 });
   } catch (err) {
     if (err instanceof DuplicateImageError) {

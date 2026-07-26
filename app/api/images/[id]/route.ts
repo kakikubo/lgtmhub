@@ -29,7 +29,7 @@ export async function DELETE(
   try {
     const service = buildImageService(supabase);
     await service.deleteImage(parsed.data.id, user.id);
-    revalidateTag(HOME_IMAGES_CACHE_TAG);
+    revalidateTag(HOME_IMAGES_CACHE_TAG, 'max');
     return new NextResponse(null, { status: 204 });
   } catch (err) {
     if (err instanceof NotFoundError) {
