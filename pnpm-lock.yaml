@@ -27,13 +27,13 @@ importers:
         version: 2.110.8
       '@vercel/analytics':
         specifier: ^2.0.1
-        version: 2.0.1(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.61.1)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+        version: 2.0.1(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.0)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       '@vercel/blob':
         specifier: ^2.3.3
         version: 2.6.1
       '@vercel/speed-insights':
         specifier: ^2.0.0
-        version: 2.0.0(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.61.1)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+        version: 2.0.0(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.0)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -45,7 +45,7 @@ importers:
         version: 1.25.0(react@19.2.7)
       next:
         specifier: ~16.2.11
-        version: 16.2.12(@babel/core@7.29.7)(@playwright/test@1.61.1)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.0)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       opentype.js:
         specifier: ^2.0.0
         version: 2.0.0
@@ -79,7 +79,7 @@ importers:
         version: 2.5.5
       '@playwright/test':
         specifier: ^1.50.0
-        version: 1.61.1
+        version: 1.62.0
       '@tailwindcss/postcss':
         specifier: ^4.2.4
         version: 4.3.3
@@ -748,9 +748,9 @@ packages:
   '@oxc-project/types@0.139.0':
     resolution: {integrity: sha512-r9gHphtCs+1M7J0pw6Sn/hh/Wpa/iQrOOkrNAlVLF/gHq+/CJmHIWKKUUhdWjcD6CIa8idarspCsASiXCXvFUw==}
 
-  '@playwright/test@1.61.1':
-    resolution: {integrity: sha512-8nKv6+0RJSL9FE4jYOEGXnPeM/Hg12qZpmqzZjRh3qM0Y7c3z1mrOTfFLids72RDQYVh9WpLEfR5WdpNX4fkig==}
-    engines: {node: '>=18'}
+  '@playwright/test@1.62.0':
+    resolution: {integrity: sha512-9zOJ6ZQRAena31MpOH9VSzIz8Ou3YJ/wtY/eQm5T2uhfhG7/U3COrMS8xOtUrZrp9OgdmzEnIYODye3nY1VqzA==}
+    engines: {node: '>=20'}
     hasBin: true
 
   '@rolldown/binding-android-arm64@1.1.5':
@@ -2449,14 +2449,14 @@ packages:
     resolution: {integrity: sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA==}
     engines: {node: '>=8'}
 
-  playwright-core@1.61.1:
-    resolution: {integrity: sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg==}
-    engines: {node: '>=18'}
+  playwright-core@1.62.0:
+    resolution: {integrity: sha512-nsNRyq0r2zsG8AcRHWknc9QRA5XCueC7gWMrs+Gx2tlZn9hcl8zudfh00lhJPY1DE7NmZ6bDsT9g2yey8mXljA==}
+    engines: {node: '>=20'}
     hasBin: true
 
-  playwright@1.61.1:
-    resolution: {integrity: sha512-DWnY5o3YbLWK4GovuAVwpqL+1VwGNdUGrRr++8j8PtQQzvAVZUIMjKQ90fY689sEJZJBbZVw1rXaOKSTitkzPQ==}
-    engines: {node: '>=18'}
+  playwright@1.62.0:
+    resolution: {integrity: sha512-Z14dG305dgaLu6foB1TXQagFiW8JfSUIUaUuPaKQ6NtBPKF1P/qXcqfh6c6K/icPqdy37JmjbiBXf6JNg6Sylw==}
+    engines: {node: '>=20'}
     hasBin: true
 
   postcss-selector-parser@7.1.4:
@@ -3635,9 +3635,9 @@ snapshots:
 
   '@oxc-project/types@0.139.0': {}
 
-  '@playwright/test@1.61.1':
+  '@playwright/test@1.62.0':
     dependencies:
-      playwright: 1.61.1
+      playwright: 1.62.0
 
   '@rolldown/binding-android-arm64@1.1.5':
     optional: true
@@ -3909,9 +3909,9 @@ snapshots:
     dependencies:
       '@types/node': 24.13.3
 
-  '@vercel/analytics@2.0.1(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.61.1)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)':
+  '@vercel/analytics@2.0.1(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.0)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)':
     optionalDependencies:
-      next: 16.2.12(@babel/core@7.29.7)(@playwright/test@1.61.1)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      next: 16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.0)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react: 19.2.7
 
   '@vercel/blob@2.6.1':
@@ -3938,9 +3938,9 @@ snapshots:
       '@vercel/cli-exec': 1.0.0
       jose: 5.10.0
 
-  '@vercel/speed-insights@2.0.0(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.61.1)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)':
+  '@vercel/speed-insights@2.0.0(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.0)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)':
     optionalDependencies:
-      next: 16.2.12(@babel/core@7.29.7)(@playwright/test@1.61.1)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      next: 16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.0)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react: 19.2.7
 
   '@vitest/coverage-v8@4.1.10(vitest@4.1.10)':
@@ -4932,7 +4932,7 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.61.1)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+  next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.0)(@types/node@24.13.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       '@next/env': 16.2.12
       '@swc/helpers': 0.5.15
@@ -4951,7 +4951,7 @@ snapshots:
       '@next/swc-linux-x64-musl': 16.2.12
       '@next/swc-win32-arm64-msvc': 16.2.12
       '@next/swc-win32-x64-msvc': 16.2.12
-      '@playwright/test': 1.61.1
+      '@playwright/test': 1.62.0
       sharp: 0.35.3(@types/node@24.13.3)
     transitivePeerDependencies:
       - '@babel/core'
@@ -5087,11 +5087,11 @@ snapshots:
     dependencies:
       find-up: 3.0.0
 
-  playwright-core@1.61.1: {}
+  playwright-core@1.62.0: {}
 
-  playwright@1.61.1:
+  playwright@1.62.0:
     dependencies:
-      playwright-core: 1.61.1
+      playwright-core: 1.62.0
     optionalDependencies:
       fsevents: 2.3.2
 
