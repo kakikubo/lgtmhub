@@ -71,6 +71,11 @@
       "groupName": "github-actions",
       "automerge": true,
       "platformAutomerge": true
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "all non-major npm dependencies"
     }
   ]
 }

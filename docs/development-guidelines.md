@@ -979,7 +979,7 @@ jobs:
 
 | 種別 | 例 | 自動マージ | 備考 |
 |------|------|-----------|------|
-| minor / patch | `next 15.5.15 → 15.5.16` | ✅ (CI green 時) | `platformAutomerge` で GitHub の auto-merge を利用 |
+| minor / patch | `next 15.5.15 → 15.5.16` | ✅ (CI green 時) | `platformAutomerge` で GitHub の auto-merge を利用。npm 依存は **`all non-major npm dependencies` の 1 PR にまとめる**（後述） |
 | GitHub Actions の更新 | `actions/checkout@v4 → v5` | ✅ (CI green 時) | `github-actions` グループにまとめる |
 | `lockFileMaintenance` | `pnpm-lock.yaml` の週次更新 | ✅ | 月曜午前 |
 | major | `react 19 → 20` | ❌ (手動レビュー) | `dependencies` / `major` ラベル付き |
@@ -992,8 +992,15 @@ PR は **月曜の朝（Asia/Tokyo 9 時前）** にまとめて立ち、`chore(
 
 `packageRules` で以下のグループにまとめている。詳細は `renovate.json` を参照。
 
+**npm の minor / patch / pin / digest は、パッケージを問わず `all non-major npm dependencies` の 1 PR に集約する。** 下表のパッケージ別グループが効くのは **major 更新のみ**。
+
+理由: `pnpm-lock.yaml` を含む PR がマージされると、他の lockfile PR が全て衝突する。パッケージ別に PR が分かれていると 1 回のマージで残り全部が赤くなり、`schedule` が週 1（月曜）のため Renovate の自動 rebase は次の実行まで待たされる。lockfile を触る非 major PR を常に 1 本に保てば、この兄弟衝突が構造的に発生しない。
+
+実装上の注意: **この集約ルールは `packageRules` の最後に置くこと。** Renovate は後方のルールが同名フィールドを上書きするため、パッケージ別 `groupName` より後に無いと minor / patch がそちらへ吸われて分裂する。`matchManagers: ["npm"]` で絞っているのは、`github-actions` は lockfile に影響せず独立 PR のままで良いため。
+
 | グループ | 対象 | 理由 |
 |---------|------|------|
+| `all non-major npm dependencies` | npm の minor / patch / pin / digest 全部 | lockfile 衝突の連鎖を防ぐ（上記） |
 | `react` | `react`, `react-dom`, `@types/react*` | 本体と型定義を分けると型エラーになる |
 | `next` | `next`, `@next/*`, `eslint-config-next` (将来) | メジャー間で破壊的変更が出やすい |
 | `supabase` | `@supabase/*`, `supabase` (CLI) | クライアント / SSR / CLI の整合性 |
