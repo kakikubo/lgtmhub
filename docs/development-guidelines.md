@@ -1037,6 +1037,8 @@ pnpm --package=renovate dlx renovate-config-validator renovate.json
 
 Node.js のメジャーは、`package.json` の `engines.node`、`actions/setup-node` の `node-version`、`.devcontainer/devcontainer.json` の base image (`mcr.microsoft.com/devcontainers/typescript-node:1-24`) を **同時に** 整合させる必要がある。Renovate は manager 単位で別 PR を作るため、ここだけ手動運用にしている (`renovate.json` の `matchDepTypes: ["engines"], matchDepNames: ["node"], enabled: false`)。
 
+`engines.node` は `>=24.0.0` のような上限なしの範囲ではなく、`24.x` とメジャー固定で書く。上限なしにすると Vercel が「新しいメジャー Node.js のリリース時にビルドランタイムを自動アップグレードする」と判定し、ビルドログに Warning を出したうえで、こちらの変更なしに CI (`node-version: "24"`) と Vercel のメジャーが乖離するため。
+
 ---
 
 ## 開発環境セットアップ
