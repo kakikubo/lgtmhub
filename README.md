@@ -74,6 +74,21 @@ GitHub OAuth でログインを動かすには、ローカル用の OAuth App �
 
 > 本番(Vercel)へのデプロイ時は別途 OAuth App を用意し、Authorization callback URL を Supabase プロジェクトの URL(`https://<project-ref>.supabase.co/auth/v1/callback`)に設定します。本番用 Client ID / Secret は GitHub Actions secrets(`SUPABASE_GITHUB_OAUTH_CLIENT_ID` / `SUPABASE_GITHUB_OAUTH_CLIENT_SECRET`。secret 名は `GITHUB_` プレフィックスが予約のためこの名前)に登録し、`supabase config push`(`.github/workflows/supabase-deploy.yml`)経由でリモートへ自動反映します。Dashboard での手動登録は不要です。
 
+### 画像検索プロバイダー (Pexels) のセットアップ
+
+`/images/new` の「キーワード検索」タブを動かすには、Pexels API キーを `.env.local` に設定します。未設定でも「URL 入力」タブは動作しますが、検索タブは 503 を返します。
+
+1. https://www.pexels.com/api/ にアクセスして無料アカウントを作成 / ログイン
+2. **Your API Key** から個人 API キーを取得(無料枠: 200 req/hour, 20,000 req/month)
+3. `.env.local` に貼り付け:
+   ```
+   IMAGE_SEARCH_PROVIDER=pexels
+   IMAGE_SEARCH_API_KEY=<your_pexels_api_key>
+   ```
+4. `npm run dev` を再起動して `/images/new` の「キーワード検索」タブから動作確認
+
+> 本番(Vercel)では同名の環境変数を Vercel ダッシュボードの **Settings > Environment Variables** に登録します。コミット禁止のためキーは必ずダッシュボード経由で設定してください。
+
 ### 日常的な開発コマンド
 
 ```bash

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { ImageRegisterForm } from '@/components/image-register-form';
+import { ImageRegisterTabs } from '@/components/image-register-tabs';
 import { createClient } from '@/src/lib/supabase/server';
 
 export default async function NewImagePage() {
@@ -17,11 +17,11 @@ export default async function NewImagePage() {
       <header className="space-y-2">
         <h1 className="text-2xl font-bold">LGTM 画像を登録する</h1>
         <p className="text-sm text-gray-600">
-          画像 URL を入力すると、自動で LGTM 文字を合成して登録します。
+          URL を直接入力するか、キーワードから候補画像を探して登録できます。
         </p>
       </header>
 
-      <ImageRegisterForm />
+      <ImageRegisterTabs />
     </section>
   );
 }
