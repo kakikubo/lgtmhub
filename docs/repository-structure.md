@@ -111,14 +111,14 @@ lgtmhub/
 ├── .github/                    # GitHub設定
 │   └── workflows/
 │       ├── ci.yml              # Lint/型チェック/テスト/E2E（development-guidelines.md参照）
-│       └── danger.yml          # PR サイズ警告（dangerfile.ts を実行）
+│       └── danger.yml          # PR サイズ警告（dangerfile.js を実行）
 ├── .claude/                    # Claude Code設定
 ├── .steering/                  # 作業単位のタスク管理
 ├── .env.local                  # ローカル環境変数（gitignore）
 ├── .env.example                # 環境変数テンプレート（git管理）
 ├── .gitignore
 ├── biome.json                  # Biome (Linter + Formatter) 設定
-├── dangerfile.ts               # Danger スクリプト（PRの大きさの目安チェック）
+├── dangerfile.js               # Danger スクリプト（PRの大きさの目安チェック）
 ├── next.config.ts
 ├── package.json
 ├── playwright.config.ts
