@@ -609,7 +609,7 @@ LGTM文字合成ロジックを実装
 確認方法:
 
 ```bash
-# プロダクションコード変更行数の確認例（あくまで目安。正確な集計は dangerfile.ts に従う）
+# プロダクションコード変更行数の確認例（あくまで目安。正確な集計は dangerfile.js に従う）
 # tests/ ・ pnpm-lock.yaml ・ supabase/migrations/ は対象パス指定で既に除外される
 git diff --stat main...HEAD -- 'app/' 'src/' 'components/' \
   ':(exclude)src/types/database.types.ts' \
@@ -620,11 +620,11 @@ git diff --stat main...HEAD -- 'app/' 'src/' 'components/' \
 
 **自動チェック（Danger）**:
 
-PR の作成・更新時に GitHub Actions（`.github/workflows/danger.yml`）が `dangerfile.ts` を実行し、行数閾値を超過した場合に Danger ジョブを**失敗（CI エラー）**させる。
+PR の作成・更新時に GitHub Actions（`.github/workflows/danger.yml`）が `dangerfile.js` を実行し、行数閾値を超過した場合に Danger ジョブを**失敗（CI エラー）**させる。
 
 - 行数閾値（500行）を超えた場合は `fail()` となり、`pnpm exec danger ci --failOnErrors` により Danger ジョブが赤くなる（ブロッキング）
 - ファイル数閾値（10ファイル）超過は `warn()`（コメント警告のみ、ブロックしない）
-- 計測対象・除外ルール（markdown 除外を含む）は `dangerfile.ts` の `INCLUDE_PREFIXES` / `EXCLUDE_PATTERNS` に集約し、本ドキュメントと同期する
+- 計測対象・除外ルール（markdown 除外を含む）は `dangerfile.js` の `INCLUDE_PREFIXES` / `EXCLUDE_PATTERNS` に集約し、本ドキュメントと同期する
 
 ---
 
@@ -902,7 +902,9 @@ jobs:
 
 #### Danger（PR サイズチェック）
 
-`.github/workflows/danger.yml` で `pull_request` イベントごとに `pnpm exec danger ci --failOnErrors` を実行する。判定ロジックは `dangerfile.ts` に集約しており、「PRの大きさの目安」セクションの行数閾値（500行）を超過した場合は `fail()` となり、`--failOnErrors` により Danger ジョブが失敗（CI エラー）する。ファイル数閾値（10ファイル）超過は `warn()`（コメント警告のみ）。markdown ファイル（`*.md` / `*.mdx`）は集計対象外。既存 `ci.yml` とは独立した workflow とし、API 書き込みの副作用が他ジョブに波及しないようにしている。
+`.github/workflows/danger.yml` で `pull_request` イベントごとに `pnpm exec danger ci --failOnErrors` を実行する。判定ロジックは `dangerfile.js` に集約しており、「PRの大きさの目安」セクションの行数閾値（500行）を超過した場合は `fail()` となり、`--failOnErrors` により Danger ジョブが失敗（CI エラー）する。ファイル数閾値（10ファイル）超過は `warn()`（コメント警告のみ）。markdown ファイル（`*.md` / `*.mdx`）は集計対象外。既存 `ci.yml` とは独立した workflow とし、API 書き込みの副作用が他ジョブに波及しないようにしている。
+
+- **`.ts` ではなく `.js` で書く理由**: danger-js は Dangerfile が `.ts` の場合に `require('typescript').transpileModule()` でトランスパイルする。TypeScript 7（Go 製ネイティブ移植版）はこの JS Compiler API を提供しないため、`.ts` のままだと `TypeError: ts.transpileModule is not a function` で Danger ジョブが落ちる。拡張子が `.js` かつ babel 未導入の場合、danger はソースをそのまま評価するため、CommonJS の素の JavaScript で記述する。副作用として `pnpm run typecheck`（`tsconfig.json` の `allowJs: false`）の対象外になるため、型の意図は JSDoc で残す。danger-js が TS7 に対応したら `.ts` に戻す。
 
 #### Codecov（カバレッジ可視化）
 

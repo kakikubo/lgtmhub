@@ -18,6 +18,13 @@ const nextConfig: NextConfig = {
   // Cache Components (旧 PPR)。静的シェルを先行配信し、動的部分は Suspense 境界で
   // ストリーミングする。トップページの初期画像一覧は `'use cache'` でキャッシュする。
   cacheComponents: true,
+  // TypeScript 7 (Go 製ネイティブ移植版) は Next.js が使う JS Compiler API を提供しない。
+  // このフラグを立てると型チェックを compiler API 呼び出しではなく tsc CLI の
+  // サブプロセス実行に切り替えるため、TS7 でも `next build` が通る。
+  // Next.js が TS7 の compiler API に対応したら削除する。
+  experimental: {
+    useTypeScriptCli: true,
+  },
   outputFileTracingRoot: path.resolve(__dirname),
   // Vercel サーバレス関数のバンドルに LGTM 画像合成で参照するフォントを明示的に含める。
   // public/ 配下は静的配信用にデプロイされるが、関数側のファイルシステムからの読み出しは

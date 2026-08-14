@@ -1,11 +1,19 @@
-import { danger, fail, warn } from 'danger';
+// TypeScript 7 (Go 製ネイティブ移植版) は danger-js が使う `ts.transpileModule` を
+// 提供しないため、`dangerfile.ts` のままだと danger 実行時に
+// `TypeError: ts.transpileModule is not a function` で落ちる。
+// danger は拡張子が .js でトランスパイラ（babel）が無い場合はソースをそのまま評価するため、
+// CommonJS の素の JavaScript で書く。danger 側が TS7 に対応したら .ts に戻す。
+//
+// なお danger-js のランタイムはこの require を除去して DSL を global に注入する。
+const { danger, fail, warn } = require('danger');
 
 const LINE_THRESHOLD = 500;
 const FILE_THRESHOLD = 10;
 
-const INCLUDE_PREFIXES = ['app/', 'src/', 'components/'] as const;
+const INCLUDE_PREFIXES = ['app/', 'src/', 'components/'];
 
-const EXCLUDE_PATTERNS: ReadonlyArray<RegExp> = [
+/** @type {ReadonlyArray<RegExp>} */
+const EXCLUDE_PATTERNS = [
   /^tests\//,
   /^src\/types\/database\.types\.ts$/,
   /^pnpm-lock\.yaml$/,
@@ -15,7 +23,11 @@ const EXCLUDE_PATTERNS: ReadonlyArray<RegExp> = [
   /\.mdx?$/i,
 ];
 
-const isProductionFile = (filePath: string): boolean => {
+/**
+ * @param {string} filePath
+ * @returns {boolean}
+ */
+const isProductionFile = (filePath) => {
   if (!INCLUDE_PREFIXES.some((prefix) => filePath.startsWith(prefix))) {
     return false;
   }
@@ -24,7 +36,11 @@ const isProductionFile = (filePath: string): boolean => {
 
 // danger-js の diffForFile が返す added / removed は「追加 / 削除された行の中身のみ」を
 // EOL で連結した文字列。空文字列のときは 0 行扱いにしないと "".split('\n').length が 1 を返す。
-const countDiffLines = (text: string | undefined): number => {
+/**
+ * @param {string | undefined} text
+ * @returns {number}
+ */
+const countDiffLines = (text) => {
   if (!text) return 0;
   return text.split('\n').length;
 };
@@ -36,7 +52,8 @@ const productionFiles = [...danger.git.created_files, ...danger.git.modified_fil
 const guidelineLink =
   '[`docs/development-guidelines.md`](../blob/main/docs/development-guidelines.md) の「PRの大きさの目安」';
 
-const run = async (): Promise<void> => {
+/** @returns {Promise<void>} */
+const run = async () => {
   let totalChangedLines = 0;
   for (const file of productionFiles) {
     const diff = await danger.git.diffForFile(file);
