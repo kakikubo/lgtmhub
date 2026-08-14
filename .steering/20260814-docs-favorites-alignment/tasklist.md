@@ -172,8 +172,8 @@
    - lefthook の pre-commit は staged ファイルにしか Biome をかけないため、既存ファイルの format ドリフトは検出されない
    - 結果、`biome check` でしか出ない format 差分が main に残った
 
-   `CLAUDE.md` は検証コマンドとして `pnpm run check` を挙げているため、CI が `lint` しか実行していないのは齟齬。別 Issue として (a) 当該ファイルの format 修正、(b) CI ジョブを `pnpm run check` に変更（または `biome format --check` を追加）を検討する。本 PR の変更対象は `docs/` と `.steering/` の Markdown のみで `biome.json` の `files.includes` 対象外のため、本変更自体は Biome に無影響。
-2. **別 Issue 候補**: `docs/glossary.md` の LgtmImage 状態遷移の記述で、Blob 物理削除が「PRD機能9」「P1機能9」と参照されているが、PRD 上は **機能8**（削除画像の物理クリーンアップ）が正しい（機能9 はファイルアップロード対応）。本 PR のスコープ（お気に入りと構造図）外のため未修正。
-3. **別 Issue 候補（Markdown lint）**: CodeRabbit が MD040（コードフェンスに言語指定が無い）を指摘した。本 PR で触れた 4 箇所だけ直すと、`docs/` 全体に 135 箇所ある素の ``` フェンスとの間で不統一になるため未対応とした（リポジトリに markdownlint の設定ファイルは無く、CI でも検査していない）。対応するなら docs 全体の一括修正 + markdownlint の CI 導入を 1 つの独立した PR で行う。
+   `CLAUDE.md` は検証コマンドとして `pnpm run check` を挙げているため、CI が `lint` しか実行していないのは齟齬。**#306 として起票済み**（(a) 当該ファイルの format 修正、(b) CI ジョブを `pnpm run check` に変更または `biome format --check` を追加）。本 PR の変更対象は `docs/` と `.steering/` の Markdown のみで `biome.json` の `files.includes` 対象外のため、本変更自体は Biome に無影響。
+2. **#308 として起票済み**: `docs/glossary.md` の LgtmImage 状態遷移の記述で、Blob 物理削除が「PRD機能9」「P1機能9」と参照されているが、PRD 上は **機能8**（削除画像の物理クリーンアップ）が正しい（機能9 はファイルアップロード対応）。該当は `glossary.md` の 157 / 516 / 525 / 557 行の 4 箇所。本 PR のスコープ（お気に入りと構造図）外のため未修正。
+3. **#307 として起票済み（Markdown lint）**: CodeRabbit が MD040（コードフェンスに言語指定が無い）を指摘した。本 PR で触れた 4 箇所だけ直すと、`docs/` 全体に 135 箇所ある素の ``` フェンスとの間で不統一になるため未対応とした（リポジトリに markdownlint の設定ファイルは無く、CI でも検査していない）。対応するなら docs 全体の一括修正 + markdownlint の CI 導入を 1 つの独立した PR で行う。
 
 4. **#198 着手時の作業**: `docs/repository-structure.md` の「未実装の P0 機能（お気に入り）で追加予定のファイル」セクションを削除し、各ファイルを冒頭の構造図とディレクトリ詳細へマージする。併せて各 docs の `（未実装 / #198）` マーカーと `> **未実装**:` ブロックを削除する。
