@@ -148,7 +148,6 @@ lgtmhub/
 ├── .claude/                    # Claude Code設定（agents / commands / steering）
 ├── .devcontainer/              # devcontainer 設定
 ├── .steering/                  # 作業単位のタスク管理
-├── .env.local                  # ローカル環境変数（gitignore）
 ├── .env.example                # 環境変数テンプレート（git管理）
 ├── .gitignore
 ├── .npmrc                      # pnpm の挙動設定
@@ -539,7 +538,7 @@ tests/e2e/favorites.test.ts                     # 追加・解除・一覧のE2E
 
 API・データモデルの仕様は [`docs/functional-design.md`](./functional-design.md) の該当セクションを参照する。
 
-> #198 の実装完了時に本セクションを削除し、各ファイルを冒頭の構造図とディレクトリ詳細へマージすること。P1 各機能についても同様に、実装時に本体へ昇格させる。
+> **注**: #198 の実装完了時に本セクションを削除し、各ファイルを冒頭の構造図とディレクトリ詳細へマージすること。P1 各機能についても同様に、実装時に本体へ昇格させる。
 
 ---
 

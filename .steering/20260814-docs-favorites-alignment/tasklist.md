@@ -99,9 +99,11 @@
   - [x] 指摘対応: Issue リンクはブロック注記のみに付け、行内マーカーはプレーン `#198` に統一
   - [x] 指摘対応: サブディレクトリ配下の `.gitignore` を省略する旨と表記規約を冒頭注記に明記
   - [x] 指摘対応: `functional-design.md` の統合テスト節が `tests/integration/` の実態（空）と食い違う点に注記を追加
-- [x] `pnpm run check`（Biome）が成功することを確認（docs/ は Biome の対象外。残る 1 件の format エラーは未変更の tests/unit/lib/image/compose-lgtm.test.ts で origin/main 由来の既存事象）
+- [x] Biome を実行し、本変更起因のエラーが無いことを確認する
+  - [x] `pnpm run lint`（`biome lint .` / CI の lint-and-typecheck ジョブと同一）: 成功
+  - [x] `pnpm run check`（`biome check .` = lint + format）: **失敗（exit 1）**。原因は本ブランチで未変更の `tests/unit/lib/image/compose-lgtm.test.ts` の format 差分で、base（origin/main）から引き継いだ既存事象。本 PR の変更対象は `docs/` と `.steering/` の Markdown のみで、いずれも `biome.json` の `files.includes` 対象外のため本変更は Biome に無影響（詳細は下記「申し送り事項」）
 - [x] `pnpm run typecheck` が成功することを確認
-- [x] `pnpm run test` が成功することを確認
+- [x] `pnpm run test` が成功することを確認（32 ファイル / 306 件）
 
 ## フェーズ7: ドキュメント更新
 
@@ -151,6 +153,8 @@
 **プロセス上の改善点**:
 - 読み取り専用のインベントリ調査をサブエージェントに切り出したのは有効だったが、**調査時の作業ツリーの状態（ブランチ）を明示しなかった**ため、ブランチ切り替え後に結果が 1 ファイルだけ陳腐化した。調査を依頼する前にベースブランチを確定しておくべきだった。
 - 未実装マーカーの書式を design.md で 1 種類に決めていたにもかかわらず、実装中に 3 種のゆれが出た。書式規約はドキュメント本体（`repository-structure.md` 冒頭）に書き残すことで、次回以降の書き手にも効くようにした。
+- **requirements.md の受け入れ条件を design.md の決定に追随させ忘れた**: 計画時に「既存の `> **注**:` 記法に揃える」と書いたまま、design.md で `> **未実装**:` を新設した際に requirements.md を更新しなかった。CodeRabbit のレビューで検出。設計判断が変わったら、上流のステアリングファイルにも遡って反映する。
+- **検証の失敗を「既存事象だから問題なし」で片付けかけた**: `pnpm run check` の exit 1 を注記付きで `[x]` にしたが、原因を「Biome のバージョン差」と推測で書いていた。実際にはローカル・CI とも同一バージョンで、CI が `biome lint` しか実行していないことが真因だった。失敗したコマンドにチェックを付ける場合は、推測ではなく原因を特定してから書く。
 
 ### 次回への改善提案
 - ドキュメント整合系のタスクでは、**着手前にベースブランチを確定 → インベントリ取得 → 修正**の順を固定する。
@@ -161,6 +165,15 @@
 
 ## 申し送り事項
 
-1. **`origin/main` の Biome format エラーは本 PR と無関係**: `pnpm exec biome check .` が `tests/unit/lib/image/compose-lgtm.test.ts` で format エラーを 1 件出すが、このファイルは本ブランチで未変更で `origin/main` 由来。`docs/` は `biome.json` の対象外のため本変更は Biome に影響しない。ローカル Biome CLI (2.4.16) と `biome.json` の schema (2.4.14) のバージョン差が原因の可能性がある。
+1. **`pnpm run check` が main で失敗している（本 PR と無関係・要別対応）**: `biome check .` が `tests/unit/lib/image/compose-lgtm.test.ts` で format エラーを 1 件出し exit 1 になる。このファイルは本ブランチで未変更で base（origin/main）由来。
+
+   **なぜ気づかれずに main へ入ったか**（当初「Biome のバージョン差」と推測したが誤り。ローカル・CI とも lockfile 固定の Biome 2.5.7 で同一）:
+   - CI（`.github/workflows/ci.yml` の lint-and-typecheck ジョブ）が実行するのは `pnpm run lint` = `biome lint .` のみで、**format を検査しない**
+   - lefthook の pre-commit は staged ファイルにしか Biome をかけないため、既存ファイルの format ドリフトは検出されない
+   - 結果、`biome check` でしか出ない format 差分が main に残った
+
+   `CLAUDE.md` は検証コマンドとして `pnpm run check` を挙げているため、CI が `lint` しか実行していないのは齟齬。別 Issue として (a) 当該ファイルの format 修正、(b) CI ジョブを `pnpm run check` に変更（または `biome format --check` を追加）を検討する。本 PR の変更対象は `docs/` と `.steering/` の Markdown のみで `biome.json` の `files.includes` 対象外のため、本変更自体は Biome に無影響。
 2. **別 Issue 候補**: `docs/glossary.md` の LgtmImage 状態遷移の記述で、Blob 物理削除が「PRD機能9」「P1機能9」と参照されているが、PRD 上は **機能8**（削除画像の物理クリーンアップ）が正しい（機能9 はファイルアップロード対応）。本 PR のスコープ（お気に入りと構造図）外のため未修正。
-3. **#198 着手時の作業**: `docs/repository-structure.md` の「未実装の P0 機能（お気に入り）で追加予定のファイル」セクションを削除し、各ファイルを冒頭の構造図とディレクトリ詳細へマージする。併せて各 docs の `（未実装 / #198）` マーカーと `> **未実装**:` ブロックを削除する。
+3. **別 Issue 候補（Markdown lint）**: CodeRabbit が MD040（コードフェンスに言語指定が無い）を指摘した。本 PR で触れた 4 箇所だけ直すと、`docs/` 全体に 135 箇所ある素の ``` フェンスとの間で不統一になるため未対応とした（リポジトリに markdownlint の設定ファイルは無く、CI でも検査していない）。対応するなら docs 全体の一括修正 + markdownlint の CI 導入を 1 つの独立した PR で行う。
+
+4. **#198 着手時の作業**: `docs/repository-structure.md` の「未実装の P0 機能（お気に入り）で追加予定のファイル」セクションを削除し、各ファイルを冒頭の構造図とディレクトリ詳細へマージする。併せて各 docs の `（未実装 / #198）` マーカーと `> **未実装**:` ブロックを削除する。
