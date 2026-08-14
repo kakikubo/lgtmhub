@@ -717,8 +717,10 @@ glob 閾値は**マッチしたファイル群の集計**に対して効く（�
 
 **対象**: API Routeの正常系・異常系、RLSポリシーの検証
 
+> **注**: `tests/integration/` は現時点でディレクトリ枠のみで実テストを持たない。API の正常系・異常系は `tests/unit/api/` が Supabase クライアントをモックしてカバーしており、RLS ポリシーや DB 制約の実起動検証が必要になった時点で本節の形式で追加する。以下は実装時のテンプレート。
+
 ```typescript
-// tests/integration/images/image-crud.test.ts
+// tests/integration/images/image-crud.test.ts（追加予定のファイル）
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestClient, createAdminClient } from '../helpers/supabase';
 

@@ -120,7 +120,7 @@ Presentation → API → Service → Data
 |-----------|----------|-------------|------|
 | ユーザープロフィール | Supabase（PostgreSQL） | リレーショナル | 認証情報と1:1で結合、RLSで保護 |
 | LGTM画像メタデータ | Supabase（PostgreSQL） | リレーショナル | お気に入りとのJOIN、pHashインデックス検索 |
-| お気に入り | Supabase（PostgreSQL） | リレーショナル | (user_id, lgtm_image_id)のUNIQUE制約 |
+| お気に入り（未実装 / #198） | Supabase（PostgreSQL） | リレーショナル | (user_id, lgtm_image_id)のUNIQUE制約 |
 | 1日の登録カウント | Supabase（PostgreSQL） | リレーショナル | 原子的なINCREMENT、UPSERT |
 | LGTM合成済み画像本体 | Vercel Blob | WebP（バイナリ） | CDN配信が標準、HTTPSアクセス可能、Next.js Image最適化と相性良 |
 
@@ -273,7 +273,7 @@ Next.js 16 の **Cache Components**（Next.js 15 までの実験的 PPR を安�
 `Cache-Control: immutable` を採用しているため、論理削除（`status = 'deleted'`）後もブラウザ・CDN キャッシュ期間中は Blob URL への直アクセスで画像が表示されうる。
 
 **設計選択**:
-- 一覧 API・お気に入り一覧 API は `active` のみを返す（RLS ポリシーで担保）ため、ユーザー導線上は削除済み画像へ到達できない
+- 一覧 API・お気に入り一覧 API（未実装 / #198）は `active` のみを返す（RLS ポリシーで担保）ため、ユーザー導線上は削除済み画像へ到達できない
 - CDN キャッシュの能動的な無効化は実装しない（Blob URL 単位のパージは Vercel 側でコストが高く、MVP の運用範囲には過剰）
 - 不適切コンテンツの即時排除が必要な場合は管理者削除（PRD機能6）が Blob を即時物理削除するため、キャッシュ期間中であっても URL 自体が 404 となり実害は限定される
 
@@ -326,7 +326,7 @@ Next.js 16 の **Cache Components**（Next.js 15 までの実験的 PPR を安�
 - **シナリオ**（最小）:
   1. 未ログインで一覧表示・マークダウンコピーができる
   2. GitHub OAuthログイン後、画像URLを登録すると一覧に表示される
-  3. お気に入り追加・解除が動作する
+  3. お気に入り追加・解除が動作する（未実装 / #198）
   4. 自分の画像を削除すると一覧から消える
 - **実行環境**: ローカル + GitHub Actions（PR時）
 

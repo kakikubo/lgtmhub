@@ -89,7 +89,7 @@ interface LgtmImage {
 - `uploaderId` は `user_profiles.id` への外部キー
 
 **`status` のライフサイクルとUI表示ルール**:
-- `active`: 公開可能な状態。**画像一覧 / お気に入り一覧APIは `active` のみを返す**（RLSポリシーで担保）。MVP の画像登録 API は合成・Blob 保存・DB INSERT を同期で完了させ、`active` で直接 INSERT する
+- `active`: 公開可能な状態。**画像一覧 / お気に入り一覧APIは `active` のみを返す**（RLSポリシーで担保。お気に入り一覧APIは未実装 / #198 で実装予定）。MVP の画像登録 API は合成・Blob 保存・DB INSERT を同期で完了させ、`active` で直接 INSERT する
 - `processing`: 将来の非同期アップロードパイプライン (例: ジョブキュー化・大容量ファイル対応) のために予約された中間状態。MVP では使用しない（CHECK 制約のみ存在）
 - `deleted`: 論理削除済み。一覧・詳細APIともに 404 として扱う
 
@@ -97,7 +97,9 @@ UI 側ではAPI 登録レスポンス（201）= `active` 確定とみなして�
 
 ---
 
-### エンティティ: Favorite
+### エンティティ: Favorite（未実装 / #198）
+
+> **未実装**: お気に入り機能（PRD 機能4）は未実装で、[#198](https://github.com/kakikubo/lgtmhub/issues/198) で実装予定。`favorites` テーブル・マイグレーション・`src/types/favorite.ts` はいずれも存在しない。本セクションは実装時の設計指針である。
 
 ユーザーのお気に入り登録。
 
@@ -136,6 +138,8 @@ interface DailyUploadCount {
 ---
 
 ### ER図
+
+> **注**: `FAVORITES` は未実装（[#198](https://github.com/kakikubo/lgtmhub/issues/198) で実装予定）。現在の DB に実在するテーブルは `USER_PROFILES` / `LGTM_IMAGES` / `DAILY_UPLOAD_COUNTS` の3つ。
 
 ```mermaid
 erDiagram
@@ -202,9 +206,11 @@ stateDiagram-v2
     画像登録 --> 画像一覧: 登録完了 / キャンセル
     画像登録 --> 既存画像詳細: 重複検出時リダイレクト
 
-    画像一覧 --> お気に入り一覧: お気に入りタブ（ログイン済み）
+    画像一覧 --> お気に入り一覧: お気に入りタブ（ログイン済み・未実装）
     お気に入り一覧 --> 画像詳細: 画像クリック
 ```
+
+> **注**: お気に入り一覧への遷移は未実装（[#198](https://github.com/kakikubo/lgtmhub/issues/198) で実装予定）。現在 `/favorites` ルートは存在しない。
 
 ---
 
@@ -238,7 +244,7 @@ GET /api/images
 ```
 
 **フィールド絞り込み方針**:
-- 一覧 API は CDN 経由の画像表示と「コピー / お気に入り」操作だけを満たせばよいため、`imageUrl` と `id` を中心に最小フィールドのみ返す
+- 一覧 API は CDN 経由の画像表示と「コピー / お気に入り（未実装 / #198）」操作だけを満たせばよいため、`imageUrl` と `id` を中心に最小フィールドのみ返す
 - `width` / `height` は画像詳細ページ (`/images/[id]`) で `next/image` の `width` / `height` 属性に流し込み、実画像比率を保ちながら CLS を防ぐために公開する。一覧 API も詳細ページ用と整合させて同じフィールドを返す
 - `pHash` / `fileSizeBytes` は内部用途専用で公開しない
 - 投稿者の表示名・アバターは MVP の一覧UIでは表示しない方針（PRD「画像一覧画面」受け入れ条件参照）。将来的に必要になった場合は `GET /api/users/:id` を別途追加するか、本APIのレスポンスに `uploader: { displayName, avatarUrl }` を拡張する
@@ -400,7 +406,9 @@ POST /api/images/:id/regenerate
 
 ---
 
-### お気に入り追加（PRD機能 4-A）
+### お気に入り追加（PRD機能 4-A・未実装 / #198）
+
+> **未実装**: 以下のお気に入り API 3 本（追加 / 解除 / 一覧取得）はいずれも未実装で、[#198](https://github.com/kakikubo/lgtmhub/issues/198) で実装予定。現在 `app/api/favorites/` はディレクトリ枠（`.gitkeep`）のみで Route Handler は存在せず、リクエストしても 404 になる。本セクションは実装時の設計指針である。
 
 ```
 POST /api/favorites
@@ -430,7 +438,7 @@ POST /api/favorites
 
 ---
 
-### お気に入り解除（PRD機能 4-A）
+### お気に入り解除（PRD機能 4-A・未実装 / #198）
 
 ```
 DELETE /api/favorites/:lgtmImageId
@@ -448,7 +456,7 @@ DELETE /api/favorites/:lgtmImageId
 
 ---
 
-### お気に入り一覧取得（PRD機能 4-B）
+### お気に入り一覧取得（PRD機能 4-B・未実装 / #198）
 
 ```
 GET /api/favorites
@@ -642,11 +650,11 @@ async function composeLgtmImage(imageBuffer: Buffer): Promise<Buffer> {
 |------|------|
 | LGTM合成済み画像 | `object-cover` でトリミング表示 |
 | マークダウンコピーボタン | クリックでクリップボードにコピー、完了後「コピーしました✓」に変化（2秒後に戻る） |
-| お気に入りボタン | ハートアイコン、ログイン済みのみ表示 |
+| お気に入りボタン（未実装 / #198） | ハートアイコン、ログイン済みのみ表示 |
 
 **ナビゲーション**:
 - ヘッダー: サービスロゴ / 「画像を登録する」ボタン（ログイン時）/ ログイン・ログアウトボタン
-- タブ: 「すべての画像」「お気に入り」（ログイン時のみお気に入りタブ表示）
+- タブ: 「すべての画像」「お気に入り」（ログイン時のみお気に入りタブ表示。お気に入りタブは未実装 / #198 のため、現在はタブ自体を表示していない）
 
 ### 画像登録画面
 
@@ -682,19 +690,25 @@ app/
 │   ├── images/
 │   │   ├── new/page.tsx        # 画像登録フォーム
 │   │   └── [id]/page.tsx       # 画像詳細
-│   └── favorites/
+│   └── favorites/                  # ← 未実装 / #198
 │       └── page.tsx            # お気に入り一覧
 ├── api/
 │   ├── auth/
-│   │   └── callback/route.ts   # GitHub OAuth コールバック
+│   │   ├── callback/route.ts   # GitHub OAuth コールバック
+│   │   └── test-signin/route.ts    # E2E 用テストサインイン
 │   ├── images/
 │   │   ├── route.ts            # GET（一覧）/ POST（登録）
-│   │   └── [id]/route.ts       # DELETE（削除）
-│   └── favorites/
+│   │   ├── random/route.ts     # GET（ランダム取得）
+│   │   └── [id]/
+│   │       ├── route.ts            # DELETE（削除）
+│   │       └── regenerate/route.ts # POST（再生成、管理者限定）
+│   └── favorites/                  # ← 未実装 / #198（現在は .gitkeep のみ）
 │       ├── route.ts            # GET（一覧）/ POST（追加）
 │       └── [lgtmImageId]/route.ts  # DELETE（解除）
 └── layout.tsx                  # ルートレイアウト
 ```
+
+> **注**: `favorites/` の2ブロックは未実装（[#198](https://github.com/kakikubo/lgtmhub/issues/198) で実装予定）。実在するファイルのみのツリーは [`docs/repository-structure.md`](./repository-structure.md) を参照。
 
 詳細なディレクトリ構造は [`docs/repository-structure.md`](./repository-structure.md) を正典とする。
 
@@ -725,7 +739,7 @@ class ImageService {
 }
 ```
 
-**FavoriteService**（`src/services/favorite-service.ts`）
+**FavoriteService**（`src/services/favorite-service.ts`・未実装 / #198）
 
 ```typescript
 class FavoriteService {
@@ -791,6 +805,7 @@ CREATE POLICY "owner or admin can update images"
   ));
 
 -- favorites: 自分のお気に入りのみ操作可能
+-- ※ 未実装（#198 で実装予定）。favorites テーブル自体がまだ存在しない
 CREATE POLICY "users can manage own favorites"
   ON favorites
   USING (auth.uid() = user_id)
@@ -826,16 +841,18 @@ CREATE POLICY "users can manage own favorites"
 
 ### 統合テスト
 
+> **注**: 以下は Route Handler に対して検証すべき観点の一覧。実装上は `tests/integration/`（Supabase Local 実起動）ではなく `tests/unit/api/` で Supabase クライアントをモックしてカバーしている。RLS ポリシーや DB 制約の実起動検証が必要になった時点で `tests/integration/` に追加する（[`docs/development-guidelines.md`](./development-guidelines.md) の「統合テスト」節を参照）。
+
 - `POST /api/images`: 正常登録・重複検出・上限超過・SSRF・未ログイン
 - `DELETE /api/images/:id`: 本人削除・他人削除（403）・管理者削除
 - `POST /api/images/:id/regenerate`: 管理者による再生成・非管理者 403・URL 差し替え・重複判定で自己除外・daily count 非加算・取得失敗時の無傷性
-- `POST /api/favorites` / `DELETE /api/favorites/:id`: 追加・解除・重複追加（409）
+- `POST /api/favorites` / `DELETE /api/favorites/:id`: 追加・解除・重複追加（409）（未実装 / #198）
 
 ### E2Eテスト
 
 - 未ログインユーザーが画像一覧を閲覧し、マークダウンをコピーできる
   - **ユーザビリティ検証**: トップページ到達 → 画像クリック → コピーボタンクリック → コピー完了確認 が **5ステップ以内・ページ遷移なし** で完結すること（PRD非機能要件「5分以内に基本操作を習得」を担保）
 - ログイン済みユーザーが画像URLを登録し、一覧に表示される
-- ログイン済みユーザーがお気に入りに追加・解除できる（PRD機能 4-A）
-- ログイン済みユーザーがお気に入り一覧画面で自分のお気に入り画像のみを閲覧できる（PRD機能 4-B）
+- ログイン済みユーザーがお気に入りに追加・解除できる（PRD機能 4-A）（未実装 / #198）
+- ログイン済みユーザーがお気に入り一覧画面で自分のお気に入り画像のみを閲覧できる（PRD機能 4-B）（未実装 / #198）
 - 自分の画像を削除すると一覧から消える
