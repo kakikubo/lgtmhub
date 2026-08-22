@@ -22,6 +22,13 @@ export class DuplicateImageError extends AppError {
   }
 }
 
+export class DuplicateFavoriteError extends AppError {
+  constructor() {
+    super('すでにお気に入りに登録されています', 'DUPLICATE_FAVORITE');
+    this.name = 'DuplicateFavoriteError';
+  }
+}
+
 export class DailyLimitExceededError extends AppError {
   constructor() {
     super('本日の登録上限(10枚)に達しました', 'DAILY_LIMIT_EXCEEDED');
