@@ -21,6 +21,14 @@ export async function Header() {
         <div>
           {profile ? (
             <div className="flex items-center gap-3">
+              {/* お気に入りはユーザーごとの非公開リストなので、ログイン時のみ導線を出す (Issue #198) */}
+              <Link
+                href="/favorites"
+                data-testid="header-favorites-link"
+                className="text-sm text-gray-700 hover:text-gray-900"
+              >
+                お気に入り
+              </Link>
               <Link
                 href="/images/new"
                 data-testid="header-register-link"

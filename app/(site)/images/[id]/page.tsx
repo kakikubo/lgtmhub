@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { CopyMarkdownButton } from '@/components/copy-markdown-button';
+import { FavoriteButton } from '@/components/favorite-button';
 import { ImageDetailActions } from '@/components/image-detail-actions';
 import { ImageRegenerateAction } from '@/components/image-regenerate-action';
 import { UploaderProfileRow } from '@/components/uploader-profile-row';
@@ -55,6 +56,8 @@ function DetailView({ image, uploader, isOwner, isAdmin }: DetailViewProps) {
       <UploaderProfileRow profile={uploader} />
 
       <CopyMarkdownButton imageUrl={image.imageUrl} />
+
+      <FavoriteButton lgtmImageId={image.id} />
 
       {isOwner ? <ImageDetailActions imageId={image.id} /> : null}
       {isAdmin ? (

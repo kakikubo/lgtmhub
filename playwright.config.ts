@@ -19,7 +19,7 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
       // 認証必須のテストはここでは動かさず、authenticated プロジェクトに任せる
-      testIgnore: /auth-callback\.test\.ts/,
+      testIgnore: /(auth-callback|favorites-authenticated)\.test\.ts/,
     },
     {
       name: 'authenticated',
@@ -28,7 +28,7 @@ export default defineConfig({
         storageState: STORAGE_STATE_PATH,
       },
       // 認証済み前提のシナリオだけをこのプロジェクトで実行する
-      testMatch: /auth-callback\.test\.ts/,
+      testMatch: /(auth-callback|favorites-authenticated)\.test\.ts/,
     },
   ],
   webServer: {
