@@ -5,6 +5,7 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from '@/src/lib/errors';
+import { PRIVATE_CACHE_HEADERS } from '@/src/lib/http/cache-headers';
 import { createClient } from '@/src/lib/supabase/server';
 import {
   createFavoriteRequestSchema,
@@ -15,7 +16,7 @@ import { buildFavoriteService } from '@/src/services/favorite-service';
 // お気に入りはユーザー固有の非公開データなので、CDN / 共有キャッシュに載せない。
 // GET /api/images と違い createAnonClient() は使えず (RLS が auth.uid() を要求する)、
 // Cookie 連携の createClient() を使う。
-const PRIVATE_CACHE_HEADERS = { 'Cache-Control': 'private, no-store' };
+// PRIVATE_CACHE_HEADERS は成功・失敗を問わず全レスポンスに付ける。
 
 export async function GET(request: NextRequest) {
   // 空文字クエリ (`?cursor=` など) は zod の .optional() で弾けないため、事前に undefined 化する
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
   });
   if (!parsed.success) {
     const message = parsed.error.issues[0]?.message ?? '入力値が不正です';
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json({ error: message }, { status: 400, headers: PRIVATE_CACHE_HEADERS });
   }
 
   const supabase = await createClient();
@@ -35,7 +36,10 @@ export async function GET(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+    return NextResponse.json(
+      { error: '認証が必要です' },
+      { status: 401, headers: PRIVATE_CACHE_HEADERS },
+    );
   }
 
   try {
@@ -49,14 +53,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result, { status: 200, headers: PRIVATE_CACHE_HEADERS });
   } catch (err) {
     if (err instanceof UnauthorizedError) {
-      return NextResponse.json({ error: err.message }, { status: 401 });
+      return NextResponse.json(
+        { error: err.message },
+        { status: 401, headers: PRIVATE_CACHE_HEADERS },
+      );
     }
     if (err instanceof AppError) {
       console.error('[GET /api/favorites] AppError', err);
-      return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'サーバーエラーが発生しました' },
+        { status: 500, headers: PRIVATE_CACHE_HEADERS },
+      );
     }
     console.error('[GET /api/favorites]', err);
-    return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'サーバーエラーが発生しました' },
+      { status: 500, headers: PRIVATE_CACHE_HEADERS },
+    );
   }
 }
 
@@ -66,14 +79,17 @@ export async function POST(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+    return NextResponse.json(
+      { error: '認証が必要です' },
+      { status: 401, headers: PRIVATE_CACHE_HEADERS },
+    );
   }
 
   const body = await request.json().catch(() => null);
   const parsed = createFavoriteRequestSchema.safeParse(body);
   if (!parsed.success) {
     const message = parsed.error.issues[0]?.message ?? '入力値が不正です';
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json({ error: message }, { status: 400, headers: PRIVATE_CACHE_HEADERS });
   }
 
   try {
@@ -87,19 +103,34 @@ export async function POST(request: NextRequest) {
     );
   } catch (err) {
     if (err instanceof DuplicateFavoriteError) {
-      return NextResponse.json({ error: err.message }, { status: 409 });
+      return NextResponse.json(
+        { error: err.message },
+        { status: 409, headers: PRIVATE_CACHE_HEADERS },
+      );
     }
     if (err instanceof NotFoundError) {
-      return NextResponse.json({ error: '画像が見つかりません' }, { status: 404 });
+      return NextResponse.json(
+        { error: '画像が見つかりません' },
+        { status: 404, headers: PRIVATE_CACHE_HEADERS },
+      );
     }
     if (err instanceof UnauthorizedError) {
-      return NextResponse.json({ error: err.message }, { status: 401 });
+      return NextResponse.json(
+        { error: err.message },
+        { status: 401, headers: PRIVATE_CACHE_HEADERS },
+      );
     }
     if (err instanceof AppError) {
       console.error('[POST /api/favorites] AppError', err);
-      return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'サーバーエラーが発生しました' },
+        { status: 500, headers: PRIVATE_CACHE_HEADERS },
+      );
     }
     console.error('[POST /api/favorites]', err);
-    return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'サーバーエラーが発生しました' },
+      { status: 500, headers: PRIVATE_CACHE_HEADERS },
+    );
   }
 }

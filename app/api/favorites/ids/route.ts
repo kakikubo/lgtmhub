@@ -1,5 +1,6 @@
 import { connection, NextResponse } from 'next/server';
 import { AppError, UnauthorizedError } from '@/src/lib/errors';
+import { PRIVATE_CACHE_HEADERS } from '@/src/lib/http/cache-headers';
 import { createClient } from '@/src/lib/supabase/server';
 import { buildFavoriteService } from '@/src/services/favorite-service';
 
@@ -26,26 +27,35 @@ export async function GET() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+    return NextResponse.json(
+      { error: '認証が必要です' },
+      { status: 401, headers: PRIVATE_CACHE_HEADERS },
+    );
   }
 
   try {
     const service = buildFavoriteService(supabase);
     const lgtmImageIds = await service.listFavoriteImageIds(user.id);
 
-    return NextResponse.json(
-      { lgtmImageIds },
-      { status: 200, headers: { 'Cache-Control': 'private, no-store' } },
-    );
+    return NextResponse.json({ lgtmImageIds }, { status: 200, headers: PRIVATE_CACHE_HEADERS });
   } catch (err) {
     if (err instanceof UnauthorizedError) {
-      return NextResponse.json({ error: err.message }, { status: 401 });
+      return NextResponse.json(
+        { error: err.message },
+        { status: 401, headers: PRIVATE_CACHE_HEADERS },
+      );
     }
     if (err instanceof AppError) {
       console.error('[GET /api/favorites/ids] AppError', err);
-      return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'サーバーエラーが発生しました' },
+        { status: 500, headers: PRIVATE_CACHE_HEADERS },
+      );
     }
     console.error('[GET /api/favorites/ids]', err);
-    return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'サーバーエラーが発生しました' },
+      { status: 500, headers: PRIVATE_CACHE_HEADERS },
+    );
   }
 }

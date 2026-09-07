@@ -56,6 +56,7 @@ describe('GET /api/favorites', () => {
     const res = await callGet('?cursor=not-a-date');
 
     expect(res.status).toBe(400);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     expect(createClient).not.toHaveBeenCalled();
     expect(buildFavoriteService).not.toHaveBeenCalled();
   });
@@ -64,6 +65,7 @@ describe('GET /api/favorites', () => {
     const res = await callGet('?limit=51');
 
     expect(res.status).toBe(400);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
   });
 
   it('未ログインなら 401 を返し Service を呼ばない', async () => {
@@ -72,6 +74,7 @@ describe('GET /api/favorites', () => {
     const res = await callGet();
 
     expect(res.status).toBe(401);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     expect(buildFavoriteService).not.toHaveBeenCalled();
   });
 
@@ -84,6 +87,7 @@ describe('GET /api/favorites', () => {
     const res = await callGet();
 
     expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     const parsed = listFavoritesResponseSchema.parse(await res.json());
     expect(parsed.images).toHaveLength(1);
     expect(parsed.images[0]).toMatchObject({ id: 'img-1', uploaderId: 'user-2' });
@@ -113,22 +117,12 @@ describe('GET /api/favorites', () => {
     const res = await callGet('?cursor=&limit=');
 
     expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     expect(listFavorites).toHaveBeenCalledWith({
       userId: 'user-1',
       cursor: undefined,
       limit: undefined,
     });
-  });
-
-  it('ユーザー固有データなので共有キャッシュに載せない', async () => {
-    createClient.mockResolvedValue(buildSupabase({ user: { id: 'user-1' } }));
-    buildFavoriteService.mockReturnValue({
-      listFavorites: vi.fn().mockResolvedValue({ images: [], nextCursor: null }),
-    });
-
-    const res = await callGet();
-
-    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
   });
 
   it('Service が想定外のエラーを投げたら 500 を返す', async () => {
@@ -141,6 +135,7 @@ describe('GET /api/favorites', () => {
     const res = await callGet();
 
     expect(res.status).toBe(500);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     consoleErrorSpy.mockRestore();
   });
 });
