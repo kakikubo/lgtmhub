@@ -40,6 +40,16 @@ function renderFavoriteUi(imageIds: string[] = [IMAGE_ID]) {
   );
 }
 
+/**
+ * `body.cancel()` の呼び出しを検証できる Response モック。
+ * お気に入り API は全レスポンスが no-store なので、使わないボディは破棄する必要がある。
+ */
+function cancellableResponse(status: number, body: unknown) {
+  const cancel = vi.fn().mockResolvedValue(undefined);
+  const res = { ...jsonResponse(status, body), body: { cancel } } as unknown as Response;
+  return { res, cancel };
+}
+
 /** ids 取得のレスポンスを設定して描画し、初期取得の完了まで待つ */
 async function setupResolved(idsResponse: Response, imageIds: string[] = [IMAGE_ID]) {
   fetchMock.mockResolvedValueOnce(idsResponse);
@@ -72,6 +82,16 @@ describe('お気に入りストアの初期取得', () => {
 
     expect(button).toBeInTheDocument();
     expect(button).toHaveAttribute('data-favorite-state', 'off');
+  });
+
+  it('401 のときレスポンスボディを破棄してリクエストを完了させる', async () => {
+    // 未読のまま放置すると no-store のレスポンスでストリームが開いたままになり、
+    // ブラウザがリクエストを完了扱いにしない (e2e の networkidle に到達しない)
+    const { res, cancel } = cancellableResponse(401, { error: '認証が必要です' });
+
+    await setupResolved(res);
+
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 
   it('ids の取得はハートが何個あっても 1 回だけ', async () => {
@@ -148,6 +168,18 @@ describe('お気に入りのトグル', () => {
       `/api/favorites/${IMAGE_ID}`,
       expect.objectContaining({ method: 'DELETE' }),
     );
+  });
+
+  it('登録 / 解除でもレスポンスボディを破棄する', async () => {
+    const button = await setupResolved(jsonResponse(200, { lgtmImageIds: [] }));
+    const { res, cancel } = cancellableResponse(201, { id: 'fav-1', lgtmImageId: IMAGE_ID });
+    fetchMock.mockResolvedValueOnce(res);
+
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 
   it('登録が 500 で失敗したら輪郭へロールバックしトーストを表示する', async () => {
