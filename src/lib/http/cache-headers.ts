@@ -5,4 +5,4 @@
  * すべての応答に付ける。分岐によって付いたり付かなかったりすると、
  * 401 / 404 / 500 が共有キャッシュに載って別ユーザーへ再利用される余地が残るため。
  */
-export const PRIVATE_CACHE_HEADERS = { 'Cache-Control': 'private, no-store' } as const;
+export const PRIVATE_CACHE_HEADERS = { 'Cache-Control': 'private, no-store' };
