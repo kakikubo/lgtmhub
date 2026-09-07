@@ -78,16 +78,19 @@ Issue: [#198 LGTM画像のお気に入り機能を追加する](https://github.c
 
 ## フェーズ6: お気に入りトグル UI（PR2 フロントエンド）
 
-- [x] `components/favorite-provider.tsx` を作成
-  - [x] マウント時に `/api/favorites/ids` を取得（401 は未ログインとして扱う）
+- [x] `components/favorite-store.ts` を作成
+      （当初は `components/favorite-provider.tsx`（Context）の予定だったが、
+      レイアウトを包むと DOM が二重化するためモジュールストアに変更。
+      経緯は「計画と実績の差分」を参照）
+  - [x] 初回参照時に `/api/favorites/ids` を取得（401 は未ログインとして扱う）
   - [x] オプティミスティック更新 + ロールバック
-  - [x] 最小トースト（live region）の描画
   - [x] 未ログイン時に `signInWithGithub()` を呼ぶ
+- [x] `components/favorite-toaster.tsx` を作成（最小トースト = live region の葉コンポーネント）
 - [x] `components/favorite-button.tsx` を作成（icon / text の 2 variant）
-- [x] `app/(site)/layout.tsx` で `FavoriteProvider` を適用
+- [x] `app/(site)/layout.tsx` で `FavoriteToaster` を配置
 - [x] `components/image-card.tsx` にハート（icon variant）を追加
 - [x] `app/(site)/images/[id]/page.tsx` にハート（text variant）を追加
-- [x] `tests/unit/components/favorite-provider.test.tsx` を作成して通す
+- [x] `tests/unit/components/favorite-store.test.tsx` を作成して通す
 - [x] `tests/unit/components/favorite-button.test.tsx` を作成して通す
 - [x] `tests/unit/components/image-card.test.tsx` にハート描画のケースを追加
 
@@ -155,7 +158,7 @@ Issue: [#198 LGTM画像のお気に入り機能を追加する](https://github.c
   トップ一覧は `'use cache'` で匿名キャッシュされ、「もっと読み込む」「ランダム表示」は
   クライアント fetch でカードを増やすため、サーバー側でユーザー固有の状態を埋め込めない。
   「1 セッション 1 回だけ ID 集合を取得する」方式が唯一整合した。
-- **トーストは汎用ライブラリを入れず、`FavoriteProvider` 内の最小 live region で実装した**。
+- **トーストは汎用ライブラリを入れず、`components/favorite-toaster.tsx` の最小 live region で実装した**。
   既存に `components/ui/toast.tsx` は無く、お気に入り以外に用途も無いため。
 - **e2e を 2 ファイルに分割した**。`favorites.test.ts`（未ログイン / chromium）と
   `favorites-authenticated.test.ts`（ログイン済み / authenticated プロジェクト）。
