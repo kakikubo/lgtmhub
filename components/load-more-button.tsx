@@ -5,7 +5,17 @@ import { ImageGrid } from '@/components/image-grid';
 import { listImagesResponseSchema } from '@/src/lib/validation/image';
 import type { PublicLgtmImage } from '@/src/types/image';
 
-export function LoadMoreButton({ initialCursor }: { initialCursor: string }) {
+interface LoadMoreButtonProps {
+  initialCursor: string;
+  /**
+   * 次ページの取得先。既定はトップの画像一覧。
+   * お気に入り一覧 (`/api/favorites`) もレスポンス形状が同一 (`{ images, nextCursor }`) なので
+   * エンドポイントの差し替えだけで再利用できる (Issue #198)。
+   */
+  endpoint?: string;
+}
+
+export function LoadMoreButton({ initialCursor, endpoint = '/api/images' }: LoadMoreButtonProps) {
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [extra, setExtra] = useState<PublicLgtmImage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -16,7 +26,7 @@ export function LoadMoreButton({ initialCursor }: { initialCursor: string }) {
     setLoading(true);
     setError(null);
     try {
-      const url = `/api/images?cursor=${encodeURIComponent(cursor)}`;
+      const url = `${endpoint}?cursor=${encodeURIComponent(cursor)}`;
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) throw new Error(`status ${res.status}`);
       // res.json() は any を返すため zod で runtime バリデーションし、型安全に PublicLgtmImage へ変換する

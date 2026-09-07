@@ -783,6 +783,16 @@ GitHub OAuth 全体を E2E に含めるのは外部 IDP に依存して不安定
 2. `playwright.config.ts` の `chromium` プロジェクトの `testIgnore` と `authenticated` プロジェクトの `testMatch` の両方に正規表現を追加する
 3. テスト本体は通常の `test('...', async ({ page }) => { ... })` で書ける (storageState はプロジェクト設定で適用済み)
 
+**データを前提とするシナリオ (Issue #198)**:
+
+CI の Supabase Local はデータ空で起動するため、既存データに依存するテストは常に skip されて意味を持ちません。「登録 → 一覧 → 解除」のように **データがあることが本質** のシナリオは、テスト自身がフィクスチャを投入します。手本は `tests/e2e/favorites-authenticated.test.ts`:
+
+- `beforeAll` で `signInWithPassword` したクライアントから `lgtm_images` へ直接 INSERT する。外部 URL 取得を伴う `POST /api/images` は e2e から叩けないため
+- **service_role は使わない**。本リポジトリの Supabase では service_role にテーブル権限が無く、PostgREST が `42501 permission denied` を返す。RLS ポリシー経由 (`authenticated`) なら本番と同じ経路で書き込める
+- 後始末は `afterAll` で論理削除する (`lgtm_images` に DELETE ポリシーは無い)。行そのものは次回 globalSetup のテストユーザー再作成で cascade 削除される
+- 共有 DB 状態を跨ぐテストが並行すると干渉するため、ファイル冒頭で `test.describe.configure({ mode: 'serial' })` を宣言する
+- 楽観更新の UI はクリック直後に遷移すると in-flight のリクエストが中断される。`page.waitForResponse` でレスポンス到着を待ってから次の操作へ進む
+
 **注意**:
 
 - `/api/auth/test-signin` は `process.env.E2E_TEST_MODE === 'true'` のときのみ動く。本番では未設定にする (Vercel/CI の本番デプロイ環境変数に絶対に追加しないこと)

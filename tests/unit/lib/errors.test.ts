@@ -4,6 +4,7 @@ import {
   BadRequestError,
   DailyLimitExceededError,
   DatabaseError,
+  DuplicateFavoriteError,
   DuplicateImageError,
   ForbiddenError,
   NotFoundError,
@@ -31,6 +32,14 @@ describe('errors', () => {
     const err = new DuplicateImageError('image-456');
     expect(err.code).toBe('DUPLICATE_IMAGE');
     expect(err.existingImageId).toBe('image-456');
+  });
+
+  it('DuplicateFavoriteError は DUPLICATE_FAVORITE コードを返す', () => {
+    const err = new DuplicateFavoriteError();
+    expect(err.code).toBe('DUPLICATE_FAVORITE');
+    expect(err.message).toBe('すでにお気に入りに登録されています');
+    expect(err.name).toBe('DuplicateFavoriteError');
+    expect(err).toBeInstanceOf(AppError);
   });
 
   it('DailyLimitExceededError は DAILY_LIMIT_EXCEEDED コードを返す', () => {

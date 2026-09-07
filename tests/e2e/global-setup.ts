@@ -89,4 +89,5 @@ export default async function globalSetup(): Promise<void> {
   await captureStorageState(baseURL);
 }
 
-export { STORAGE_STATE_PATH };
+// 認証済みシナリオのテストがフィクスチャ投入時にテストユーザーを引き当てるために公開する
+export { STORAGE_STATE_PATH, TEST_USER_EMAIL, TEST_USER_PASSWORD };

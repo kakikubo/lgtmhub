@@ -60,6 +60,42 @@ export type Database = {
           },
         ]
       }
+      favorites: {
+        Row: {
+          created_at: string
+          id: string
+          lgtm_image_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lgtm_image_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lgtm_image_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_lgtm_image_id_fkey"
+            columns: ["lgtm_image_id"]
+            isOneToOne: false
+            referencedRelation: "lgtm_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lgtm_images: {
         Row: {
           created_at: string
