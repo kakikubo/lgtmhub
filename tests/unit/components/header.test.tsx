@@ -47,6 +47,8 @@ describe('Header', () => {
 
     expect(screen.getByRole('button', { name: 'GitHub でログイン' })).toBeInTheDocument();
     expect(screen.queryByTestId('header-register-link')).not.toBeInTheDocument();
+    // お気に入りはログインユーザーごとの非公開リストなので未ログインでは導線を出さない (Issue #198)
+    expect(screen.queryByTestId('header-favorites-link')).not.toBeInTheDocument();
     expect(findById).not.toHaveBeenCalled();
   });
 
@@ -57,6 +59,7 @@ describe('Header', () => {
     render(await Header());
 
     expect(screen.getByTestId('header-register-link')).toHaveAttribute('href', '/images/new');
+    expect(screen.getByTestId('header-favorites-link')).toHaveAttribute('href', '/favorites');
     expect(screen.getByText('Octo Cat')).toBeInTheDocument();
     // next/image は unoptimized 指定が無いと src を /_next/image?url=... に書き換えるため、
     // 厳密一致ではなく元 URL がエンコードされて含まれることを確認する

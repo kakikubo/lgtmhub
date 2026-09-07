@@ -1,7 +1,13 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { CopyMarkdownButton } from '@/components/copy-markdown-button';
+import { FavoriteButton } from '@/components/favorite-button';
 import type { PublicLgtmImage } from '@/src/types/image';
+
+// ホバー / キーボードフォーカス時だけ現れるオーバーレイボタンの共通クラス。
+// お気に入り登録済みのハートは FavoriteButton 側で opacity-100 に上書きされ常時表示になる。
+const OVERLAY_BUTTON_CLASS =
+  'opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-has-[:focus-visible]:opacity-100 group-has-[:focus-visible]:pointer-events-auto';
 
 export function ImageCard({
   image,
@@ -39,11 +45,14 @@ export function ImageCard({
         ホバーを外してもオーバーレイが消えない (Issue #169 の不具合)。:focus-visible は
         キーボード操作時のみ立つため、マウスクリック後はホバーが外れた時点で確実に消える。
       */}
-      <CopyMarkdownButton
-        imageUrl={image.imageUrl}
-        variant="icon"
-        className="absolute right-2 top-2 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-has-[:focus-visible]:opacity-100 group-has-[:focus-visible]:pointer-events-auto"
-      />
+      <div className="absolute right-2 top-2 flex items-center gap-1">
+        <FavoriteButton lgtmImageId={image.id} variant="icon" className={OVERLAY_BUTTON_CLASS} />
+        <CopyMarkdownButton
+          imageUrl={image.imageUrl}
+          variant="icon"
+          className={OVERLAY_BUTTON_CLASS}
+        />
+      </div>
     </article>
   );
 }

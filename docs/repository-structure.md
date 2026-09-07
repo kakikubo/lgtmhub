@@ -2,16 +2,18 @@
 
 ## プロジェクト構造
 
-> 本ツリーは **実在するファイルのみ** を列挙する。未実装機能のために追加予定のファイルは、末尾の「未実装の P0 機能（お気に入り）で追加予定のファイル」「P1フェーズで追加予定のファイル」に分離している。生成物・gitignore 対象（`.next/` `coverage/` `playwright-report/` `test-results/` `.vercel/` 等）、`.gitkeep`、およびサブディレクトリ配下の `.gitignore` は省略する。
+> 本ツリーは **実在するファイルのみ** を列挙する。未実装機能のために追加予定のファイルは、末尾の「P1フェーズで追加予定のファイル」に分離している。生成物・gitignore 対象（`.next/` `coverage/` `playwright-report/` `test-results/` `.vercel/` 等）、`.gitkeep`、およびサブディレクトリ配下の `.gitignore` は省略する。
 >
-> 未実装であることの表記は `> **未実装**:` ブロック（節全体が未実装の場合）と行内の `（未実装 / #198）`（一部の記述のみが未実装の場合）の2種類に統一し、Issue へのハイパーリンクはブロック側にのみ付ける。他の docs も同じ規約に従う。
+> 未実装であることの表記は `> **未実装**:` ブロック（節全体が未実装の場合）と行内の `（未実装 / #Issue番号）`（一部の記述のみが未実装の場合）の2種類に統一し、Issue へのハイパーリンクはブロック側にのみ付ける。他の docs も同じ規約に従う。
 
 ```
 lgtmhub/
 ├── app/                        # Next.js App Router（Presentation + API Layer）
 │   ├── (site)/                 # 画面グループ（レイアウト共有）
-│   │   ├── layout.tsx          # 共通レイアウト（ヘッダー等）
+│   │   ├── layout.tsx          # 共通レイアウト（ヘッダー・お気に入り Provider）
 │   │   ├── page.tsx            # 画像一覧トップページ
+│   │   ├── favorites/
+│   │   │   └── page.tsx        # お気に入り一覧画面
 │   │   └── images/
 │   │       ├── new/
 │   │       │   ├── page.tsx        # 画像登録フォーム
@@ -24,6 +26,10 @@ lgtmhub/
 │   │   ├── auth/
 │   │   │   ├── callback/route.ts       # GitHub OAuth コールバック
 │   │   │   └── test-signin/route.ts    # E2E 用テストサインイン
+│   │   ├── favorites/
+│   │   │   ├── route.ts                # GET（一覧）/ POST（追加）
+│   │   │   ├── ids/route.ts            # GET（お気に入り済み画像ID一覧）
+│   │   │   └── [lgtmImageId]/route.ts  # DELETE（解除）
 │   │   └── images/
 │   │       ├── route.ts                # GET（一覧）/ POST（登録）
 │   │       ├── random/route.ts         # GET（ランダム取得、no-store）
@@ -36,9 +42,11 @@ lgtmhub/
 │   ├── CLAUDE.md               # src 配下の実装規約
 │   ├── services/               # Service Layer（ビジネスロジック）
 │   │   ├── image-service.ts
+│   │   ├── favorite-service.ts
 │   │   └── user-profile-service.ts
 │   ├── repositories/           # Data Layer（DB・Blob アクセス）
 │   │   ├── image-repository.ts
+│   │   ├── favorite-repository.ts
 │   │   ├── daily-upload-count-repository.ts
 │   │   └── user-profile-repository.ts
 │   ├── lib/                    # 技術ユーティリティ（フレームワーク非依存）
@@ -59,6 +67,7 @@ lgtmhub/
 │   │   │   └── resolve-uploader-display.ts # 投稿者の表示名・アバター解決
 │   │   ├── validation/             # zod スキーマ集約（API入力検証）
 │   │   │   ├── image.ts            # 画像登録・削除リクエスト
+│   │   │   ├── favorite.ts         # お気に入りAPIの入出力スキーマ
 │   │   │   └── create-image-error.ts # 登録APIエラー → UIメッセージ変換
 │   │   └── supabase/
 │   │       ├── client.ts           # クライアントサイドSupabase
@@ -66,6 +75,7 @@ lgtmhub/
 │   │       └── anon.ts             # 匿名（未認証）向けSupabase
 │   └── types/                  # 共通型定義
 │       ├── image.ts
+│       ├── favorite.ts
 │       ├── user.ts
 │       └── database.types.ts   # Supabaseスキーマから自動生成（pnpm run db:types）
 ├── components/                 # 再利用可能なReactコンポーネント
@@ -76,13 +86,18 @@ lgtmhub/
 │   ├── header-skeleton.tsx     # ヘッダーのローディングスケルトン
 │   ├── home-content.tsx        # トップページ本体（一覧とアクションの組み立て）
 │   ├── home-images.tsx         # トップページの画像一覧（ストリーミング境界）
-│   ├── image-card.tsx          # 画像カード（サムネイル + コピーボタン）
+│   ├── image-card.tsx          # 画像カード（サムネイル + お気に入り / コピーボタン）
 │   ├── image-grid.tsx          # 画像グリッド一覧
 │   ├── image-grid-skeleton.tsx # グリッドのローディングスケルトン
 │   ├── image-detail-actions.tsx    # 詳細ページの操作群（削除等）
 │   ├── image-regenerate-action.tsx # 再生成操作（管理者限定）
 │   ├── image-register-form.tsx # 画像登録フォーム
 │   ├── copy-markdown-button.tsx # マークダウンコピーボタン
+│   ├── favorite-store.ts       # お気に入り状態のモジュールストア（ID集合・楽観更新）
+│   ├── favorite-toaster.tsx    # お気に入り操作失敗のトースト表示
+│   ├── favorite-button.tsx     # お気に入りボタン（ハートアイコン）
+│   ├── favorites-content.tsx   # お気に入り一覧の本体（認証確認 + 初期取得）
+│   ├── favorite-images.tsx     # お気に入り一覧の描画（空状態 / グリッド）
 │   ├── load-more-button.tsx    # カーソルページネーションの追加読み込み
 │   └── uploader-profile-row.tsx # 投稿者プロフィールの表示行
 ├── supabase/                   # Supabase設定・マイグレーション
@@ -94,7 +109,8 @@ lgtmhub/
 │   │   ├── 20260506000000_extend_lgtm_images_select_policy.sql
 │   │   ├── 20260512000000_bootstrap_admin_kakikubo.sql
 │   │   ├── 20260626000000_add_lgtm_images_is_animated.sql
-│   │   └── 20260720000000_restrict_user_profiles_column_grants.sql
+│   │   ├── 20260720000000_restrict_user_profiles_column_grants.sql
+│   │   └── 20260820000000_create_favorites.sql
 │   ├── seed.sql                # 開発用シードデータ
 │   ├── config.toml             # Supabase Local設定
 │   └── .env.example            # Supabase CLI 用環境変数テンプレート
@@ -103,7 +119,8 @@ lgtmhub/
 │   │   ├── api/                # Route Handler のテスト
 │   │   │   ├── auth-callback.test.ts
 │   │   │   ├── auth-test-signin.test.ts
-│   │   │   └── images/         # 一覧 / 登録 / 削除 / ランダム / 再生成
+│   │   │   ├── images/         # 一覧 / 登録 / 削除 / ランダム / 再生成
+│   │   │   └── favorites/      # 一覧 / 追加 / 解除 / ID一覧
 │   │   ├── components/         # コンポーネントテスト（happy-dom）
 │   │   │   └── _helpers.ts     # 共通のレンダリングヘルパー
 │   │   ├── lib/                # auth / http / image / profile / validation / errors
@@ -118,7 +135,9 @@ lgtmhub/
 │   │   ├── image-list.test.ts
 │   │   ├── image-detail.test.ts
 │   │   ├── image-register.test.ts
-│   │   └── image-deletion.test.ts
+│   │   ├── image-deletion.test.ts
+│   │   ├── favorites.test.ts               # 未ログイン視点
+│   │   └── favorites-authenticated.test.ts # ログイン済み（authenticated プロジェクト専用）
 │   └── setup/
 │       └── component-setup.ts  # コンポーネントテストのグローバルセットアップ
 ├── public/                     # 静的アセット
@@ -217,6 +236,7 @@ app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositori
 
 **配置ファイル**:
 - `image-service.ts`: 画像登録・削除・一覧取得のオーケストレーション
+- `favorite-service.ts`: お気に入りの追加・解除・一覧取得・お気に入り済み画像 ID 取得
 - `user-profile-service.ts`: ユーザープロフィールの単一 / 複数取得 (画像一覧の N+1 回避を含む)
 
 **命名規則**:
@@ -231,6 +251,7 @@ app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositori
 ```
 src/services/
 ├── image-service.ts        # 画像登録（取得→検証→重複チェック→合成→保存→DB）
+├── favorite-service.ts     # お気に入り（画像の存在検証→登録 / 解除 / 一覧）
 └── user-profile-service.ts # ユーザープロフィール取得（単一 / 複数）
 ```
 
@@ -242,6 +263,7 @@ src/services/
 
 **配置ファイル**:
 - `image-repository.ts`: `lgtm_images` テーブルのCRUD、pHash検索
+- `favorite-repository.ts`: `favorites` テーブルのCRUD、`lgtm_images` との内部結合による一覧取得
 - `daily-upload-count-repository.ts`: 日次カウントのUPSERT・取得
 - `user-profile-repository.ts`: `user_profiles` テーブルの取得（単一 / 複数）
 
@@ -289,6 +311,7 @@ src/services/
 
 **配置ファイル**:
 - `image.ts`: `LgtmImage` インターフェース、`ImageStatus` 型
+- `favorite.ts`: `Favorite` インターフェース
 - `user.ts`: `UserProfile` インターフェース
 - `database.types.ts`: Supabase スキーマから自動生成された型定義（`pnpm run db:types` で生成）
 
@@ -374,8 +397,11 @@ tests/
 | `src/services/image-service.ts` | `tests/unit/services/image-service.test.ts` |
 | `src/repositories/image-repository.ts` | `tests/unit/repositories/image-repository.test.ts` |
 | `app/api/images/route.ts` | `tests/unit/api/images/list-route.test.ts` / `create-route.test.ts` |
+| `app/api/favorites/route.ts` | `tests/unit/api/favorites/list-route.test.ts` / `create-route.test.ts` |
 | `components/image-card.tsx` | `tests/unit/components/image-card.test.tsx` |
+| `components/favorite-store.ts` | `tests/unit/components/favorite-store.test.tsx` |
 | 未ログインで閲覧・コピー | `tests/e2e/image-list.test.ts` |
+| ログイン済みでお気に入り登録・解除 | `tests/e2e/favorites-authenticated.test.ts` |
 
 ---
 
@@ -510,35 +536,6 @@ import { createClient } from '@/src/lib/supabase/client';
 import type { Database } from '@/src/types/database.types';
 import { DuplicateImageError } from '@/src/lib/errors';
 ```
-
----
-
-## 未実装の P0 機能（お気に入り）で追加予定のファイル
-
-PRD 機能4「お気に入り機能（登録・解除・一覧）」は P0 だが **未実装** であり、[#198](https://github.com/kakikubo/lgtmhub/issues/198) で実装予定。現時点で実在するのは `app/api/favorites/` ディレクトリ（`.gitkeep` のみでディレクトリ枠を確保した状態）だけで、Route Handler・Service・Repository・型・テーブル・コンポーネントはいずれも存在しない。
-
-実装時は以下の配置に従う（本ドキュメント前段で定義した命名規則・依存ルールに準拠）。
-
-```
-app/(site)/favorites/page.tsx                   # お気に入り一覧画面
-app/api/favorites/route.ts                      # GET（一覧）/ POST（追加）
-app/api/favorites/[lgtmImageId]/route.ts        # DELETE（解除）
-src/services/favorite-service.ts                # お気に入りCRUD
-src/repositories/favorite-repository.ts         # favorites テーブルのCRUD
-src/lib/validation/favorite.ts                  # お気に入りAPIのzodスキーマ
-src/types/favorite.ts                           # Favorite インターフェース
-components/favorite-button.tsx                  # お気に入りボタン（ハートアイコン）
-supabase/migrations/*_create_favorites.sql      # favorites テーブル + RLS ポリシー
-tests/unit/services/favorite-service.test.ts
-tests/unit/repositories/favorite-repository.test.ts
-tests/unit/lib/validation/favorite.test.ts
-tests/unit/api/favorites/                       # 追加 / 解除 / 一覧の Route Handler テスト
-tests/e2e/favorites.test.ts                     # 追加・解除・一覧のE2Eシナリオ
-```
-
-API・データモデルの仕様は [`docs/functional-design.md`](./functional-design.md) の該当セクションを参照する。
-
-> **注**: #198 の実装完了時に本セクションを削除し、各ファイルを冒頭の構造図とディレクトリ詳細へマージすること。P1 各機能についても同様に、実装時に本体へ昇格させる。
 
 ---
 

@@ -79,20 +79,18 @@ lgtmoon.comの「白文字一択で背景によっては読めない」という
 
 **定義**: ユーザーが頻繁に使う画像にマークを付けて、後から素早く見つけられるようにする機能。PRDでは機能4として定義され、サブ機能 4-A（登録・解除）と 4-B（一覧画面）から構成される。
 
-> **未実装**: 本機能は未実装で、[#198](https://github.com/kakikubo/lgtmhub/issues/198) で実装予定。以下の API パス・ページ・型はいずれも実装時に追加されるもので、現時点では存在しない。
-
 **説明**:
 - ログイン済みユーザーのみ利用可能
 - 自分が登録した画像でなくてもお気に入り登録できる
 - お気に入りリストは本人のみ閲覧可能（非公開）
 
-**サブ機能**（いずれも未実装 / #198）:
+**サブ機能**:
 - **4-A 登録・解除**: `POST /api/favorites` / `DELETE /api/favorites/:lgtmImageId`
 - **4-B 一覧画面**: `GET /api/favorites`、専用ページ `/favorites`
 
 **関連用語**: [Favorite](#favorite-お気に入りエンティティ)
 
-**データモデル**: `src/types/favorite.ts` の `Favorite` インターフェース（#198 で追加予定）
+**データモデル**: `src/types/favorite.ts` の `Favorite` インターフェース
 
 **英語表記**: Favorite
 
@@ -157,7 +155,7 @@ P1機能。`user_profiles.is_admin = true` のユーザーのみ実行可能。R
 本サービスでは画像の削除（PRD 機能2 / 6）は論理削除のみで完結する。Vercel Blob 上の画像実体は MVP 期間中は残置し、`deletedAt` から30日経過後に P1 機能9（削除画像の物理クリーンアップ）で物理削除する。
 
 **運用上の前提**:
-- 一覧 API・お気に入り一覧 API（未実装 / #198）は `status = 'active'` のみを返す（RLSポリシーで担保）
+- 一覧 API・お気に入り一覧 API は `status = 'active'` のみを返す（RLSポリシー、およびお気に入り一覧は JOIN フィルタで担保）
 - 削除済み画像の Blob URL は MVP 期間中は直アクセス可能（ユーザー導線からは到達不能）
 - 物理削除（GitHub Actions 日次ジョブ）は3回までリトライ、失敗時は運用者に通知
 
@@ -317,7 +315,7 @@ export const createImageSchema = z.object({
 
 **公式サイト**: https://playwright.dev/
 
-**本プロジェクトでの用途**: E2Eテスト（画像登録・削除・詳細表示・認証・コピー操作の検証。お気に入りは未実装 / #198）。
+**本プロジェクトでの用途**: E2Eテスト（画像登録・削除・詳細表示・認証・コピー操作・お気に入りの検証）。
 
 **バージョン**: 1.5x
 
@@ -343,7 +341,7 @@ export const createImageSchema = z.object({
 
 **意味**: 実用最小限の製品。価値検証のために必要最低限の機能だけを備えた初期リリース版。
 
-**本プロジェクトでの使用**: P0機能（画像登録・削除・OAuth認証・お気に入り・一覧）が MVP に該当。このうちお気に入りのみ未実装（[#198](https://github.com/kakikubo/lgtmhub/issues/198) で実装予定）。
+**本プロジェクトでの使用**: P0機能（画像登録・削除・OAuth認証・お気に入り・一覧）が MVP に該当。いずれも実装済み。
 
 ---
 
@@ -479,7 +477,7 @@ Data Layer (src/repositories/)
 **本プロジェクトでの適用**:
 - `useState` / `useEffect` などのフックを使うコンポーネント
 - ユーザーインタラクション（クリック・入力）を扱うコンポーネント
-- 例: マークダウンコピーボタン、画像登録フォーム、お気に入りボタン（未実装 / #198）
+- 例: マークダウンコピーボタン、画像登録フォーム、お気に入りボタン
 
 **関連用語**: [Server Component](#server-component)
 
@@ -512,7 +510,7 @@ export async function POST(request: NextRequest) { /* ... */ }
 | ステータス | 意味 | 遷移条件 | 次の状態 |
 |----------|------|---------|---------|
 | `processing` | DB先行作成〜Blob保存完了までの内部中間状態（ユーザー可視にはならない） | 画像登録APIを受け付けた直後 | `active`, `deleted`（失敗時） |
-| `active` | 公開中（一覧・お気に入り一覧に表示される。お気に入り一覧は未実装 / #198） | 合成・Blob保存・DBレコード確定が完了 | `deleted` |
+| `active` | 公開中（一覧・お気に入り一覧に表示される） | 合成・Blob保存・DBレコード確定が完了 | `deleted` |
 | `deleted` | 論理削除済み（一覧・詳細APIともに 404 として扱う） | ユーザーまたは管理者が削除 | （終端、30日後にBlob物理削除：PRD機能9） |
 
 **状態遷移図**:
@@ -527,7 +525,7 @@ stateDiagram-v2
 
 **重要**:
 - `processing` はサーバー内部の中間状態で、API レスポンス（201）が返った時点で `active` 確定。**ユーザー側でポーリングする必要はない**
-- 一覧 API・お気に入り一覧 API（未実装 / #198）は `active` のみを返す（RLSポリシーで担保）
+- 一覧 API・お気に入り一覧 API は `active` のみを返す（RLSポリシー、およびお気に入り一覧は JOIN フィルタで担保）
 
 **関連用語**: [論理削除](#論理削除)
 
@@ -586,8 +584,6 @@ export type ImageStatus = 'processing' | 'active' | 'deleted';
 
 **定義**: ユーザーと画像のお気に入り関係を表すエンティティ。
 
-> **未実装**: `favorites` テーブル・`src/types/favorite.ts` ともに存在しない。[#198](https://github.com/kakikubo/lgtmhub/issues/198) で実装予定。
-
 **主要フィールド**:
 - `id`: UUID
 - `userId`: ユーザーID
@@ -596,7 +592,7 @@ export type ImageStatus = 'processing' | 'active' | 'deleted';
 
 **制約**: `(user_id, lgtm_image_id)` にUNIQUE制約
 
-**データソース**: `favorites` テーブル / `src/types/favorite.ts`（いずれも #198 で追加予定）
+**データソース**: `favorites` テーブル / `src/types/favorite.ts`
 
 ---
 
@@ -738,7 +734,7 @@ if (error) throw new DatabaseError(error.message);
 
 **継承元**: `AppError`
 
-**発生条件**: 認証されていないユーザーが認証必須のリソース（画像登録・削除、将来のお気に入り操作（未実装 / #198）等）にアクセスしようとした場合。
+**発生条件**: 認証されていないユーザーが認証必須のリソース（画像登録・削除、お気に入り操作等）にアクセスしようとした場合。
 
 **HTTPマッピング**: 401 Unauthorized
 

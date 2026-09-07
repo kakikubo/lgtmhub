@@ -51,6 +51,18 @@ describe('LoadMoreButton', () => {
     expect(screen.getByTestId('load-more-button')).toBeInTheDocument();
   });
 
+  // Issue #198: お気に入り一覧はレスポンス形状が同一なので endpoint 差し替えだけで再利用する
+  it('endpoint を渡すとその API を叩く', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, { images: [], nextCursor: null }));
+    render(<LoadMoreButton initialCursor="2026-08-20T00:00:00.000Z" endpoint="/api/favorites" />);
+
+    await clickLoadMore();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/favorites?cursor=2026-08-20T00%3A00%3A00.000Z', {
+      cache: 'no-store',
+    });
+  });
+
   it('API が失敗したらエラーメッセージを表示する', async () => {
     fetchMock.mockResolvedValue(jsonResponse(500, {}));
     render(<LoadMoreButton initialCursor="2026-05-18T00:00:00.000Z" />);
