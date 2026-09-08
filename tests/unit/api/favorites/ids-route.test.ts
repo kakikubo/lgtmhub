@@ -56,6 +56,7 @@ describe('GET /api/favorites/ids', () => {
     const res = await callGet();
 
     expect(res.status).toBe(401);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     expect(buildFavoriteService).not.toHaveBeenCalled();
   });
 
@@ -67,20 +68,10 @@ describe('GET /api/favorites/ids', () => {
     const res = await callGet();
 
     expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     const parsed = favoriteImageIdsResponseSchema.parse(await res.json());
     expect(parsed.lgtmImageIds).toEqual(['img-1', 'img-2']);
     expect(listFavoriteImageIds).toHaveBeenCalledWith('user-1');
-  });
-
-  it('ユーザー固有データなので共有キャッシュに載せない', async () => {
-    createClient.mockResolvedValue(buildSupabase({ user: { id: 'user-1' } }));
-    buildFavoriteService.mockReturnValue({
-      listFavoriteImageIds: vi.fn().mockResolvedValue([]),
-    });
-
-    const res = await callGet();
-
-    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
   });
 
   it('AppError (DatabaseError) は 500 を返す', async () => {
@@ -93,6 +84,7 @@ describe('GET /api/favorites/ids', () => {
     const res = await callGet();
 
     expect(res.status).toBe(500);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     consoleErrorSpy.mockRestore();
   });
 
@@ -106,6 +98,7 @@ describe('GET /api/favorites/ids', () => {
     const res = await callGet();
 
     expect(res.status).toBe(500);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     consoleErrorSpy.mockRestore();
   });
 });

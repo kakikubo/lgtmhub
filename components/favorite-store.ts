@@ -64,6 +64,17 @@ function withId(source: ReadonlySet<string>, id: string, present: boolean): Set<
 }
 
 /**
+ * 使わないレスポンスボディを明示的に破棄する。
+ *
+ * お気に入り API は全レスポンスが `Cache-Control: private, no-store` で、ブラウザは
+ * これをキャッシュに回さない。ボディを未読のまま放置するとストリームが開いたままになり、
+ * リクエストが完了扱いにならない (Playwright の networkidle に到達しない)。
+ */
+async function discardBody(res: Response): Promise<void> {
+  await res.body?.cancel().catch(() => undefined);
+}
+
+/**
  * お気に入り済み画像 ID を 1 度だけ取得する。
  *
  * トップの一覧は 'use cache' で匿名キャッシュされ、「もっと読み込む」「ランダム表示」は
@@ -79,7 +90,10 @@ function ensureLoaded(): void {
     try {
       const res = await fetch('/api/favorites/ids', { cache: 'no-store' });
       // 401 = 未ログイン。エラー表示はせず、ハートは輪郭のままにする
-      if (!res.ok) return;
+      if (!res.ok) {
+        await discardBody(res);
+        return;
+      }
       const json = favoriteImageIdsResponseSchema.parse(await res.json());
       setState({ favoritedIds: new Set(json.lgtmImageIds), signedIn: true });
     } catch {
@@ -133,6 +147,9 @@ export function toggleFavorite(lgtmImageId: string): void {
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ lgtmImageId }),
           });
+
+      // 登録 / 解除はステータスしか見ないのでボディを読まない。開いたままにしない
+      await discardBody(res);
 
       // 409 (登録済み) / 404 (解除済み) は「望む状態と一致」しているので成功として扱う。
       // お気に入り解除の冪等性は functional-design.md 参照。

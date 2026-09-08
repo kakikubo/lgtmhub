@@ -54,6 +54,7 @@ describe('POST /api/favorites', () => {
     const res = await callPost({ lgtmImageId: VALID_UUID });
 
     expect(res.status).toBe(401);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     expect(buildFavoriteService).not.toHaveBeenCalled();
   });
 
@@ -63,6 +64,7 @@ describe('POST /api/favorites', () => {
     const res = await callPost({ lgtmImageId: 'not-a-uuid' });
 
     expect(res.status).toBe(400);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     expect(buildFavoriteService).not.toHaveBeenCalled();
   });
 
@@ -72,6 +74,7 @@ describe('POST /api/favorites', () => {
     const res = await callPost('{ broken');
 
     expect(res.status).toBe(400);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
   });
 
   it('成功時は 201 と createFavoriteResponseSchema 準拠の JSON を返す', async () => {
@@ -87,26 +90,11 @@ describe('POST /api/favorites', () => {
     const res = await callPost({ lgtmImageId: VALID_UUID });
 
     expect(res.status).toBe(201);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     const parsed = createFavoriteResponseSchema.parse(await res.json());
     expect(parsed).toEqual({ id: 'fav-1', lgtmImageId: VALID_UUID });
     // user_id はセッション由来の値を使う (ボディからは受け取らない)
     expect(addFavorite).toHaveBeenCalledWith('user-1', VALID_UUID);
-  });
-
-  it('成功レスポンスは共有キャッシュに載せない', async () => {
-    createClient.mockResolvedValue(buildSupabase({ user: { id: 'user-1' } }));
-    buildFavoriteService.mockReturnValue({
-      addFavorite: vi.fn().mockResolvedValue({
-        id: 'fav-1',
-        userId: 'user-1',
-        lgtmImageId: VALID_UUID,
-        createdAt: new Date(),
-      }),
-    });
-
-    const res = await callPost({ lgtmImageId: VALID_UUID });
-
-    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
   });
 
   it('すでに登録済みなら 409 を返す', async () => {
@@ -118,6 +106,7 @@ describe('POST /api/favorites', () => {
     const res = await callPost({ lgtmImageId: VALID_UUID });
 
     expect(res.status).toBe(409);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
   });
 
   it('画像が存在しなければ 404 を返す', async () => {
@@ -129,6 +118,7 @@ describe('POST /api/favorites', () => {
     const res = await callPost({ lgtmImageId: VALID_UUID });
 
     expect(res.status).toBe(404);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
   });
 
   it('AppError (DatabaseError) は 500 を返し内部メッセージを露出しない', async () => {
@@ -141,6 +131,7 @@ describe('POST /api/favorites', () => {
     const res = await callPost({ lgtmImageId: VALID_UUID });
 
     expect(res.status).toBe(500);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     expect((await res.json()).error).toBe('サーバーエラーが発生しました');
     consoleErrorSpy.mockRestore();
   });
@@ -155,6 +146,7 @@ describe('POST /api/favorites', () => {
     const res = await callPost({ lgtmImageId: VALID_UUID });
 
     expect(res.status).toBe(500);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     consoleErrorSpy.mockRestore();
   });
 });

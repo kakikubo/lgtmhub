@@ -50,6 +50,7 @@ describe('DELETE /api/favorites/[lgtmImageId]', () => {
     const res = await callDelete('not-a-uuid');
 
     expect(res.status).toBe(400);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     expect(buildFavoriteService).not.toHaveBeenCalled();
   });
 
@@ -59,6 +60,7 @@ describe('DELETE /api/favorites/[lgtmImageId]', () => {
     const res = await callDelete(VALID_UUID);
 
     expect(res.status).toBe(401);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     expect(buildFavoriteService).not.toHaveBeenCalled();
   });
 
@@ -70,6 +72,7 @@ describe('DELETE /api/favorites/[lgtmImageId]', () => {
     const res = await callDelete(VALID_UUID);
 
     expect(res.status).toBe(204);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     expect(removeFavorite).toHaveBeenCalledWith('user-1', VALID_UUID);
   });
 
@@ -82,6 +85,7 @@ describe('DELETE /api/favorites/[lgtmImageId]', () => {
     const res = await callDelete(VALID_UUID);
 
     expect(res.status).toBe(404);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
   });
 
   it('AppError (DatabaseError) は 500 を返す', async () => {
@@ -94,6 +98,7 @@ describe('DELETE /api/favorites/[lgtmImageId]', () => {
     const res = await callDelete(VALID_UUID);
 
     expect(res.status).toBe(500);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     consoleErrorSpy.mockRestore();
   });
 
@@ -107,6 +112,7 @@ describe('DELETE /api/favorites/[lgtmImageId]', () => {
     const res = await callDelete(VALID_UUID);
 
     expect(res.status).toBe(500);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
     consoleErrorSpy.mockRestore();
   });
 });
