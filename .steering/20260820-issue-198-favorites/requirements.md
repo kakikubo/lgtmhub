@@ -70,12 +70,15 @@
 ### テスト
 - [ ] `FavoriteService` / `FavoriteRepository` のユニットテストが通る。
 - [ ] お気に入り API 4 本の route handler ユニットテストが通る。
-- [ ] `FavoriteButton` / `FavoriteProvider` のコンポーネントテストが通る。
+- [ ] `FavoriteButton` / `favorite-store` のコンポーネントテストが通る。
 - [ ] 登録 → 一覧表示 → 解除の e2e が通る。
 
 ## 成功指標
 
-- `pnpm run test` / `pnpm run check` / `pnpm run typecheck` / `pnpm run build` が通る。
+- `pnpm run test` / `pnpm run lint` / `pnpm run typecheck` / `pnpm run build` が通る。
+  `pnpm run check` は本タスク着手時点から既存の
+  `tests/unit/lib/image/compose-lgtm.test.ts` にフォーマット差分があり失敗する。
+  本タスクの変更に起因しないため、この 1 件のみ許容する（CI のゲートは `pnpm run lint`）。
 - 既存のカバレッジ閾値（`src/services/**`, `src/lib/**`, `app/api/images/**`）を割らない。
 
 ## スコープ外
