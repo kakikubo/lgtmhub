@@ -795,7 +795,7 @@ CI の Supabase Local はデータ空で起動するため、既存データに�
 
 **注意**:
 
-- `/api/auth/test-signin` は `process.env.E2E_TEST_MODE === 'true'` のときのみ動く。本番では未設定にする (Vercel/CI の本番デプロイ環境変数に絶対に追加しないこと)
+- `/api/auth/test-signin` は `process.env.E2E_TEST_MODE === 'true'` かつ `process.env.VERCEL_ENV !== 'production'` のときのみ動く。本番では未設定にする (Vercel の本番デプロイ環境変数に絶対に追加しないこと)。Vercel 本番では `E2E_TEST_MODE=true` が混入しても 403 を返す。CI e2e の `pnpm start` (`NODE_ENV=production`) は `VERCEL_ENV` 未設定のため引き続き利用できる
 - `tests/e2e/.auth/` は `.gitignore` 済み。CI では globalSetup が毎回再生成する
 - ローカル実行には `.env.local` に `SUPABASE_SERVICE_ROLE_KEY` と `E2E_TEST_MODE=true` を追加する必要がある (詳しくは README 参照)
 

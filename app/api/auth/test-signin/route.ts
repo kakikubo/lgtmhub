@@ -3,20 +3,23 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 // E2E テスト時のみ有効化される、email/password での sign-in を許可するエンドポイント。
-// 本番ビルドでは E2E_TEST_MODE が undefined のため、即座に 403 を返して機能しない。
 // GitHub OAuth 成功パスの session cookie を Playwright globalSetup から立てるためだけに存在する。
+// ガードは多層: E2E_TEST_MODE=true かつ Vercel 本番 (VERCEL_ENV=production) ではないこと。
+// NODE_ENV では弾かない。CI e2e は pnpm start (NODE_ENV=production) でこのルートを使う。
 
 const requestBodySchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
 
-function isE2ETestMode(): boolean {
-  return process.env.E2E_TEST_MODE === 'true';
+function isTestSigninEnabled(): boolean {
+  if (process.env.E2E_TEST_MODE !== 'true') return false;
+  if (process.env.VERCEL_ENV === 'production') return false;
+  return true;
 }
 
 export async function POST(request: NextRequest) {
-  if (!isE2ETestMode()) {
+  if (!isTestSigninEnabled()) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 
