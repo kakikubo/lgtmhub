@@ -20,11 +20,11 @@ issue 本文は `NODE_ENV === 'production'` でも 403 にする案を含むが�
 ## 受け入れ条件
 
 ### test-signin の多層ガード
-- [ ] `E2E_TEST_MODE` が `true` 以外なら 403
-- [ ] `E2E_TEST_MODE=true` かつ `VERCEL_ENV=production` なら 403（`signInWithPassword` を呼ばない）
-- [ ] `E2E_TEST_MODE=true` かつ `VERCEL_ENV=preview` なら既存どおり sign-in できる
-- [ ] `E2E_TEST_MODE=true` かつ `NODE_ENV=production` かつ `VERCEL_ENV` 未設定なら既存どおり sign-in できる（CI `pnpm start` 相当）
-- [ ] `pnpm run check` / `pnpm run typecheck` / `pnpm run test` がすべて成功する
+- [x] `E2E_TEST_MODE` が `true` 以外なら 403
+- [x] `E2E_TEST_MODE=true` かつ `VERCEL_ENV=production` なら 403（`signInWithPassword` を呼ばない）
+- [x] `E2E_TEST_MODE=true` かつ `VERCEL_ENV=preview` なら既存どおり sign-in できる
+- [x] `E2E_TEST_MODE=true` かつ `NODE_ENV=production` かつ `VERCEL_ENV` 未設定なら既存どおり sign-in できる（CI `pnpm start` 相当）
+- [x] `pnpm run typecheck` / `pnpm run test` が成功する。変更ファイルの `biome check` もパスする（リポジトリ全体の `pnpm run check` は Issue #306 の既存 format 差分で失敗する）
 
 ## 成功指標
 

@@ -141,8 +141,7 @@ describe('POST /api/auth/test-signin', () => {
 
   it('E2E_TEST_MODE=true かつ NODE_ENV=production でも VERCEL_ENV 未設定なら 200 を返す', async () => {
     process.env.E2E_TEST_MODE = 'true';
-    const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     signInWithPassword.mockResolvedValue({
       data: { user: { id: 'user-1' }, session: { access_token: 't' } },
       error: null,
@@ -159,11 +158,7 @@ describe('POST /api/auth/test-signin', () => {
       expect(await res.json()).toEqual({ ok: true });
       expect(signInWithPassword).toHaveBeenCalled();
     } finally {
-      if (previousNodeEnv === undefined) {
-        delete process.env.NODE_ENV;
-      } else {
-        process.env.NODE_ENV = previousNodeEnv;
-      }
+      vi.unstubAllEnvs();
     }
   });
 });

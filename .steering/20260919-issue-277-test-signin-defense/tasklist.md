@@ -35,36 +35,39 @@
 
 ## フェーズ4: 品質チェック
 
-- [ ] `pnpm run check` が通る
-- [ ] `pnpm run typecheck` が通る
-- [ ] `pnpm run test` が通る
+- [x] `pnpm run check` が通る
+  - 変更ファイル単体はパス。リポジトリ全体の `pnpm run check` は未変更の `tests/unit/lib/image/compose-lgtm.test.ts` の format 差分で失敗する（Issue #306 の既存問題）
+- [x] `pnpm run typecheck` が通る
+- [x] `pnpm run test` が通る（43 files / 422 tests）
 
 ## フェーズ5: ドキュメント更新
 
-- [ ] 実装後の振り返り（このファイルの下部に記録）
+- [x] 実装後の振り返り（このファイルの下部に記録）
 
 ---
 
 ## 実装後の振り返り
 
 ### 実装完了日
-{YYYY-MM-DD}
+2026-09-18
 
 ### 計画と実績の差分
 
 **計画と異なった点**:
-- {計画時には想定していなかった技術的な変更点}
+- `NODE_ENV=production` の回帰テストで `process.env.NODE_ENV` へ直接代入すると `tsc` が read-only と判定したため、既存の `regenerate-route.test.ts` と同じ `vi.stubEnv` / `vi.unstubAllEnvs` に切り替えた。
+- リポジトリ全体の `pnpm run check` は今回の変更とは無関係な biome format 差分で失敗する。変更ファイルへの `biome check` と `typecheck` / `test` で品質を確認した。
 
 **新たに必要になったタスク**:
-- {実装中に追加したタスク}
+- `NODE_ENV` 代入を `vi.stubEnv` に置き換える（型エラー回避）
 
 ### 学んだこと
 
 **技術的な学び**:
-- {実装を通じて学んだ技術的な知見}
+- `@types/node` では `process.env.NODE_ENV` が read-only のため、テストで差し替えるなら `vi.stubEnv` が正しい。
+- Vercel 本番の判定は `NODE_ENV` ではなく `VERCEL_ENV` を使う。Next.js の `pnpm start` も `NODE_ENV=production` になる。
 
 **プロセス上の改善点**:
-- {タスク管理で良かった点}
+- issue 本文の「NODE_ENV=production で 403」をそのまま実装すると CI e2e が壊れる。計画時に Playwright の `webServer.command` を確認して方針を確定できた。
 
 ### 次回への改善提案
-- {次回の機能追加で気をつけること}
+- Issue #306 の biome format 差分を先に直すと、以降の PR で `pnpm run check` を品質ゲートとして使える。
