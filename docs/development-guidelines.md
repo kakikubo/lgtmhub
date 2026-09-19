@@ -397,14 +397,15 @@ const image = await imageRepository.findById(id);
 
 **Biome lint 基本方針**:
 
-- `linter.rules.recommended: true` をベースに採用する
+- `linter.rules.preset: "recommended"` をベースに採用する
 - 既存コードに合わせて以下のルールを調整している(`biome.json` 参照):
   - `style.noNonNullAssertion: "off"` — `process.env.X!` のような環境変数アクセスを許容
   - `tests/**` 配下は `suspicious.noThenProperty: "off"` — Supabase クエリビルダーモックの thenable を許容
 - Next.js 固有の Web Vitals チェック(`next/core-web-vitals` 由来)は `next build` の警告と PR レビューで担保する
-- 変更前に `pnpm run lint` をローカル実行する。自動修正可能なルールは `pnpm run check` で一括適用できる
+- 変更前に `pnpm run check` をローカル実行する。自動修正可能な差分は `pnpm exec biome check --write .`（format のみなら `pnpm run format`）で一括適用できる
+- `pnpm run lint`（`biome lint .`）は lint のみの確認用として残す
 
-CI で `pnpm run lint` を実行し、エラー検出時は失敗扱いとする。
+CI で `pnpm run check`（lint + format）を実行し、エラー検出時は失敗扱いとする。
 
 **コミット時の自動実行 (lefthook)**:
 
@@ -413,7 +414,8 @@ CI で `pnpm run lint` を実行し、エラー検出時は失敗扱いとする
 - `pnpm install` 直後に `prepare` スクリプト(`lefthook install`)が走り、`.git/hooks/pre-commit` がフレッシュリポジトリでは自動配置される
 - 対象拡張子: `*.{js,jsx,ts,tsx,json,jsonc,css}`(Biome がサポートする拡張子のみ)
 - 整形可能な差分は `biome check --write` により自動修正され、`stage_fixed: true` で再ステージされたうえでコミットに含まれる
-- 修正不能な lint エラーが残った場合、コミットは失敗する(`biome.json` のルール設定は CI の `pnpm run lint` と同一。CI 側は format チェックを行わないため、format 違反は pre-commit の自動修正でのみ解消される)
+- 修正不能な lint エラーが残った場合、コミットは失敗する(`biome.json` のルール設定は CI の `pnpm run check` と同一)
+- lefthook は staged ファイルのみを見る。Biome のバージョン更新に伴う未ステージファイルの format ドリフトは、CI の `pnpm run check` がリポジトリ全体を検査して検出する
 - 上記対象外の拡張子のみのコミットでは、`biome-check` ジョブはスキップされコミットがそのまま成立する
 - 緊急回避が必要な場合のみ `git commit --no-verify` でフックをバイパスできる。通常運用では使用しない
 
@@ -827,7 +829,7 @@ jobs:
           node-version: '24'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run lint
+      - run: pnpm run check
       - run: pnpm run typecheck
 
   test:
@@ -1154,7 +1156,7 @@ PRを作成する前に以下を確認する:
 - [ ] 新規APIエンドポイントに統合テストが追加されているか
 - [ ] `pnpm run test` がパスするか
 - [ ] `pnpm run typecheck` がパスするか
-- [ ] `pnpm run lint` がパスするか
+- [ ] `pnpm run check` がパスするか
 
 **ドキュメント**:
 - [ ] WHYが非自明な箇所にコメントがあるか
