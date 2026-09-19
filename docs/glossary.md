@@ -152,7 +152,7 @@ P1機能。`user_profiles.is_admin = true` のユーザーのみ実行可能。R
 **定義**: レコードを物理削除せず、`status = 'deleted'` への更新と `deletedAt` の記録によって「削除された」状態を表す削除方式。
 
 **説明**:
-本サービスでは画像の削除（PRD 機能2 / 6）は論理削除のみで完結する。Vercel Blob 上の画像実体は MVP 期間中は残置し、`deletedAt` から30日経過後に P1 機能9（削除画像の物理クリーンアップ）で物理削除する。
+本サービスでは画像の削除（PRD 機能2 / 6）は論理削除のみで完結する。Vercel Blob 上の画像実体は MVP 期間中は残置し、`deletedAt` から30日経過後に PRD 機能8（削除画像の物理クリーンアップ）で物理削除する。
 
 **運用上の前提**:
 - 一覧 API・お気に入り一覧 API は `status = 'active'` のみを返す（RLSポリシー、およびお気に入り一覧は JOIN フィルタで担保）
@@ -511,7 +511,7 @@ export async function POST(request: NextRequest) { /* ... */ }
 |----------|------|---------|---------|
 | `processing` | DB先行作成〜Blob保存完了までの内部中間状態（ユーザー可視にはならない） | 画像登録APIを受け付けた直後 | `active`, `deleted`（失敗時） |
 | `active` | 公開中（一覧・お気に入り一覧に表示される） | 合成・Blob保存・DBレコード確定が完了 | `deleted` |
-| `deleted` | 論理削除済み（一覧・詳細APIともに 404 として扱う） | ユーザーまたは管理者が削除 | （終端、30日後にBlob物理削除：PRD機能9） |
+| `deleted` | 論理削除済み（一覧・詳細APIともに 404 として扱う） | ユーザーまたは管理者が削除 | （終端、30日後にBlob物理削除：PRD 機能8） |
 
 **状態遷移図**:
 ```mermaid
@@ -520,7 +520,7 @@ stateDiagram-v2
     processing --> active: 合成・Blob保存・DB確定が完了
     processing --> deleted: Blob保存失敗時のロールバック（内部遷移、ユーザーには 400/500 を返却）
     active --> deleted: ユーザー/管理者が削除
-    deleted --> [*]: 30日後に物理削除（P1機能9）
+    deleted --> [*]: 30日後に物理削除（PRD 機能8）
 ```
 
 **重要**:
@@ -552,7 +552,7 @@ export type ImageStatus = 'processing' | 'active' | 'deleted';
 - `width` / `height` / `fileSizeBytes`: 合成後の画像メタデータ
 - `mimeType`: 常に `'image/webp'`
 - `status`: `processing` / `active` / `deleted`
-- `deletedAt`: 論理削除日時（`null` = 削除されていない）。30日経過後の物理クリーンアップ（PRD機能9）の判定基準
+- `deletedAt`: 論理削除日時（`null` = 削除されていない）。30日経過後の物理クリーンアップ（PRD 機能8）の判定基準
 - `createdAt` / `updatedAt`: 作成・更新日時
 
 **関連エンティティ**: [UserProfile](#userprofile), [Favorite](#favorite-お気に入りエンティティ)
