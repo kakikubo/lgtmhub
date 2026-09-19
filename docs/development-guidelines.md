@@ -1018,7 +1018,7 @@ pnpm 12 は `minimumReleaseAge`（1440 分）をデフォルトで持ち、公�
 - vulnerability alerts も同じ 24h ゲートを通す。スケジュールは無視して通知されるが、待てない緊急 CVE は手動 bump する
 - `prCreation: "not-pending"` は使わない。CI は `pull_request` のみのため、PR 未作成ブランチにチェックが付かず無限延期になる
 - Renovate の `minimumReleaseAgeBuffer` はデフォルト 30 分のまま。関連パッケージ後出しによる lockfile 更新失敗を避ける
-- `lockFileMaintenance` の推移依存が 24h 未満だと稀に artifact 失敗しうる。発生したらその週は翌週まで待つ
+- `lockFileMaintenance` は Renovate の `minimumReleaseAge` の対象外だが、lockfile を作り直す pnpm 自身が `minimumReleaseAge` を守り、24h 以上経過した版だけを解決する。週次 lockfile 更新もこのゲートを通る
 
 ### グルーピング方針
 

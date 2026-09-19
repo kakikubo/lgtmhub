@@ -88,7 +88,7 @@ CI: pnpm install --frozen-lockfile
 本変更にアプリの実行時エラー処理は無い。品質ゲートの失敗は次のとおり:
 
 - 公開直後の版が lockfile に入った場合: `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で install が失敗する（意図どおり）
-- `lockFileMaintenance` の推移依存が 24h 未満だと稀に artifact 失敗しうる。発生したらその週は翌週まで待つ
+- `lockFileMaintenance` は Renovate の `minimumReleaseAge` の対象外だが、lockfile を作り直す pnpm 自身が 24h 以上経過した版だけを解決するため、週次 lockfile 更新もゲートを通る
 
 ## テスト戦略
 
