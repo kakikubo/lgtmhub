@@ -110,7 +110,7 @@ pnpm run db:reset
    pnpm run test:e2e
    ```
 
-> **本番では `E2E_TEST_MODE` を絶対に設定しないでください**。`/api/auth/test-signin` は `E2E_TEST_MODE === 'true'` のときのみ email/password sign-in を許可します。未設定なら 403 を返すだけの無害なルートとして振る舞います。
+> **本番では `E2E_TEST_MODE` を絶対に設定しないでください**。`/api/auth/test-signin` は `E2E_TEST_MODE === 'true'` かつ `VERCEL_ENV !== 'production'` のときのみ email/password sign-in を許可します。未設定なら 403 を返すだけの無害なルートとして振る舞います。Vercel 本番 (`VERCEL_ENV=production`) では `E2E_TEST_MODE=true` が混入しても 403 になります。
 
 ### コミット時の自動チェック (lefthook + Biome)
 

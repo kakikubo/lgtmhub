@@ -12,6 +12,7 @@ beforeEach(() => {
   createServerClient.mockClear();
   // 既定値: 入力 ENV を毎回クリーンに
   delete process.env.E2E_TEST_MODE;
+  delete process.env.VERCEL_ENV;
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321';
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
 });
@@ -101,5 +102,63 @@ describe('POST /api/auth/test-signin', () => {
     );
 
     expect(res.status).toBe(401);
+  });
+
+  it('E2E_TEST_MODE=true でも VERCEL_ENV=production なら 403 を返す', async () => {
+    process.env.E2E_TEST_MODE = 'true';
+    process.env.VERCEL_ENV = 'production';
+
+    const { POST } = await import('@/app/api/auth/test-signin/route');
+    // biome-ignore lint/suspicious/noExplicitAny: NextRequest 互換のためのテストキャスト
+    const res = await POST(buildRequest({ email: 'e2e@example.com', password: 'pw' }) as any);
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'forbidden' });
+    expect(signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it('E2E_TEST_MODE=true かつ VERCEL_ENV=preview なら 200 を返す', async () => {
+    process.env.E2E_TEST_MODE = 'true';
+    process.env.VERCEL_ENV = 'preview';
+    signInWithPassword.mockResolvedValue({
+      data: { user: { id: 'user-1' }, session: { access_token: 't' } },
+      error: null,
+    });
+
+    const { POST } = await import('@/app/api/auth/test-signin/route');
+    const res = await POST(
+      // biome-ignore lint/suspicious/noExplicitAny: NextRequest 互換のためのテストキャスト
+      buildRequest({ email: 'e2e@example.com', password: 'secret-pw' }) as any,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(signInWithPassword).toHaveBeenCalledWith({
+      email: 'e2e@example.com',
+      password: 'secret-pw',
+    });
+  });
+
+  it('E2E_TEST_MODE=true かつ NODE_ENV=production でも VERCEL_ENV 未設定なら 200 を返す', async () => {
+    process.env.E2E_TEST_MODE = 'true';
+    vi.stubEnv('NODE_ENV', 'production');
+    signInWithPassword.mockResolvedValue({
+      data: { user: { id: 'user-1' }, session: { access_token: 't' } },
+      error: null,
+    });
+
+    try {
+      const { POST } = await import('@/app/api/auth/test-signin/route');
+      const res = await POST(
+        // biome-ignore lint/suspicious/noExplicitAny: NextRequest 互換のためのテストキャスト
+        buildRequest({ email: 'e2e@example.com', password: 'secret-pw' }) as any,
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true });
+      expect(signInWithPassword).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
