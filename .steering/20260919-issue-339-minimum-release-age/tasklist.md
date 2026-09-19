@@ -71,7 +71,8 @@
 
 **計画と異なった点**:
 - なし。pnpm / Renovate の 24h 明示とドキュメント更新に収まった
-- ローカルの corepack pnpm 12.3.4 shim が壊れていたため、検証は mise の pnpm 11.13.0 + Node 24 で実施した。`pnpm install --frozen-lockfile` は供給チェーン検証を通過し、現行 lockfile は十分古いことを確認した
+- 初回検証は corepack shim の不調で mise の pnpm 11.13.0 で実施したが、レビュー指摘を受けて `packageManager` と同じ pnpm 12.3.4（`corepack pnpm`）で再実行した。validator / `install --frozen-lockfile`（供給チェーン検証を通過）/ check / typecheck / test（422 件）がすべて成功した
+- ローカル直下に未追跡の別 clone（`lgtmhub/`）があると `pnpm run check` が nested root configuration で失敗する。追跡対象パスを明示した `biome check` で検証した
 
 **新たに必要になったタスク**:
 - なし
@@ -90,4 +91,4 @@
 
 ### 次回への改善提案
 - npm の 72h unpublish 窓に合わせるなら、pnpm と Renovate の値を同時に変える
-- corepack の pnpm shim が壊れている環境では `mise exec -- pnpm` で検証を続行できる
+- 検証は `packageManager` と同じ版で行う。`corepack pnpm --version` で版を確認してから実行する
