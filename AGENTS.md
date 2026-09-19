@@ -55,9 +55,44 @@ set -a; source .env.local; set +a; pnpm run test:e2e
 
 ## Cursor Cloud specific instructions
 
-- 依存は `pnpm`（Corepack）。`pnpm install` 済みの環境を前提にする
+設定の正本は `.cursor/environment.json`（`install` / `start` は `.cursor/install.sh` / `.cursor/start.sh`）。
+
+### 起動時に自動で行うこと
+
+- **install**: Node 24 を PATH 先頭に置き、`pnpm install --frozen-lockfile --ignore-scripts` の後 `pnpm rebuild`
+  - `--ignore-scripts` はルートの `prepare`（`lefthook install`）が Cursor 管理の `core.hooksPath` と競合して失敗するのを避けるため
+  - `pnpm rebuild` で sharp などのネイティブビルドを復元する
+- **start**: Docker デーモン起動 → ネスト Docker 向けネットワーク修正 → `supabase start` → 稼働キーから `/workspace/.env.local` を生成
+
+### ネスト Docker の注意
+
+Cloud Agent はコンテナ in コンテナのため、ブリッジ経由のコンテナ間通信が落ちることがある（`realtime` マイグレーションが `connection not available` でタイムアウトする症状）。`start.sh` 内で次を実施する:
+
+```bash
+sudo iptables -P FORWARD ACCEPT
+sudo iptables-legacy -P FORWARD ACCEPT
+sudo sysctl -w net.bridge.bridge-nf-call-iptables=0
+sudo sysctl -w net.bridge.bridge-nf-call-ip6tables=0
+```
+
+ストレージドライバは `fuse-overlayfs`（`/etc/docker/daemon.json`）。
+
+### 日常コマンド
+
+- 依存は `pnpm`（Corepack）。`engines.node` は `24.x`（`.npmrc` の `engine-strict=true`）
 - 秘密情報は `.env.local` / `supabase/.env`。未設定なら `.env.example` / `supabase/.env.example` を参照し、不足は推測で埋めない
-- ローカル DB: `pnpm run db:start` → `pnpm run db:reset` → `pnpm run db:types`（スキーマ変更時は型再生成を同じコミットに含める）
+- ローカル DB: start 済みなら追加の `db:start` は不要。スキーマ変更時は `pnpm run db:reset` → `pnpm run db:types`（型再生成を同じコミットに含める）
 - 開発サーバー: `pnpm run dev`（既定ポート 3000）
 - UI 変更の検証はブラウザ操作で行い、証跡を残す。ターミナルのみで足りる変更は unit / typecheck / biome で十分
-- Supabase / Docker が使えない Cloud 環境では、DB 依存の e2e を無理に回さず、unit / typecheck / 静的検証を優先し、ブロッカーを明示する
+
+### E2E（Playwright）
+
+`start` が書いた `.env.local` には `E2E_TEST_MODE` を含めない（本番相当のガードを壊さないため）。e2e 実行時だけ付与する:
+
+```bash
+set -a; source .env.local; set +a
+export E2E_TEST_MODE=true
+pnpm run test:e2e
+```
+
+Supabase / Docker が使えない場合は DB 依存の e2e を無理に回さず、unit / typecheck / 静的検証を優先し、ブロッカーを明示する。

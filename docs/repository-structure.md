@@ -165,6 +165,7 @@ lgtmhub/
 │       ├── supabase-preview-migrate.yml # Preview 環境へのマイグレーション適用
 │       └── _supabase-push.yml  # 上記2つから呼ばれる再利用ワークフロー
 ├── .claude/                    # Claude Code設定（agents / commands / steering）
+├── .cursor/                    # Cursor Cloud Agent 環境（environment.json / install / start）
 ├── .devcontainer/              # devcontainer 設定
 ├── .steering/                  # 作業単位のタスク管理
 ├── .env.example                # 環境変数テンプレート（git管理）
