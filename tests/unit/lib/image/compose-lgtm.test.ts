@@ -108,20 +108,18 @@ describe('composeLgtmImage (静止画)', () => {
     { label: '正方形', width: 1024, height: 1024, expectedW: 400, expectedH: 400 },
     { label: '縦長', width: 736, height: 1000, expectedW: 294, expectedH: 400 },
     { label: '縦長 (短辺切り捨て)', width: 600, height: 1000, expectedW: 240, expectedH: 400 },
-  ])('アスペクト比違い ($label) でも長辺が $expectedW × $expectedH (長辺 400) になる', async ({
-    width,
-    height,
-    expectedW,
-    expectedH,
-  }) => {
-    const input = await makeImage(width, height);
-    const result = await composeLgtmImage(input);
+  ])(
+    'アスペクト比違い ($label) でも長辺が $expectedW × $expectedH (長辺 400) になる',
+    async ({ width, height, expectedW, expectedH }) => {
+      const input = await makeImage(width, height);
+      const result = await composeLgtmImage(input);
 
-    expect(Math.max(result.width, result.height)).toBe(MAX_LONG_SIDE);
-    expect(result.width).toBe(expectedW);
-    expect(result.height).toBe(expectedH);
-    expect(result.isAnimated).toBe(false);
-  });
+      expect(Math.max(result.width, result.height)).toBe(MAX_LONG_SIDE);
+      expect(result.width).toBe(expectedW);
+      expect(result.height).toBe(expectedH);
+      expect(result.isAnimated).toBe(false);
+    },
+  );
 
   it('原画が MAX_LONG_SIDE 未満の場合は拡大されず原画サイズで保存される (300×200 → 300×200)', async () => {
     const input = await makeImage(300, 200);
