@@ -40,6 +40,7 @@ permissions:
 jobs:
   push:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       # supabase CLI が認証に使う。--password フラグだとログ事故が起きうるので env で渡す。
       SUPABASE_ACCESS_TOKEN: ${{ secrets.access_token }}

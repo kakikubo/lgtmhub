@@ -35,6 +35,7 @@ jobs:
     if: >-
       contains(github.event.pull_request.labels.*.name, 'apply-preview-migration')
       && github.event.pull_request.head.repo.full_name == github.repository
+    timeout-minutes: 10
     uses: ./.github/workflows/_supabase-push.yml
     with:
       remote_name: preview

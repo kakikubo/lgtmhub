@@ -809,6 +809,10 @@ CI の Supabase Local はデータ空で起動するため、既存データに�
 
 > 以下は構成を説明するためのサンプル。`actions/*` などのバージョンは `renovate.json` の `github-actions` グループで自動更新されるため、**常に実際の `.github/workflows/ci.yml` を正**とする（サンプルのバージョン表記をそのままコピーしない）。
 
+ハングしたジョブが GitHub Actions のデフォルト上限（6 時間）まで走り続けないよう、各ジョブに `timeout-minutes` を設定する。目安は実測の 2〜3 倍（lint / test / security ほか 10 分、e2e 20 分）。`ci.yml` 以外（Danger、Release Drafter、Supabase Push）も同じ方針で 10 分とする。
+
+e2e ジョブの Playwright ブラウザ本体（`~/.cache/ms-playwright`）は `actions/cache` でキャッシュする。OS パッケージ（`--with-deps`）は apt 側でキャッシュできないため、ヒット時は `playwright install-deps chromium` のみ実行する。
+
 ```yaml
 # .github/workflows/ci.yml
 name: CI
@@ -821,6 +825,7 @@ on:
 jobs:
   lint-and-typecheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -834,6 +839,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # 設計意図: CI 上では Supabase CLI（Docker）の起動コストを避け、
     # 統合テストの DB 接続先として素の Postgres コンテナを使用する。
     # RLS ポリシーの検証はローカル開発時の `pnpm run db:start`（Supabase Local）で行い、
@@ -870,6 +876,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # 設計意図: e2e ジョブは supabase/setup-cli + supabase start で本物の
     # PostgreSQL + PostgREST + Auth + Storage を Docker で立ち上げ、Server Component
     # / Route Handler が実 DB を叩けるようにする。NEXT_PUBLIC_* は build 時に
@@ -895,7 +902,15 @@ jobs:
           status=$(supabase status -o json)
           echo "NEXT_PUBLIC_SUPABASE_URL=$(echo "$status" | jq -er '.API_URL')" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(echo "$status" | jq -er '.ANON_KEY')" >> "$GITHUB_ENV"
-      - run: pnpm exec playwright install --with-deps chromium
+      - uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
       - run: pnpm run build
       - run: pnpm run test:e2e
       - if: always()
@@ -903,6 +918,7 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
