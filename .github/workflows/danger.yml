@@ -15,6 +15,7 @@ jobs:
     # 計測対象・除外ルール・閾値は docs/development-guidelines.md
     # 「PRの大きさの目安」と dangerfile.ts に集約する。
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

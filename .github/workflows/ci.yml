@@ -8,6 +8,7 @@ on:
 jobs:
   lint-and-typecheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -21,6 +22,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # 設計意図: CI 上では Supabase CLI(Docker)の起動コストを避け、
     # 統合テストの DB 接続先として素の Postgres コンテナを使用する。
     # RLS ポリシーの検証はローカル開発時の `pnpm run db:start`(Supabase Local)で行い、
@@ -72,6 +74,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # 設計意図: e2e ジョブでは supabase/setup-cli + supabase start で本物の
     # PostgreSQL + PostgREST + Auth + Storage を Docker で立ち上げ、Server Component
     # と Route Handler が実 DB を叩けるようにする。これにより HomePage / ImageDetailPage
@@ -107,7 +110,21 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon_key" >> "$GITHUB_ENV"
           # globalSetup から admin API でテストユーザーを作るために必要
           echo "SUPABASE_SERVICE_ROLE_KEY=$service_role_key" >> "$GITHUB_ENV"
-      - run: pnpm exec playwright install --with-deps chromium
+      # Playwright のブラウザ本体は ~/.cache/ms-playwright に置かれる。
+      # OS パッケージ (--with-deps) は apt 側でキャッシュできないため、
+      # ヒット時は install-deps のみ実行して Chromium のダウンロードを省略する。
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Install Playwright OS dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
       - run: pnpm run build
       # E2E_TEST_MODE は playwright.config.ts の webServer.env で webServer プロセスにのみ渡る。
       # 本番デプロイ環境変数には絶対に追加しないこと
@@ -118,6 +135,7 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

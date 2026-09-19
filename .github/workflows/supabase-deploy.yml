@@ -32,6 +32,7 @@ concurrency:
 
 jobs:
   prod:
+    timeout-minutes: 10
     uses: ./.github/workflows/_supabase-push.yml
     with:
       remote_name: prod
@@ -48,6 +49,7 @@ jobs:
   # PREVIEW_DB_ENABLED=true を設定すると prod と並んで自動 push されるようになる。
   preview:
     if: ${{ vars.PREVIEW_DB_ENABLED == 'true' }}
+    timeout-minutes: 10
     uses: ./.github/workflows/_supabase-push.yml
     with:
       remote_name: preview
