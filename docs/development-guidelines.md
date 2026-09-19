@@ -895,7 +895,15 @@ jobs:
           status=$(supabase status -o json)
           echo "NEXT_PUBLIC_SUPABASE_URL=$(echo "$status" | jq -er '.API_URL')" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(echo "$status" | jq -er '.ANON_KEY')" >> "$GITHUB_ENV"
-      - run: pnpm exec playwright install --with-deps chromium
+      - uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
       - run: pnpm run build
       - run: pnpm run test:e2e
       - if: always()
@@ -903,6 +911,7 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -999,10 +1008,26 @@ jobs:
 | GitHub Actions の更新 | `actions/checkout@v4 → v5` | ✅ (CI green 時) | `github-actions` グループにまとめる |
 | `lockFileMaintenance` | `pnpm-lock.yaml` の週次更新 | ✅ | 月曜午前 |
 | major | `react 19 → 20` | ❌ (手動レビュー) | `dependencies` / `major` ラベル付き |
-| vulnerability alerts | GitHub Security Advisory 由来 | ❌ (手動レビュー) | スケジュールを無視して即時 PR |
+| vulnerability alerts | GitHub Security Advisory 由来 | ❌ (手動レビュー) | スケジュールは無視して通知。npm は 24h ゲートを維持し、緊急時は手動 bump |
 | `engines.node` | Node のメジャー更新 | 無効化 | devcontainer / `actions/setup-node` / `engines.node` を手動で同期 |
 
 PR は **月曜の朝（Asia/Tokyo 9 時前）** にまとめて立ち、`chore(deps): ...` の Conventional Commit スタイルとなる。Dependency Dashboard issue がリポジトリに常時 1 件存在し、保留中の更新と open PR が一覧できる。
+
+### 公開後 24h の成熟度ゲート
+
+pnpm 12 は `minimumReleaseAge`（1440 分）をデフォルトで持ち、公開から 24h 未満の版を `pnpm install --frozen-lockfile` が拒否する。Renovate 側にも同等の冷却を入れ、**Renovate が通した lockfile がそのまま CI でも通る**ようにする。
+
+| 層 | 設定 | 対象 |
+|----|------|------|
+| pnpm | `pnpm-workspace.yaml` の `minimumReleaseAge: 1440` | すべての `pnpm install`（CI / ローカル / Vercel） |
+| Renovate | `matchDatasources: ["npm"]` の `minimumReleaseAge: "24 hours"` + `internalChecksFilter: "strict"` | npm パッケージのみ。GitHub Actions 等は対象外 |
+
+- 公開から 24h 未満の npm 版は PR に載せない。グループ PR では十分古い版だけが入る
+- `minimumReleaseAgeExclude` は使わない。供給チェーンゲートを空洞化しない
+- vulnerability alerts も同じ 24h ゲートを通す。スケジュールは無視して通知されるが、待てない緊急 CVE は手動 bump する
+- `prCreation: "not-pending"` は使わない。CI は `pull_request` のみのため、PR 未作成ブランチにチェックが付かず無限延期になる
+- Renovate の `minimumReleaseAgeBuffer` はデフォルト 30 分のまま。関連パッケージ後出しによる lockfile 更新失敗を避ける
+- `lockFileMaintenance` の推移依存が 24h 未満だと稀に artifact 失敗しうる。発生したらその週は翌週まで待つ
 
 ### グルーピング方針
 
@@ -1046,7 +1071,7 @@ pnpm --package=renovate dlx renovate-config-validator renovate.json
 ### major / vulnerability の運用
 
 - Dependency Dashboard issue を週 1 確認し、major アップデートはチェックボックスで個別にトリガー
-- vulnerability alerts は Slack / GitHub 通知が来たら **その日のうちに** レビュー & マージする
+- vulnerability alerts は Slack / GitHub 通知が来たらレビューする。npm の 24h ゲートは維持し、待てない場合のみ手動 bump する
 - メジャー更新で破壊的変更が含まれる場合は、追従 PR とは別ブランチでアプリ側の修正を入れてから merge する
 
 ### `engines.node` を Renovate で更新しない理由

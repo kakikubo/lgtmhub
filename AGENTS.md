@@ -79,7 +79,7 @@ sudo sysctl -w net.bridge.bridge-nf-call-ip6tables=0
 
 ### 日常コマンド
 
-- 依存は `pnpm`（Corepack）。`engines.node` は `24.x`（`.npmrc` の `engine-strict=true`）
+- 依存は `pnpm`（Corepack）。`engines.node` は `24.x`（`.npmrc` の `engine-strict=true`）。npm パッケージは公開から 24h 未満だと `pnpm install` が拒否する（`pnpm-workspace.yaml` の `minimumReleaseAge: 1440`。Renovate も同じ冷却）
 - 秘密情報は `.env.local` / `supabase/.env`。未設定なら `.env.example` / `supabase/.env.example` を参照し、不足は推測で埋めない
 - ローカル DB: start 済みなら追加の `db:start` は不要。スキーマ変更時は `pnpm run db:reset` → `pnpm run db:types`（型再生成を同じコミットに含める）
 - 開発サーバー: `pnpm run dev`（既定ポート 3000）
