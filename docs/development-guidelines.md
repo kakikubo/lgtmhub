@@ -999,7 +999,7 @@ jobs:
 | GitHub Actions の更新 | `actions/checkout@v4 → v5` | ✅ (CI green 時) | `github-actions` グループにまとめる |
 | `lockFileMaintenance` | `pnpm-lock.yaml` の週次更新 | ✅ | 月曜午前 |
 | major | `react 19 → 20` | ❌ (手動レビュー) | `dependencies` / `major` ラベル付き |
-| vulnerability alerts | GitHub Security Advisory 由来 | ❌ (手動レビュー) | スケジュールは無視して通知。npm は 24h ゲートを維持し、緊急時は手動 bump |
+| vulnerability alerts | GitHub Security Advisory 由来 | ❌ (手動レビュー) | スケジュールと Renovate の 24h ゲートをバイパスして即時 PR 化。pnpm の 24h ゲートは残る（後述） |
 | `engines.node` | Node のメジャー更新 | 無効化 | devcontainer / `actions/setup-node` / `engines.node` を手動で同期 |
 
 PR は **月曜の朝（Asia/Tokyo 9 時前）** にまとめて立ち、`chore(deps): ...` の Conventional Commit スタイルとなる。Dependency Dashboard issue がリポジトリに常時 1 件存在し、保留中の更新と open PR が一覧できる。
@@ -1014,8 +1014,9 @@ pnpm 12 は `minimumReleaseAge`（1440 分）をデフォルトで持ち、公�
 | Renovate | `matchDatasources: ["npm"]` の `minimumReleaseAge: "24 hours"` + `internalChecksFilter: "strict"` | npm パッケージのみ。GitHub Actions 等は対象外 |
 
 - 公開から 24h 未満の npm 版は PR に載せない。グループ PR では十分古い版だけが入る
-- `minimumReleaseAgeExclude` は使わない。供給チェーンゲートを空洞化しない
-- vulnerability alerts も同じ 24h ゲートを通す。スケジュールは無視して通知されるが、待てない緊急 CVE は手動 bump する
+- `minimumReleaseAgeExclude` は常設しない。供給チェーンゲートを空洞化しない（緊急 CVE の一時 override のみ例外）
+- vulnerability alerts は Renovate の `minimumReleaseAge` をバイパスし、公開 24h 未満でも即時に PR が立つ。一方 pnpm のゲートは残るため、24h 未満の修正版は lockfile 更新（`ERR_PNPM_NO_MATURE_MATCHING_VERSION`）か CI の frozen install（`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`）で止まる。通常は 24h 経過後に Renovate が PR を更新するのを待つ
+- 24h を待てない緊急 CVE は、Renovate の設定ではなく pnpm 側で override する。`pnpm-workspace.yaml` の `minimumReleaseAgeExclude` に修正版を版指定（例: `"<pkg>@<version>"`）で一時追加して `pnpm install` し、24h 経過後に除外を削除する
 - `prCreation: "not-pending"` は使わない。CI は `pull_request` のみのため、PR 未作成ブランチにチェックが付かず無限延期になる
 - Renovate の `minimumReleaseAgeBuffer` はデフォルト 30 分のまま。関連パッケージ後出しによる lockfile 更新失敗を避ける
 - `lockFileMaintenance` は Renovate の `minimumReleaseAge` の対象外だが、lockfile を作り直す pnpm 自身が `minimumReleaseAge` を守り、24h 以上経過した版だけを解決する。週次 lockfile 更新もこのゲートを通る
@@ -1062,7 +1063,7 @@ pnpm --package=renovate dlx renovate-config-validator renovate.json
 ### major / vulnerability の運用
 
 - Dependency Dashboard issue を週 1 確認し、major アップデートはチェックボックスで個別にトリガー
-- vulnerability alerts は Slack / GitHub 通知が来たらレビューする。npm の 24h ゲートは維持し、待てない場合のみ手動 bump する
+- vulnerability alerts は Slack / GitHub 通知が来たらレビューする。公開 24h 未満の修正版は pnpm のゲートで CI が通らないため、待てない場合のみ上記の `minimumReleaseAgeExclude` 一時 override で適用する
 - メジャー更新で破壊的変更が含まれる場合は、追従 PR とは別ブランチでアプリ側の修正を入れてから merge する
 
 ### `engines.node` を Renovate で更新しない理由

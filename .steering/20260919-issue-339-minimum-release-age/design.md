@@ -2,7 +2,7 @@
 
 ## アーキテクチャ概要
 
-pnpm の install ゲートと Renovate の PR 作成ゲートを同じ 24h に揃える。除外リストは使わず、緊急 CVE は手動 bump とする。
+pnpm の install ゲートと Renovate の PR 作成ゲートを同じ 24h に揃える。除外リストは常設せず、24h を待てない緊急 CVE のみ pnpm 側で一時 override する。
 
 ```
 npm 公開
@@ -52,12 +52,12 @@ CI: pnpm install --frozen-lockfile
 - GitHub Actions / docker / devcontainer には掛けない。pnpm ゲートと揃える対象は npm だけ
 - `prCreation: "not-pending"` は入れない。CI は `pull_request` のみなので、PR 未作成ブランチにチェックが付かず無限延期になる
 - `minimumReleaseAgeBuffer` はデフォルト 30 分のまま。関連パッケージ後出しによる artifact 失敗を避ける
-- `minimumReleaseAgeExclude` は作らない
+- `minimumReleaseAgeExclude` は常設しない（緊急 CVE の一時 override のみ例外）
 
 ### 3. ドキュメント
 
 **責務**:
-- 24h ゲートが意図であること、除外しないこと、緊急時は手動 bump であることを残す
+- 24h ゲートが意図であること、除外を常設しないこと、緊急時は pnpm 側の一時 override であることを残す
 
 **実装の要点**:
 - 正典は `docs/development-guidelines.md` の「依存関係管理 (Renovate)」
@@ -78,9 +78,10 @@ CI: pnpm install --frozen-lockfile
 
 ### 緊急 CVE
 ```
-1. vulnerability alerts は schedule を無視して通知される
-2. ただし npm の 24h ゲートは維持する（供給チェーンゲートと一致させる）
-3. 24h を待てない場合は人間が手動で bump する
+1. vulnerability alerts は schedule と Renovate の minimumReleaseAge をバイパスし、24h 未満でも即時に PR が立つ
+2. pnpm の minimumReleaseAge: 1440 は残るため、24h 未満の修正版は lockfile 更新 (ERR_PNPM_NO_MATURE_MATCHING_VERSION) か CI の frozen install (ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION) で止まる
+3. 通常は 24h 経過後に Renovate が PR を更新するのを待つ
+4. 待てない場合は人間が pnpm-workspace.yaml の minimumReleaseAgeExclude に修正版を版指定で一時追加し、24h 経過後に削除する
 ```
 
 ## エラーハンドリング戦略
@@ -126,7 +127,7 @@ README.md
 ## セキュリティ考慮事項
 
 - 24h ゲートは公開直後の悪意ある版を取り込む窓を狭める。除外リストで空洞化しない
-- vulnerability も同じゲートにする。緊急時のみ手動 override
+- Renovate の security update は `minimumReleaseAge` をバイパスするが、pnpm の 24h ゲートは残す。緊急時のみ `minimumReleaseAgeExclude` の版指定で一時 override
 
 ## パフォーマンス考慮事項
 
