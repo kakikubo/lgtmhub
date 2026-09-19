@@ -3,6 +3,7 @@ import { BadRequestError } from '@/src/lib/errors';
 
 export const ALLOWED_IMAGE_FORMATS = ['jpeg', 'png', 'gif', 'webp'] as const;
 export type AllowedImageFormat = (typeof ALLOWED_IMAGE_FORMATS)[number];
+const ALLOWED_IMAGE_FORMAT_VALUES: readonly string[] = ALLOWED_IMAGE_FORMATS;
 
 // アニメーション入力 (GIF / WebP) で共有するフレーム数上限。
 // Vercel Functions の maxDuration / メモリと sharp の合成所要時間から
@@ -10,7 +11,7 @@ export type AllowedImageFormat = (typeof ALLOWED_IMAGE_FORMATS)[number];
 export const MAX_GIF_FRAMES = 150;
 
 function isAllowedFormat(value: string | undefined): value is AllowedImageFormat {
-  return typeof value === 'string' && (ALLOWED_IMAGE_FORMATS as readonly string[]).includes(value);
+  return typeof value === 'string' && ALLOWED_IMAGE_FORMAT_VALUES.includes(value);
 }
 
 export interface ValidatedImage {
