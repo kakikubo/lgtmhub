@@ -16,14 +16,16 @@ const FONT_PATH = path.join(process.cwd(), 'public/fonts/ArchivoBlack-Regular.tt
 
 let cachedFont: Font | null = null;
 
+function toArrayBuffer(buffer: Buffer): ArrayBuffer {
+  const copy = new ArrayBuffer(buffer.byteLength);
+  new Uint8Array(copy).set(buffer);
+  return copy;
+}
+
 function loadFont(): Font {
   if (cachedFont) return cachedFont;
   const ttf = readFileSync(FONT_PATH);
-  const arrayBuffer = ttf.buffer.slice(
-    ttf.byteOffset,
-    ttf.byteOffset + ttf.byteLength,
-  ) as ArrayBuffer;
-  cachedFont = parseFont(arrayBuffer);
+  cachedFont = parseFont(toArrayBuffer(ttf));
   return cachedFont;
 }
 

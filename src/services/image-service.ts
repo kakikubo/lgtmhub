@@ -48,9 +48,15 @@ function shuffle<T>(items: readonly T[]): T[] {
   const result = [...items];
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    // tuple 代入の推論が各要素を `T | undefined` に広げるための narrowing。
-    // 同一配列内 (i, j は有効インデックス) のスワップなので実行時の型は保証済み。
-    [result[i], result[j]] = [result[j] as T, result[i] as T];
+    // noUncheckedIndexedAccess 下では result[i] が T | undefined になる。
+    // i / j は 0..length-1 なので実行時は必ず要素がある。
+    const current = result[i];
+    const swapWith = result[j];
+    if (current === undefined || swapWith === undefined) {
+      continue;
+    }
+    result[i] = swapWith;
+    result[j] = current;
   }
   return result;
 }
