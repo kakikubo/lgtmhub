@@ -78,9 +78,9 @@ export default async function ImageDetailPage({ params }: ImageDetailPageProps) 
   const [imageResult, userResult] = await Promise.all([
     buildImageService(supabase)
       .getImageDetail(id)
-      .catch((err: unknown) => {
+      .catch((err: unknown): PublicLgtmImageDetail | null => {
         console.error('[ImageDetailPage] failed to load image', err);
-        return null as PublicLgtmImageDetail | null;
+        return null;
       }),
     supabase.auth.getUser(),
   ]);
