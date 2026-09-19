@@ -112,6 +112,29 @@ pnpm run db:reset
 
 > **本番では `E2E_TEST_MODE` を絶対に設定しないでください**。`/api/auth/test-signin` は `E2E_TEST_MODE === 'true'` のときのみ email/password sign-in を許可します。未設定なら 403 を返すだけの無害なルートとして振る舞います。
 
+### Cursor Cloud Agent
+
+Cloud Agent 向けの環境はリポジトリの `.cursor/environment.json` で管理する（個人ダッシュボードより優先）。
+
+| フェーズ | スクリプト | 内容 |
+|----------|------------|------|
+| install | `.cursor/install.sh` | Node 24 を PATH 先頭に置き、`pnpm install --frozen-lockfile --ignore-scripts` → `pnpm rebuild` |
+| start | `.cursor/start.sh` | Docker（`fuse-overlayfs`）起動、ネスト Docker 向け `FORWARD` 修正、`supabase start`、`.env.local` 生成 |
+
+`--ignore-scripts` は `prepare`（`lefthook install`）が Cursor 管理の `core.hooksPath` と競合するため。ネイティブモジュールは `pnpm rebuild` で復元する。
+
+ネスト Docker では legacy `iptables` の `FORWARD` が `DROP` のままだとコンテナ間通信が落ち、`realtime` マイグレーションがタイムアウトすることがある。`start.sh` が `FORWARD ACCEPT` と bridge-nf 無効化を行う。詳細は `AGENTS.md` の「Cursor Cloud specific instructions」を参照。
+
+Cloud 上での e2e:
+
+```bash
+set -a; source .env.local; set +a
+export E2E_TEST_MODE=true
+pnpm run test:e2e
+```
+
+（`start` が書く `.env.local` には `E2E_TEST_MODE` を含めない。）
+
 ### コミット時の自動チェック (lefthook + Biome)
 
 `pnpm install` 後、`prepare` スクリプト(`lefthook install`)により `.git/hooks/pre-commit` が配置されます。`git commit` 時にステージ済みのファイル(`*.{js,jsx,ts,tsx,json,jsonc,css}`)に対して `biome check --write` が走り、整形差分の再ステージと lint エラー時のコミット中断を自動で行います。

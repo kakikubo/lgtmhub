@@ -1,0 +1,11 @@
+{
+  "name": "lgtmhub",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "ports": [
+    { "name": "Next.js", "port": 3000 },
+    { "name": "Supabase API", "port": 54321 },
+    { "name": "Supabase DB", "port": 54322 },
+    { "name": "Supabase Studio", "port": 54323 }
+  ]
+}
