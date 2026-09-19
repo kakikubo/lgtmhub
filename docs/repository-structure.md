@@ -183,7 +183,7 @@ lgtmhub/
 ├── package.json
 ├── playwright.config.ts
 ├── pnpm-lock.yaml
-├── pnpm-workspace.yaml         # pnpm の allowBuilds 等の設定
+├── pnpm-workspace.yaml         # pnpm の allowBuilds / minimumReleaseAge 等の設定
 ├── postcss.config.mjs          # Tailwind CSS の PostCSS プラグイン設定
 ├── proxy.ts                    # Supabase セッションリフレッシュ（cookies 伝播、旧 middleware.ts）
 ├── renovate.json               # 依存更新の自動 PR 設定
@@ -435,7 +435,7 @@ tests/
 | `postcss.config.mjs` | Tailwind CSS 4.x の PostCSS プラグイン設定 |
 | `components.json` | shadcn/ui CLI の生成設定（`components/ui/` の出力先・エイリアス） |
 | `lefthook.yml` | Git hooks 設定（コミット時に Biome を実行） |
-| `pnpm-workspace.yaml` | pnpm の `allowBuilds` 等の設定 |
+| `pnpm-workspace.yaml` | pnpm の `allowBuilds` / `minimumReleaseAge`（24h）等の設定 |
 | `vercel.json` | Vercel のビルド・関数設定 |
 | `codecov.yml` | Codecov のカバレッジ集計・ステータス設定 |
 | `renovate.json` | 依存更新の自動 PR 設定 |

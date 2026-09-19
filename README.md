@@ -22,7 +22,7 @@ LGTM 画像を GitHub 上のコードレビューに気軽に貼り付けられ�
 | ツール | バージョン | 備考 |
 |--------|-----------|------|
 | Node.js | v24.x | mise / nvm 等でバージョン管理推奨 |
-| pnpm | 10.x | Corepack 経由で利用(`corepack enable`)。バージョンは `package.json` の `packageManager` で固定 |
+| pnpm | 12.x | Corepack 経由で利用(`corepack enable`)。バージョンは `package.json` の `packageManager` で固定。公開から 24h 未満の npm パッケージは `minimumReleaseAge` で install 拒否 |
 | Docker | 最新 | Supabase Local 起動に必要 |
 
 開発環境は devcontainer での起動も可能(`.devcontainer/devcontainer.json` 参照)。

@@ -7,6 +7,7 @@
     ":timezone(Asia/Tokyo)"
   ],
   "schedule": ["before 9am on monday"],
+  "internalChecksFilter": "strict",
   "automergeStrategy": "squash",
   "lockFileMaintenance": {
     "enabled": true,
@@ -19,6 +20,10 @@
     "automerge": false
   },
   "packageRules": [
+    {
+      "matchDatasources": ["npm"],
+      "minimumReleaseAge": "24 hours"
+    },
     {
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "automerge": true,
