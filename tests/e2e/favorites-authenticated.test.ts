@@ -20,6 +20,19 @@ const FIXTURE_ORIGINAL_URL = 'https://example.com/e2e-favorites-fixture.png';
 // public/ の実ファイルを相対パスで指す。next/image の remotePatterns 設定に依存せず、
 // 画像の中身ではなく DOM の状態だけを検証するため何でもよい。
 const FIXTURE_IMAGE_URL = '/default-avatar.svg';
+// ダミー pHash (Issue #345)。
+// この値は POST /api/images の重複判定 (src/services/image-service.ts の isDuplicate) で
+// 必ず比較対象になるため、「固定値なら何でもよい」わけではない。
+// * 長さは src/lib/image/calculate-phash.ts の PHASH_LENGTH (32*32 = 1024) と一致させる。
+//   ズレると hammingDistance が throw し、登録 API が 500 になる
+// * '1' の繰り返しは使わない。calculatePHash は `value >= avg` でビット化するため
+//   単色画像の pHash が全ビット '1' になり、DUPLICATE_THRESHOLD (10) 以内に収まって
+//   409 (重複) を誤爆させる
+// * ブロック状のパターン ('0'×512 + '1'×512 など) も使わない。上下で明暗が分かれた画像の
+//   pHash がまさにその形になるため、実画像と一致しうる
+// 周期 4 の 0011 パターンなら、実画像 (単色 / 左右 2 分割 / 上下 2 分割) とも
+// supabase/seed.sql のフィクスチャとも距離が 511 以上離れる (実測)。
+const FIXTURE_P_HASH = '0011'.repeat(256);
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -76,8 +89,7 @@ test.describe('お気に入り (ログイン済み)', () => {
         uploader_id: userId,
         original_url: FIXTURE_ORIGINAL_URL,
         image_url: FIXTURE_IMAGE_URL,
-        // pHash の重複判定は POST /api/images 経由の登録でしか走らないため固定値でよい
-        p_hash: '1'.repeat(1024),
+        p_hash: FIXTURE_P_HASH,
         width: 266,
         height: 199,
         file_size_bytes: 1024,
