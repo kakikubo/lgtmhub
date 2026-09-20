@@ -22,3 +22,4 @@ overrides:
   sharp: ^0.35.3 # libvips 由来 CVE-2026-33327/33328/35590/35591 (直接依存は既に 0.35 系)
   fast-uri: ^4.0.0 # バックスラッシュ authority 区切りによる host confusion
   brace-expansion: ^5.0.8 # 展開長が無制限で OOM クラッシュする DoS
+  smol-toml: ^1.7.1 # 不正な TOML による DoS (GHSA-7w5x-hrqm-74c2)。markdownlint-cli2 が 1.7.0 を固定ピンしている
