@@ -172,6 +172,7 @@ lgtmhub/
 ├── .gitignore
 ├── .npmrc                      # pnpm の挙動設定
 ├── .coderabbit.yaml            # CodeRabbit レビュー設定
+├── .markdownlint-cli2.jsonc    # markdownlint 設定（docs/ の Markdown lint）
 ├── biome.json                  # Biome (Linter + Formatter) 設定
 ├── codecov.yml                 # Codecov のカバレッジ設定
 ├── components.json             # UIプリミティブ生成ツールの設定
@@ -220,9 +221,9 @@ lgtmhub/
 - 依存禁止: `src/repositories/`（Service Layerを経由する）
 
 **例**:
-```
-app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositories/image-repository.ts
 ```text
+app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositories/image-repository.ts
+```
 
 **例外: `app/api/auth/callback/route.ts`**:
 - GitHub OAuth のコールバック処理のみを担い、Supabase Auth のセッション確立に必要な `src/lib/supabase/server.ts` を直接利用する
@@ -439,6 +440,7 @@ tests/
 | `vitest.config.ts` | Vitestテスト設定 |
 | `playwright.config.ts` | Playwrightテスト設定 |
 | `biome.json` | Biome (Linter + Formatter) 設定 |
+| `.markdownlint-cli2.jsonc` | markdownlint 設定（`docs/**/*.md` を検査。CI と CodeRabbit が共有） |
 | `postcss.config.mjs` | Tailwind CSS 4.x の PostCSS プラグイン設定 |
 | `components.json` | shadcn/ui CLI の生成設定（`components/ui/` の出力先・エイリアス） |
 | `lefthook.yml` | Git hooks 設定（コミット時に Biome を実行） |
@@ -578,11 +580,11 @@ tests/integration/reports/report-flow.test.ts
 
 ### 機能8: 削除画像の物理クリーンアップ
 
-```
+```text
 src/services/cleanup-service.ts                 # deleted_at から30日経過した画像のBlob/DB削除
 .github/workflows/cleanup.yml                   # 日次クリーンアップジョブ
 tests/unit/services/cleanup-service.test.ts
-```text
+```
 
 ### 機能9: ファイルアップロード対応
 
