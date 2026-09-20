@@ -1,9 +1,9 @@
 import { revalidateTag } from 'next/cache';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { HOME_IMAGES_CACHE_TAG } from '@/src/lib/cache/list-home-images';
 import { AppError, ForbiddenError, NotFoundError, UnauthorizedError } from '@/src/lib/errors';
 import { createClient } from '@/src/lib/supabase/server';
+import { HOME_IMAGES_CACHE_TAG } from '@/src/services/cache/list-home-images';
 import { buildImageService } from '@/src/services/image-service';
 
 const paramsSchema = z.object({ id: z.string().uuid() });

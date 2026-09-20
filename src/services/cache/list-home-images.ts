@@ -9,6 +9,9 @@ export const HOME_IMAGES_CACHE_TAG = 'lgtm-images:list';
  * 投稿/削除時に `revalidateTag(HOME_IMAGES_CACHE_TAG, 'max')` で破棄する。
  * cursor 付き (LoadMoreButton 経由) はキャッシュ対象外。
  *
+ * ImageService を呼ぶため `src/lib/` ではなく Service 層に置く（lib → services の逆依存を避ける）。
+ * `'use cache'` / `next/cache` への依存は `src/services/cache/` に隔離する。
+ *
  * `'use cache'` 配下では `cookies()` を呼べない (= Cookie 連携の `createServerClient` は使えない) ため、
  * Cookie に依存しない `createAnonClient` を採用する。RLS の `"anyone can view active images"` ポリシーで
  * anon ロールから `status='active'` の SELECT が許可されている。

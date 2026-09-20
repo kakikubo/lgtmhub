@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HOME_IMAGES_CACHE_TAG } from '@/src/lib/cache/list-home-images';
 import {
   AppError,
   BadRequestError,
@@ -11,6 +10,7 @@ import {
   createImageErrorResponseSchema,
   createImageResponseSchema,
 } from '@/src/lib/validation/image';
+import { HOME_IMAGES_CACHE_TAG } from '@/src/services/cache/list-home-images';
 
 const createClient = vi.fn();
 const buildImageService = vi.fn();
@@ -20,7 +20,8 @@ vi.mock('next/cache', () => ({
   // 他の route テストと違い可変長で受ける。POST は revalidateTag(tag, 'max') と
   // 第 2 引数を渡しており、プロファイル指定まで検証したいため (app/api/CLAUDE.md)
   revalidateTag: (...args: unknown[]) => revalidateTag(...args),
-  unstable_cache: <T extends (...args: unknown[]) => unknown>(fn: T) => fn,
+  cacheTag: vi.fn(),
+  cacheLife: vi.fn(),
 }));
 
 vi.mock('@/src/lib/supabase/server', () => ({

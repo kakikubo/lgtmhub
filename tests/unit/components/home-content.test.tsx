@@ -10,7 +10,7 @@ vi.mock('@/src/lib/supabase/server', () => ({
   createClient: async () => ({ auth: { getUser } }),
 }));
 
-vi.mock('@/src/lib/cache/list-home-images', () => ({
+vi.mock('@/src/services/cache/list-home-images', () => ({
   getHomeImagesInitial: () => getHomeImagesInitial(),
   HOME_IMAGES_CACHE_TAG: 'lgtm-images:list',
 }));

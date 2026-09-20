@@ -252,7 +252,7 @@ Next.js 16 の **Cache Components**（Next.js 15 までの実験的 PPR を安�
 
 - **有効化**: `next.config.ts` で `cacheComponents: true`（グローバルフラグ。Next.js 15 の `experimental.ppr` / ルート単位の `experimental_ppr` は廃止）
 - **トップページ（`app/(site)/`）**: ページ骨格・ヒーロー文言・グリッドスケルトンを静的シェルとしてビルド時にプリレンダーし、エッジキャッシュから即時配信する。`Header`（認証依存・動的）と `HomeContent`（画像一覧）は `<Suspense>` 境界でストリーミングする
-- **初期画像一覧のキャッシュ**: `src/lib/cache/list-home-images.ts` の `getHomeImagesInitial` を `'use cache'` ディレクティブ化する。
+- **初期画像一覧のキャッシュ**: `src/services/cache/list-home-images.ts` の `getHomeImagesInitial` を `'use cache'` ディレクティブ化する。
   - `cacheTag('lgtm-images:list')` でタグ付け、`cacheLife('max')` で寿命を最長化
   - 無効化は `revalidateTag('lgtm-images:list', 'max')` に委ねる（第2引数のプロファイル必須）
   - `'use cache'` 配下では `cookies()` を呼べないため、Cookie 非依存の `createAnonClient` を採用

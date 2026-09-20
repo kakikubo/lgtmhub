@@ -1,7 +1,7 @@
 import { HomeImages } from '@/components/home-images';
 import { signInWithGithub } from '@/src/lib/auth/actions';
-import { getHomeImagesInitial } from '@/src/lib/cache/list-home-images';
 import { createClient } from '@/src/lib/supabase/server';
+import { getHomeImagesInitial } from '@/src/services/cache/list-home-images';
 import type { PublicLgtmImage } from '@/src/types/image';
 
 export async function HomeContent() {
