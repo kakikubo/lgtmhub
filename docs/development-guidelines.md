@@ -495,9 +495,9 @@ https://lgtmhub-git-*-kakikubos-projects.vercel.app/**
 
 個別デプロイ URL（`lgtmhub-<hash>-kakikubos-projects.vercel.app`）も使う場合は、合わせて以下も登録する:
 
-```
+```text
 https://lgtmhub-*-kakikubos-projects.vercel.app/**
-```
+```text
 
 - `*` は単一サブドメインセグメント、`**` は複数セグメント（パス含む）にマッチする
 - **Site URL は本番ドメインのまま変更しない**（変更すると本番のフォールバックが Preview 側に流れて事故になる）
@@ -547,7 +547,7 @@ main（本番環境）
 
 グローバル設定（`~/.claude/rules/commit-style.md`）に従う。
 
-```
+```text
 <1行目: 日本語で変更内容を簡潔に>
 
 - <変更点1>
@@ -557,7 +557,7 @@ main（本番環境）
 
 **例**:
 
-```
+```text
 画像登録APIを実装
 
 - POST /api/images のRoute Handlerを作成
@@ -571,7 +571,7 @@ LGTM文字合成ロジックを実装
 - Sharp SVGオーバーレイで白文字+黒縁のLGTM文字を合成
 - WebP変換と長辺 400px へのリサイズ（元アスペクト比保持）を実施
 - 合成後の画像バッファをunit testで検証
-```
+```text
 
 **注意**:
 - `Co-Authored-By` 行は含めない（グローバル設定）
@@ -584,7 +584,7 @@ LGTM文字合成ロジックを実装
 
 **1PR = 1つの関心事**。「このPRは何をするPRか？」を一言で説明できること。
 
-```
+```text
 ✅ 良いPR例
 - 「画像登録APIを実装」
 - 「お気に入り追加・解除機能を実装」
@@ -593,7 +593,7 @@ LGTM文字合成ロジックを実装
 ❌ 混在している例
 - 「画像登録APIと管理者削除機能とお気に入りを実装」
   → 3つの機能を分割すること
-```
+```text
 
 **PRの大きさの目安**:
 - 変更ファイル数: 10ファイル以内を推奨
@@ -641,7 +641,7 @@ PR の作成・更新時に GitHub Actions（`.github/workflows/danger.yml`）�
   /----------\
  / ユニット   \  多（Vitest、高速）
 /--------------\
-```
+```text
 
 **比率目標**: ユニット 70% / 統合 20% / E2E 10%
 

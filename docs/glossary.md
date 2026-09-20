@@ -431,7 +431,7 @@ export const createImageSchema = z.object({
 
 **本プロジェクトでの適用**:
 
-```
+```text
 Presentation Layer (app/)
     ↓
 API Layer (app/api/)
@@ -804,7 +804,7 @@ if (image.uploaderId !== requesterId && !requester.isAdmin) {
 **本プロジェクトでの用途**: pHashの類似度判定。
 
 **計算式**:
-```
+```text
 HammingDistance(a, b) = count(i for i in 0..len(a) if a[i] != b[i])
 ```
 

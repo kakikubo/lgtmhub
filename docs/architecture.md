@@ -39,7 +39,7 @@
 
 ### レイヤードアーキテクチャ（Next.js App Router）
 
-```
+```text
 ┌──────────────────────────────────────────────┐
 │  Presentation Layer                          │
 │  (Server Components / Client Components)     │ ← UI、ユーザー入力
@@ -77,7 +77,7 @@
 
 ### 依存関係の方向
 
-```
+```text
 Presentation → API → Service → Data
             ↘ Service（Server Component直接呼び出しのみOK）
 ```

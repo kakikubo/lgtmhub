@@ -212,7 +212,7 @@ stateDiagram-v2
 
 ### 画像一覧取得
 
-```
+```text
 GET /api/images
 ```
 
@@ -250,7 +250,7 @@ GET /api/images
 
 ### 画像ランダム取得（Issue #109）
 
-```
+```text
 GET /api/images/random
 ```
 
@@ -287,7 +287,7 @@ GET /api/images/random
 
 ### 画像登録
 
-```
+```text
 POST /api/images
 ```
 
@@ -331,7 +331,7 @@ POST /api/images
 
 ### 画像削除
 
-```
+```text
 DELETE /api/images/:id
 ```
 
@@ -358,7 +358,7 @@ DELETE /api/images/:id
 
 ### 画像再生成（管理者限定 / Issue #195）
 
-```
+```text
 POST /api/images/:id/regenerate
 ```
 
@@ -402,7 +402,7 @@ POST /api/images/:id/regenerate
 
 ### お気に入り追加（PRD機能 4-A）
 
-```
+```text
 POST /api/favorites
 ```
 
@@ -436,7 +436,7 @@ POST /api/favorites
 
 ### お気に入り解除（PRD機能 4-A）
 
-```
+```text
 DELETE /api/favorites/:lgtmImageId
 ```
 
@@ -456,7 +456,7 @@ DELETE /api/favorites/:lgtmImageId
 
 ### お気に入り一覧取得（PRD機能 4-B）
 
-```
+```text
 GET /api/favorites
 ```
 
@@ -502,7 +502,7 @@ GET /api/favorites
 
 ### お気に入り済み画像 ID 一覧（PRD機能 4-A の補助）
 
-```
+```text
 GET /api/favorites/ids
 ```
 
@@ -701,7 +701,7 @@ async function composeLgtmImage(imageBuffer: Buffer): Promise<Buffer> {
 
 ### 画像登録画面
 
-```
+```text
 ┌─────────────────────────────────────┐
 │ 画像URLを入力してください              │
 │ ┌───────────────────────────────┐   │
@@ -725,7 +725,7 @@ async function composeLgtmImage(imageBuffer: Buffer): Promise<Buffer> {
 
 ### ページ構成（App Router）
 
-```
+```text
 app/
 ├── (site)/                     # 画面ルートグループ（共通レイアウト）
 │   ├── layout.tsx              # ヘッダー等の共通レイアウト
