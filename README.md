@@ -105,7 +105,12 @@ pnpm run db:reset
    supabase status -o json | jq -r '"SUPABASE_SERVICE_ROLE_KEY=\(.SERVICE_ROLE_KEY)"' >> .env.local
    echo "E2E_TEST_MODE=true" >> .env.local
    ```
-3. E2E 実行:
+3. シードデータの適用 (一覧系の E2E が前提にする決定的なフィクスチャ):
+   ```bash
+   # 注意: db:reset はローカル DB を作り直すため、開発中に登録した画像・ユーザーは全て消えます
+   pnpm run db:reset
+   ```
+4. E2E 実行:
    ```bash
    pnpm run test:e2e
    ```

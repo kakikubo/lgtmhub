@@ -2,6 +2,12 @@
 
 - マイグレーション追加後は `pnpm run db:types` で src/types/database.types.ts を再生成し、
   同じコミットに含める
+- `seed.sql` は e2e / ローカル開発が前提にする決定的なフィクスチャ (Issue #279)。
+  適用は `supabase start` / `supabase db reset` のみで、本番 / Preview には流れない。
+  TypeScript 側の対応定数は `tests/e2e/fixtures/seed-images.ts`。両方を揃えて変更すること。
+  `auth.users` へ直接 INSERT する行は `confirmation_token` / `recovery_token` /
+  `email_change_token_new` / `email_change` を `''` で埋める (DEFAULT が無く、NULL のままだと
+  GoTrue の Admin API が `Database error finding users` で落ちる)
 - 本番と Preview は別 Supabase プロジェクト。main マージで本番へ自動 deploy される。
   PR 段階で Preview に先行適用するには apply-preview-migration ラベルを使い、
   他の PR とは直列に適用する。PR を未マージで close した場合、Preview に適用済みの

@@ -785,9 +785,47 @@ GitHub OAuth 全体を E2E に含めるのは外部 IDP に依存して不安定
 2. `playwright.config.ts` の `chromium` プロジェクトの `testIgnore` と `authenticated` プロジェクトの `testMatch` の両方に正規表現を追加する
 3. テスト本体は通常の `test('...', async ({ page }) => { ... })` で書ける (storageState はプロジェクト設定で適用済み)
 
+#### シードデータ前提と「条件付き skip」の禁止 (Issue #279)
+
+E2E は **`supabase/seed.sql` が投入する決定的なフィクスチャが存在する前提**で書き、
+`test.skip()` によるデータ有無の分岐を書きません。
+
+かつては「`image-grid` が出ていなければ `test.skip()`」というガードを各テストに置いていましたが、
+CI の Supabase Local は空 DB で起動するため **全テストが何もアサートせず緑になっていました**
+(サイレント no-op)。テストが緑でも回帰を一切検出できない状態です。
+
+仕組み:
+
+- `supabase/seed.sql` が専用の投稿者 (`auth.users` → トリガーで `user_profiles`) と
+  `lgtm_images` 5 件を固定 UUID / 固定 `created_at` で投入する
+- 適用タイミングは `supabase start` / `supabase db reset`。CI は
+  `supabase start` → `pnpm run build` → Playwright の順に動くため、**ビルド前**にデータが揃う。
+  トップページの一覧は `'use cache'` + `cacheLife('max')` なので、ビルド後に DB へ直接 INSERT しても
+  反映されない恐れがある（だから globalSetup でのランタイム投入ではなく seed.sql を使う）
+- TypeScript 側の ID / URL は `tests/e2e/fixtures/seed-images.ts` に定数化する
+- シードユーザーは globalSetup が毎回作り直す e2e テストユーザーとは **別人**。
+  テストユーザー削除の cascade でフィクスチャが消えないようにするため
+- `auth.users` へ直接 INSERT するときは `confirmation_token` / `recovery_token` /
+  `email_change_token_new` / `email_change` を `''` で埋める。DEFAULT が無く NULL のままだと
+  GoTrue の Admin API が `Database error finding users` で落ちる
+
+ルール:
+
+- データ有無・状態依存の `test.skip()` は書かない。CI では
+  `tests/e2e/reporters/fail-on-skip.ts` が skip 1 件でも e2e ジョブを落とす
+  (`playwright.config.ts` で `process.env.CI` のときだけ有効化。ローカルのデバッグ目的の skip は許容)
+- 0 件表示などの「データが無い状態」を検証したいときは、実データ依存ではなく
+  **明示的に空状態を作るテストとして分離する**
+  (例: `page.route` で `/api/images/random` を 0 件応答にモックする)
+- トップページは Suspense でストリーミングされるため、`goto('/')` 直後の
+  `isVisible()` は skeleton 段階で false になる。`await expect(grid).toBeVisible()` で
+  状態が確定するまで待ってから操作する
+
 **データを前提とするシナリオ (Issue #198)**:
 
-CI の Supabase Local はデータ空で起動するため、既存データに依存するテストは常に skip されて意味を持ちません。「登録 → 一覧 → 解除」のように **データがあることが本質** のシナリオは、テスト自身がフィクスチャを投入します。手本は `tests/e2e/favorites-authenticated.test.ts`:
+一覧に出ていればよいだけのテストは上記のシードデータで足ります。一方で「登録 → 一覧 → 解除」のように
+**テストが自分で状態を作り、後始末まで責任を持つことが本質** のシナリオは、テスト自身が
+フィクスチャを投入します。手本は `tests/e2e/favorites-authenticated.test.ts`:
 
 - `beforeAll` で `signInWithPassword` したクライアントから `lgtm_images` へ直接 INSERT する。外部 URL 取得を伴う `POST /api/images` は e2e から叩けないため
 - **service_role は使わない**。本リポジトリの Supabase では service_role にテーブル権限が無く、PostgREST が `42501 permission denied` を返す。RLS ポリシー経由 (`authenticated`) なら本番と同じ経路で書き込める
@@ -800,6 +838,7 @@ CI の Supabase Local はデータ空で起動するため、既存データに�
 - `/api/auth/test-signin` は `process.env.E2E_TEST_MODE === 'true'` かつ `process.env.VERCEL_ENV !== 'production'` のときのみ動く。本番では未設定にする (Vercel の本番デプロイ環境変数に絶対に追加しないこと)。Vercel 本番では `E2E_TEST_MODE=true` が混入しても 403 を返す。CI e2e の `pnpm start` (`NODE_ENV=production`) は `VERCEL_ENV` 未設定のため引き続き利用できる
 - `tests/e2e/.auth/` は `.gitignore` 済み。CI では globalSetup が毎回再生成する
 - ローカル実行には `.env.local` に `SUPABASE_SERVICE_ROLE_KEY` と `E2E_TEST_MODE=true` を追加する必要がある (詳しくは README 参照)
+- ローカルでシードデータが入っていないと一覧系のテストが落ちる。`pnpm run db:reset` で `supabase/seed.sql` を適用してから実行する
 
 ---
 
