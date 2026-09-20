@@ -7,7 +7,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  // CI では skip 0 を機械的に強制する (Issue #279)。条件付き test.skip() が再混入すると
+  // 何もアサートしないまま緑になるため、reporter 側で失敗させる。
+  reporter: process.env.CI ? [['html'], ['./tests/e2e/reporters/fail-on-skip.ts']] : [['html']],
   // ログイン済み storageState を生成する。webServer 起動 → globalSetup → 各 project の順で動く。
   globalSetup: './tests/e2e/global-setup.ts',
   use: {

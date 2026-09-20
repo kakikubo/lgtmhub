@@ -24,14 +24,10 @@ test.describe('お気に入り (未ログイン)', () => {
   test('一覧カードのハートは未ログインでも表示される', async ({ page }) => {
     await page.goto('/');
 
+    // Issue #279: supabase/seed.sql の決定的なフィクスチャがあるので grid は必ず出る。
+    // goto 直後は skeleton のことがあるため、可視になるまで待ってから判定する。
     const grid = page.getByTestId('image-grid');
-    const empty = page.getByTestId('image-list-empty');
-    const error = page.getByTestId('image-list-error');
-    // 状態が確定してから判定する (goto 直後は skeleton で grid が未表示のため)
-    await expect(grid.or(empty).or(error)).toBeVisible();
-    if ((await empty.count()) > 0 || (await error.count()) > 0) {
-      test.skip(true, '画像が無い (empty / error state) ため検証をスキップ');
-    }
+    await expect(grid).toBeVisible();
 
     const favorite = grid.getByTestId('favorite-button').first();
     await expect(favorite).toHaveAttribute('data-favorite-state', 'off');

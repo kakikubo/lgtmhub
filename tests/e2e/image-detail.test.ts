@@ -1,16 +1,14 @@
 import { expect, test } from '@playwright/test';
+import { SEED_IMAGES, SEED_UPLOADER } from './fixtures/seed-images';
+
+// Issue #279: 以前は一覧が空 / エラーのとき test.skip() していたため、CI では
+// 何もアサートされていなかった。supabase/seed.sql の決定的なフィクスチャを前提に無条件で検証する。
+
+const SEED_IMAGE = SEED_IMAGES[0];
 
 test.describe('画像詳細ページ', () => {
   test('一覧の先頭サムネイルから /images/{uuid} に遷移する', async ({ page }) => {
     await page.goto('/');
-
-    // 一覧が空 (CI placeholder env / 開発初期) の場合は遷移できないのでスキップする。
-    // image-list.test.ts と同じく「データ有無に依存しない」方針
-    const empty = page.getByTestId('image-list-empty');
-    const error = page.getByTestId('image-list-error');
-    if ((await empty.count()) > 0 || (await error.count()) > 0) {
-      test.skip();
-    }
 
     const firstLink = page.getByTestId('image-card-link').first();
     await expect(firstLink).toBeVisible();
@@ -37,23 +35,15 @@ test.describe('画像詳細ページ', () => {
 
   // Issue #128: 投稿者情報を一覧から詳細ページへ移動。詳細ページでは
   // 「投稿者： アバター 表示名」が必ず描画される (fallback でも Unknown + デフォルトアバター)。
-  // データ有無に依存しないよう、image-list.test.ts と同じく「empty/error のときはスキップ」パターン。
+  // 投稿者を決め打ちで検証するため、一覧経由ではなくシード画像へ直接遷移する。
   test('詳細ページに投稿者行 (アバター + 表示名) が表示される', async ({ page }) => {
-    await page.goto('/');
-
-    const empty = page.getByTestId('image-list-empty');
-    const error = page.getByTestId('image-list-error');
-    if ((await empty.count()) > 0 || (await error.count()) > 0) {
-      test.skip();
-    }
-
-    const firstLink = page.getByTestId('image-card-link').first();
-    await firstLink.click();
+    await page.goto(`/images/${SEED_IMAGE.id}`);
     await expect(page.getByTestId('image-detail-page')).toBeVisible();
 
     const uploader = page.getByTestId('image-detail-uploader');
     await expect(uploader).toBeVisible();
     await expect(uploader).toContainText('投稿者：');
+    await expect(uploader).toContainText(SEED_UPLOADER.displayName);
     // アバター画像は装飾扱いの alt="" だが、src は必ず付く
     await expect(uploader.locator('img')).toHaveAttribute('src', /.+/);
   });
@@ -65,30 +55,18 @@ test.describe('画像詳細ページ', () => {
   test('投稿者プロフィール取得済みのとき、アバターと表示名は同じ GitHub プロフィールへの新規タブリンクになる', async ({
     page,
   }) => {
-    await page.goto('/');
-
-    const empty = page.getByTestId('image-list-empty');
-    const error = page.getByTestId('image-list-error');
-    if ((await empty.count()) > 0 || (await error.count()) > 0) {
-      test.skip();
-    }
-
-    const firstLink = page.getByTestId('image-card-link').first();
-    await firstLink.click();
+    await page.goto(`/images/${SEED_IMAGE.id}`);
     await expect(page.getByTestId('image-detail-page')).toBeVisible();
 
     const uploader = page.getByTestId('image-detail-uploader');
-    const fallback = await uploader.getAttribute('data-fallback');
-    if (fallback !== 'false') {
-      test.skip(true, 'profile が取得できなかったため (fallback) 検証をスキップ');
-    }
+    // シード画像の投稿者は user_profiles を持つので fallback にはならない
+    await expect(uploader).toHaveAttribute('data-fallback', 'false');
 
     const anchors = uploader.locator('a');
     await expect(anchors).toHaveCount(1);
 
     const anchor = anchors.first();
-    const href = await anchor.getAttribute('href');
-    expect(href).toMatch(/^https:\/\/github\.com\/.+/);
+    await expect(anchor).toHaveAttribute('href', SEED_UPLOADER.profileUrl);
     await expect(anchor).toHaveAttribute('target', '_blank');
     const rel = (await anchor.getAttribute('rel')) ?? '';
     expect(rel).toContain('noopener');
@@ -96,6 +74,6 @@ test.describe('画像詳細ページ', () => {
 
     // 同じリンク内にアバター画像と表示名が両方含まれる (= アイコンクリックでも遷移できる)
     await expect(anchor.locator('img')).toHaveAttribute('src', /.+/);
-    await expect(anchor).toContainText(/.+/);
+    await expect(anchor).toContainText(SEED_UPLOADER.displayName);
   });
 });
