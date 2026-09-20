@@ -1,6 +1,5 @@
 import { revalidateTag } from 'next/cache';
 import { type NextRequest, NextResponse } from 'next/server';
-import { HOME_IMAGES_CACHE_TAG } from '@/src/lib/cache/list-home-images';
 import {
   AppError,
   BadRequestError,
@@ -11,6 +10,7 @@ import {
 import { createAnonClient } from '@/src/lib/supabase/anon';
 import { createClient } from '@/src/lib/supabase/server';
 import { createImageRequestSchema, listImagesQuerySchema } from '@/src/lib/validation/image';
+import { HOME_IMAGES_CACHE_TAG } from '@/src/services/cache/list-home-images';
 import { buildImageService } from '@/src/services/image-service';
 
 // アニメーション GIF → アニメーション WebP の同期合成は最大 150 フレーム ×

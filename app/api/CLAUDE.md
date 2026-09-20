@@ -14,6 +14,6 @@ service を呼ぶ。参照: app/api/images/route.ts
   UnauthorizedError→401, ForbiddenError→403, BadRequestError→400, AppError→500)。
   error.code 文字列では分岐しない
 - 'use cache' + cacheTag されたデータを変更する route は revalidateTag を呼ぶ。
-  呼び忘れるとトップの一覧が古いまま残る。参照: src/lib/cache/list-home-images.ts
+  呼び忘れるとトップの一覧が古いまま残る。参照: src/services/cache/list-home-images.ts
 - cacheComponents 有効下で動的であるべき route は先頭で connection() を呼んで
   prerender を抑止する。参照: app/api/images/random/route.ts

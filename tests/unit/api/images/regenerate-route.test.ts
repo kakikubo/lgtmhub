@@ -14,7 +14,8 @@ const revalidateTag = vi.fn();
 
 vi.mock('next/cache', () => ({
   revalidateTag: (tag: string) => revalidateTag(tag),
-  unstable_cache: <T extends (...args: unknown[]) => unknown>(fn: T) => fn,
+  cacheTag: vi.fn(),
+  cacheLife: vi.fn(),
 }));
 
 vi.mock('@/src/lib/supabase/server', () => ({

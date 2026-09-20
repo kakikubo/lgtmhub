@@ -9,10 +9,10 @@ const revalidateTag = vi.fn();
 
 vi.mock('next/cache', () => ({
   revalidateTag: (tag: string) => revalidateTag(tag),
-  // 本テストでは getHomeImagesInitial を呼ばないが、
-  // route が `@/src/lib/cache/list-home-images` 経由で unstable_cache を初期化するため、
-  // パススルー実装を提供する
-  unstable_cache: <T extends (...args: unknown[]) => unknown>(fn: T) => fn,
+  // route が HOME_IMAGES_CACHE_TAG を `@/src/services/cache/list-home-images` から
+  // import するため、同モジュールが読む next/cache の API をモックする
+  cacheTag: vi.fn(),
+  cacheLife: vi.fn(),
 }));
 
 vi.mock('@/src/lib/supabase/server', () => ({

@@ -43,7 +43,9 @@ lgtmhub/
 │   ├── services/               # Service Layer（ビジネスロジック）
 │   │   ├── image-service.ts
 │   │   ├── favorite-service.ts
-│   │   └── user-profile-service.ts
+│   │   ├── user-profile-service.ts
+│   │   └── cache/
+│   │       └── list-home-images.ts # トップページ一覧のキャッシュ境界
 │   ├── repositories/           # Data Layer（DB・Blob アクセス）
 │   │   ├── image-repository.ts
 │   │   ├── favorite-repository.ts
@@ -55,8 +57,6 @@ lgtmhub/
 │   │   ├── auth/
 │   │   │   ├── actions.ts          # GitHub OAuth サインイン/アウト Server Action
 │   │   │   └── require-admin.ts    # 管理者ロールの検証
-│   │   ├── cache/
-│   │   │   └── list-home-images.ts # トップページ一覧のキャッシュ境界
 │   │   ├── image/
 │   │   │   ├── compose-lgtm.ts     # LGTM文字合成
 │   │   │   ├── calculate-phash.ts  # pHash計算
@@ -233,19 +233,22 @@ app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositori
 
 ### `src/services/` (Service Layer)
 
-**役割**: ビジネスロジックを実装する。HTTP / UIへの依存を持たない純粋なサービス層。
+**役割**: ビジネスロジックを実装する。HTTP / UIへの依存を持たない純粋なサービス層。`'use cache'` 境界だけ `src/services/cache/` に隔離し、`next/cache` への依存をここに閉じる。
 
 **配置ファイル**:
 - `image-service.ts`: 画像登録・削除・一覧取得のオーケストレーション
 - `favorite-service.ts`: お気に入りの追加・解除・一覧取得・お気に入り済み画像 ID 取得
 - `user-profile-service.ts`: ユーザープロフィールの単一 / 複数取得 (画像一覧の N+1 回避を含む)
+- `cache/list-home-images.ts`: トップページ初期一覧の `'use cache'` 境界。ImageService を呼ぶため lib ではなくここに置く
 
 **命名規則**:
 - ファイル名: `{機能名}-service.ts`（kebab-case）
 - クラス名: `ImageService`（PascalCase）
+- キャッシュ境界: `src/services/cache/{用途}.ts`（`*-service.ts` にはしない）
 
 **依存関係**:
 - 依存可能: `src/repositories/`、`src/lib/`、`src/types/`
+- `src/services/cache/` のみ追加で `next/cache` に依存してよい
 - 依存禁止: `app/`、`components/`（HTTPレスポンスやReactへの依存禁止）
 
 **例**:
@@ -253,7 +256,9 @@ app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositori
 src/services/
 ├── image-service.ts        # 画像登録（取得→検証→重複チェック→合成→保存→DB）
 ├── favorite-service.ts     # お気に入り（画像の存在検証→登録 / 解除 / 一覧）
-└── user-profile-service.ts # ユーザープロフィール取得（単一 / 複数）
+├── user-profile-service.ts # ユーザープロフィール取得（単一 / 複数）
+└── cache/
+    └── list-home-images.ts # トップページ初期一覧のキャッシュ境界
 ```
 
 ---
@@ -289,7 +294,6 @@ src/services/
 | `errors.ts` | ドメインエラークラス（`AppError` / `NotFoundError` 等）の集約。新規エラーは必ずここに追加する |
 | `utils.ts` | className 結合などフレームワーク非依存の汎用ヘルパー |
 | `auth/` | GitHub OAuth のサインイン / サインアウト Server Action、管理者ロールの検証（`require-admin.ts`） |
-| `cache/` | `cacheComponents` 前提のキャッシュ境界関数（トップページ一覧の取得など） |
 | `image/` | Sharp を使った画像合成・pHash計算・フォーマット検証 |
 | `http/` | SSRF対策付きfetch、プライベートIP検証 |
 | `profile/` | 投稿者の表示名・アバターの解決（プロフィール未取得時のフォールバック含む） |
@@ -347,7 +351,8 @@ src/services/
 
 **依存関係**:
 - 依存可能: `src/types/`、`src/lib/supabase/client.ts`（クライアントコンポーネントのみ）
-- 依存禁止: `src/services/`、`src/repositories/`（APIを経由するか Server Component 経由で渡す）
+- Server Component（例: `HomeContent`）は `src/lib/` のサーバー向けモジュールと、`src/services/cache/` のキャッシュ境界関数を import してよい。ページを同期 RSC のまま静的シェルにするため、取得処理は Suspense 境界側に残す
+- 依存禁止（クライアントコンポーネント）: `src/services/`、`src/repositories/`（APIを経由するか Server Component 経由で渡す）
 
 ---
 
@@ -396,6 +401,7 @@ tests/
 |--------|--------|
 | `src/lib/image/compose-lgtm.ts` | `tests/unit/lib/image/compose-lgtm.test.ts` |
 | `src/services/image-service.ts` | `tests/unit/services/image-service.test.ts` |
+| `src/services/cache/list-home-images.ts` | `tests/unit/services/cache/list-home-images.test.ts` |
 | `src/repositories/image-repository.ts` | `tests/unit/repositories/image-repository.test.ts` |
 | `app/api/images/route.ts` | `tests/unit/api/images/list-route.test.ts` / `create-route.test.ts` |
 | `app/api/favorites/route.ts` | `tests/unit/api/favorites/list-route.test.ts` / `create-route.test.ts` |
@@ -416,6 +422,7 @@ tests/
 | API Route Handler | `app/api/*/route.ts` | Next.js規約 | `app/api/images/route.ts` |
 | 共有Reactコンポーネント | `components/` | kebab-case.tsx | `components/image-card.tsx` |
 | ビジネスロジック | `src/services/` | kebab-case-service.ts | `src/services/image-service.ts` |
+| キャッシュ境界 | `src/services/cache/` | kebab-case.ts | `src/services/cache/list-home-images.ts` |
 | DBアクセス | `src/repositories/` | kebab-case-repository.ts | `src/repositories/image-repository.ts` |
 | 技術ユーティリティ | `src/lib/` | kebab-case.ts | `src/lib/image/compose-lgtm.ts` |
 | 型定義 | `src/types/` | kebab-case.ts | `src/types/image.ts` |
