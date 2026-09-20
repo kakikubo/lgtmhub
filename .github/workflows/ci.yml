@@ -129,6 +129,18 @@ jobs:
       # E2E_TEST_MODE は playwright.config.ts の webServer.env で webServer プロセスにのみ渡る。
       # 本番デプロイ環境変数には絶対に追加しないこと
       - run: pnpm run test:e2e
+      # 失敗時にこそ必要なため always()。HTML レポートとリトライ時の trace を残す。
+      # 成功かつリトライなしだと test-results/ が空になりうるので if-no-files-found: ignore。
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Stop Supabase Local
         if: always()
         run: supabase stop --no-backup
