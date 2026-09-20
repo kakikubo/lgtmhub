@@ -852,6 +852,8 @@ CI の Supabase Local は空 DB で起動するため **全テストが何もア
 
 e2e ジョブの Playwright ブラウザ本体（`~/.cache/ms-playwright`）は `actions/cache` でキャッシュする。OS パッケージ（`--with-deps`）は apt 側でキャッシュできないため、ヒット時は `playwright install-deps chromium` のみ実行する。
 
+e2e の `playwright-report/`（HTML レポート）と `test-results/`（`trace: 'on-first-retry'` の成果物）は、成否にかかわらず `actions/upload-artifact` で 7 日保存する。失敗時に stdout 以外の調査材料を残すため `if: always()` とする。対象パスはこの 2 ディレクトリに限定する。
+
 ```yaml
 # .github/workflows/ci.yml
 name: CI
@@ -952,6 +954,16 @@ jobs:
         run: pnpm exec playwright install-deps chromium
       - run: pnpm run build
       - run: pnpm run test:e2e
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
       - if: always()
         run: supabase stop --no-backup
 
