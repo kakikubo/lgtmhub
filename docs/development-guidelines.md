@@ -381,7 +381,7 @@ const image = await imageRepository.findById(id);
 
 ### フォーマット規約
 
-`biome.json` を正とする。Linter / Formatter は Biome 1 本に統一している（Prettier / ESLint からの移行は Issue #16 で実施済み）。
+`biome.json` を正とする。コード（JS / TS / JSON / CSS）の Linter / Formatter は Biome 1 本に統一している（Prettier / ESLint からの移行は Issue #16 で実施済み）。Biome は Markdown を扱わないため、Markdown のみ markdownlint-cli2 で補完する（後述）。
 
 **Biome formatter 基本方針**(`biome.json` の `formatter` / `javascript.formatter`):
 
@@ -406,6 +406,18 @@ const image = await imageRepository.findById(id);
 - `pnpm run lint`（`biome lint .`）は lint のみの確認用として残す
 
 CI で `pnpm run check`（lint + format）を実行し、エラー検出時は失敗扱いとする。
+
+**Markdown lint (markdownlint-cli2)**:
+
+`.markdownlint-cli2.jsonc` を正とする。Biome は Markdown を検査しないため、その穴を markdownlint-cli2 で埋める（Issue #307 で導入）。
+
+- 検査対象は `docs/**/*.md` のみ。設定ファイルの `globs` で限定しているため、`pnpm run lint:md` は引数なしで実行する
+- `README.md` / `AGENTS.md` / `CLAUDE.md` 系 / `.claude/` / `.steering/` は対象外。適用範囲を広げる場合は `globs` に追加する
+- 中核ルールは MD040（コードフェンスの言語指定）。ディレクトリツリーや図など言語が無いブロックには `text` を付ける
+- 既存ドキュメントの書式と合わないルール（行長 MD013、表のパイプ間隔 MD060、リスト前後の空行 MD032 など）は、無効化理由をコメントで添えて設定ファイルで off にしている。自動修正可能なものは書式の一括整形という別の関心事として扱い、必要になった時点で別 PR で有効化を検討する
+- MD040 は「どの言語タグが正しいか」を機械が決められないため `--fix` の対象外。人が判断して付ける
+- CodeRabbit も同じ `.markdownlint-cli2.jsonc` を読む。設定ファイルが無いとデフォルトルールで指摘されるため、ルールの正をこの 1 ファイルに集約している
+- lefthook（pre-commit）の対象には含めない。lefthook はステージ済みファイルのパスを直接渡す方式で、設定ファイルの `globs` による対象限定が効かず、スコープ外の Markdown まで検査してしまうため
 
 **コミット時の自動実行 (lefthook)**:
 
@@ -489,13 +501,13 @@ Preview のサブドメインは PR ごとに動的に変わるため、Addition
 
 Auth > URL Configuration の **Additional Redirect URLs** に以下を追加する:
 
-```
+```text
 https://lgtmhub-git-*-kakikubos-projects.vercel.app/**
 ```
 
 個別デプロイ URL（`lgtmhub-<hash>-kakikubos-projects.vercel.app`）も使う場合は、合わせて以下も登録する:
 
-```
+```text
 https://lgtmhub-*-kakikubos-projects.vercel.app/**
 ```
 
@@ -532,7 +544,7 @@ Issue #20 で、Vercel の Production / Preview デプロイが参照する Supa
 
 ### ブランチ戦略
 
-```
+```text
 main（本番環境）
 ├── feature/{機能名}  → 新機能開発
 ├── fix/{修正名}      → バグ修正
@@ -547,7 +559,7 @@ main（本番環境）
 
 グローバル設定（`~/.claude/rules/commit-style.md`）に従う。
 
-```
+```text
 <1行目: 日本語で変更内容を簡潔に>
 
 - <変更点1>
@@ -557,7 +569,7 @@ main（本番環境）
 
 **例**:
 
-```
+```text
 画像登録APIを実装
 
 - POST /api/images のRoute Handlerを作成
@@ -565,7 +577,7 @@ main（本番環境）
 - 1日10枚の登録制限をDailyUploadCountRepositoryで管理
 ```
 
-```
+```text
 LGTM文字合成ロジックを実装
 
 - Sharp SVGオーバーレイで白文字+黒縁のLGTM文字を合成
@@ -584,7 +596,7 @@ LGTM文字合成ロジックを実装
 
 **1PR = 1つの関心事**。「このPRは何をするPRか？」を一言で説明できること。
 
-```
+```text
 ✅ 良いPR例
 - 「画像登録APIを実装」
 - 「お気に入り追加・解除機能を実装」
@@ -634,7 +646,7 @@ PR の作成・更新時に GitHub Actions（`.github/workflows/danger.yml`）�
 
 ### テストピラミッド
 
-```
+```text
      /E2E\      少（Playwright、ブラウザ起動）
     /------\
    /  統合  \   中（Vitest + Supabase Local）
@@ -854,6 +866,8 @@ e2e ジョブの Playwright ブラウザ本体（`~/.cache/ms-playwright`）は 
 
 e2e の `playwright-report/`（HTML レポート）と `test-results/`（`trace: 'on-first-retry'` の成果物）は、成否にかかわらず `actions/upload-artifact` で 7 日保存する。失敗時に stdout 以外の調査材料を残すため `if: always()` とする。対象パスはこの 2 ディレクトリに限定する。
 
+Markdown lint（`pnpm run lint:md`）は独立ジョブにせず `lint-and-typecheck` ジョブのステップとして実行する。別ジョブにすると checkout / pnpm setup / `pnpm install --frozen-lockfile` の固定コストを丸ごともう一度払うことになり、1 秒未満の検査に対して割に合わないため。lint 系のゲートという意味づけも `pnpm run check` と同じ。
+
 ```yaml
 # .github/workflows/ci.yml
 name: CI
@@ -877,6 +891,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run check
       - run: pnpm run typecheck
+      - run: pnpm run lint:md
 
   test:
     runs-on: ubuntu-latest
@@ -1034,6 +1049,7 @@ jobs:
     "build": "next build",
     "start": "next start",
     "lint": "biome lint .",
+    "lint:md": "markdownlint-cli2",
     "format": "biome format --write .",
     "check": "biome check .",
     "typecheck": "tsc --noEmit",

@@ -6,7 +6,7 @@
 >
 > 未実装であることの表記は `> **未実装**:` ブロック（節全体が未実装の場合）と行内の `（未実装 / #Issue番号）`（一部の記述のみが未実装の場合）の2種類に統一し、Issue へのハイパーリンクはブロック側にのみ付ける。他の docs も同じ規約に従う。
 
-```
+```text
 lgtmhub/
 ├── app/                        # Next.js App Router（Presentation + API Layer）
 │   ├── (site)/                 # 画面グループ（レイアウト共有）
@@ -172,6 +172,7 @@ lgtmhub/
 ├── .gitignore
 ├── .npmrc                      # pnpm の挙動設定
 ├── .coderabbit.yaml            # CodeRabbit レビュー設定
+├── .markdownlint-cli2.jsonc    # markdownlint 設定（docs/ の Markdown lint）
 ├── biome.json                  # Biome (Linter + Formatter) 設定
 ├── codecov.yml                 # Codecov のカバレッジ設定
 ├── components.json             # UIプリミティブ生成ツールの設定
@@ -220,7 +221,7 @@ lgtmhub/
 - 依存禁止: `src/repositories/`（Service Layerを経由する）
 
 **例**:
-```
+```text
 app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositories/image-repository.ts
 ```
 
@@ -252,7 +253,7 @@ app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositori
 - 依存禁止: `app/`、`components/`（HTTPレスポンスやReactへの依存禁止）
 
 **例**:
-```
+```text
 src/services/
 ├── image-service.ts        # 画像登録（取得→検証→重複チェック→合成→保存→DB）
 ├── favorite-service.ts     # お気に入り（画像の存在検証→登録 / 解除 / 一覧）
@@ -376,7 +377,7 @@ src/services/
 
 **構造**:
 
-```
+```text
 tests/
 ├── unit/           # Vitest、依存をモック、高速
 │   ├── api/            # Route Handler（app/api/** に対応）
@@ -439,6 +440,7 @@ tests/
 | `vitest.config.ts` | Vitestテスト設定 |
 | `playwright.config.ts` | Playwrightテスト設定 |
 | `biome.json` | Biome (Linter + Formatter) 設定 |
+| `.markdownlint-cli2.jsonc` | markdownlint 設定（`docs/**/*.md` を検査。CI と CodeRabbit が共有） |
 | `postcss.config.mjs` | Tailwind CSS 4.x の PostCSS プラグイン設定 |
 | `components.json` | shadcn/ui CLI の生成設定（`components/ui/` の出力先・エイリアス） |
 | `lefthook.yml` | Git hooks 設定（コミット時に Biome を実行） |
@@ -490,7 +492,7 @@ tests/
 
 ### レイヤー間の依存
 
-```
+```text
 app/ (Presentation + API)
     ↓
 src/services/ (Service)
@@ -553,7 +555,7 @@ PRD で P1 と定義された機能（管理者削除・通報・物理クリー
 
 ### 機能6: 管理者による画像削除（操作ログ）
 
-```
+```text
 src/repositories/admin-log-repository.ts        # 管理者操作ログ CRUD
 src/services/admin-service.ts                   # 管理者削除フロー（論理削除+即時Blob物理削除）
 src/lib/validation/admin.ts                     # 管理者操作APIのzodスキーマ
@@ -565,7 +567,7 @@ tests/integration/admin/admin-delete.test.ts
 
 ### 機能7: ユーザー通報機能
 
-```
+```text
 src/types/report.ts                             # ImageReport インターフェース
 src/repositories/report-repository.ts           # 通報CRUD・閾値判定クエリ
 src/services/report-service.ts                  # 通報追加・5件超過時の自動非表示
@@ -578,7 +580,7 @@ tests/integration/reports/report-flow.test.ts
 
 ### 機能8: 削除画像の物理クリーンアップ
 
-```
+```text
 src/services/cleanup-service.ts                 # deleted_at から30日経過した画像のBlob/DB削除
 .github/workflows/cleanup.yml                   # 日次クリーンアップジョブ
 tests/unit/services/cleanup-service.test.ts
@@ -586,7 +588,7 @@ tests/unit/services/cleanup-service.test.ts
 
 ### 機能9: ファイルアップロード対応
 
-```
+```text
 src/lib/image/validate-upload.ts                # アップロードファイルのMIME/サイズ検証
 # 既存の components/image-register-form.tsx にドラッグ&ドロップ + ファイル選択UIを追加
 #   （URL入力とファイルアップロードの導線を1つのフォームに統合する。新規ファイルは作らない）
@@ -625,7 +627,7 @@ tests/e2e/image-upload.test.ts
 
 Node.js 標準テンプレートをベースに、本プロジェクト固有の除外を末尾に追加している。主な固有分は以下。
 
-```
+```gitignore
 # dotenv environment variable files
 .env
 .env.*

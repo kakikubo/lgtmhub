@@ -143,7 +143,7 @@ P1機能。**5件以上の通報** を受けた画像は自動的に非表示（
 **説明**:
 P1機能。`user_profiles.is_admin = true` のユーザーのみ実行可能。RLSとアプリケーションレベルの両方で権限チェックする。
 
-**関連用語**: [通報機能](#通報機能p1), [RLS](#rls-row-level-security)
+**関連用語**: [通報機能](#通報機能p1), [RLS](#rls)
 
 ---
 
@@ -431,7 +431,7 @@ export const createImageSchema = z.object({
 
 **本プロジェクトでの適用**:
 
-```
+```text
 Presentation Layer (app/)
     ↓
 API Layer (app/api/)
@@ -804,7 +804,7 @@ if (image.uploaderId !== requesterId && !requester.isAdmin) {
 **本プロジェクトでの用途**: pHashの類似度判定。
 
 **計算式**:
-```
+```text
 HammingDistance(a, b) = count(i for i in 0..len(a) if a[i] != b[i])
 ```
 
@@ -907,7 +907,7 @@ HammingDistance(a, b) = count(i for i in 0..len(a) if a[i] != b[i])
 - [Playwright](#playwright) - 技術用語
 - [PRD](#prd) - 略語
 - [React](#react) - 技術用語
-- [RLS](#rls-row-level-security) - 略語
+- [RLS](#rls) - 略語
 - [Route Handler](#route-handler) - アーキテクチャ
 - [Server Component](#server-component) - アーキテクチャ
 - [Sharp](#sharp) - 技術用語
