@@ -42,3 +42,7 @@ e2e で主要ページの CSP 違反イベントが 0 件であることを検�
 - 違反レポートの収集基盤
 - HSTS preload 登録
 - 既存 4 ヘッダーの `next.config.ts` への移設
+
+## 後続対応（enforce 切り替え時）
+
+- Vercel は Preview に `vercel.live` のツールバースクリプトを注入するため、Preview では `script-src` 等の違反が常に報告される。Preview 観測時はこれを除外して判断し、enforce 時に Preview だけ `https://vercel.live` を許可するか決める
