@@ -429,6 +429,7 @@ CI で `pnpm run check`（lint + format）を実行し、エラー検出時は�
 - 修正不能な lint エラーが残った場合、コミットは失敗する(`biome.json` のルール設定は CI の `pnpm run check` と同一)
 - lefthook は staged ファイルのみを見る。Biome のバージョン更新に伴う未ステージファイルの format ドリフトは、CI の `pnpm run check` がリポジトリ全体を検査して検出する
 - 上記対象外の拡張子のみのコミットでは、`biome-check` ジョブはスキップされコミットがそのまま成立する
+- Biome は `./node_modules/.bin/biome` を直接実行し、Corepack(`corepack pnpm exec`)を経由しない。Corepack 0.34.4 以下は pnpm 12 の実行ファイルを存在しない `bin/pnpm.cjs` と解決するため、Node.js 24.12.0 未満の環境ではコミットのたびに失敗していた。Node.js 25 以降は Corepack が同梱されないこともあり、コミット経路を Node.js / Corepack のバージョンから切り離している。実行される Biome は lockfile で固定されたもので、`pnpm exec` と同一。Corepack 側の復旧手順は [README のトラブルシュート](../README.md#corepack-pnpm-が-cannot-find-module-binpnpmcjs-で失敗する) を参照する
 - 緊急回避が必要な場合のみ `git commit --no-verify` でフックをバイパスできる。通常運用では使用しない
 
 **既存フックとの競合**:
