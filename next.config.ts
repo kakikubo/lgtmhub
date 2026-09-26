@@ -1,5 +1,9 @@
 import path from 'node:path';
 import type { NextConfig } from 'next';
+import {
+  buildContentSecurityPolicy,
+  STRICT_TRANSPORT_SECURITY,
+} from './src/lib/security/security-headers';
 
 // sharp 0.35 以降は libvips が `@img/sharp-libvips-<platform>` という platform-specific
 // optional dep に分離された。Next.js は sharp を external 扱いするため、
@@ -35,6 +39,26 @@ const nextConfig: NextConfig = {
     '/api/images/random': SHARP_LINUX_X64_TRACE,
     '/': SHARP_LINUX_X64_TRACE,
     '/images/[id]': SHARP_LINUX_X64_TRACE,
+  },
+  // CSP / HSTS は vercel.json ではなくここで付ける。vercel.json の headers は
+  // next start / next dev に適用されず e2e で検証できないため (Issue #276)。
+  // CSP は Report-Only で導入し、違反がないことを確認してから enforce に切り替える。
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy-Report-Only',
+            value: buildContentSecurityPolicy({
+              supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+              isDev: process.env.NODE_ENV === 'development',
+            }),
+          },
+          { key: 'Strict-Transport-Security', value: STRICT_TRANSPORT_SECURITY },
+        ],
+      },
+    ];
   },
   images: {
     remotePatterns: [

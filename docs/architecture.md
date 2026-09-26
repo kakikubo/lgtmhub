@@ -172,7 +172,7 @@ Presentation → API → Service → Data
 
 - **転送時暗号化**: 全通信HTTPS（VercelおよびSupabaseが自動でTLS終端）
 - **保存時暗号化**: Supabase / Vercel Blob ともにストレージレベルで暗号化（AES-256）
-- **レスポンスヘッダ**: `vercel.json` の `headers` で `X-Content-Type-Options` / `X-Frame-Options` / `Referrer-Policy` / `Permissions-Policy` を全パスに適用。`Strict-Transport-Security` は Vercel が自動付与するため二重指定しない。CSP は Next.js の動的 nonce が必要なため proxy ベースで別途検討（未着手）
+- **レスポンスヘッダ**: `vercel.json` の `headers` で `X-Content-Type-Options` / `X-Frame-Options` / `Referrer-Policy` / `Permissions-Policy` を全パスに適用。`next.config.ts` の `headers()` で `Strict-Transport-Security`（`max-age=63072000; includeSubDomains`。Vercel 既定に includeSubDomains を追加）と `Content-Security-Policy-Report-Only` を付与する。CSP は静的シェル（cacheComponents）を維持するため nonce を使わない静的ポリシーで、inline script を `'unsafe-inline'` で許可する。enforce への切り替えは違反が出ないことを確認してから行う（Issue #276）
 - **アクセス制御**:
   - Supabase Row Level Security（RLS）を全テーブルで有効化
   - クライアントから直接Supabaseに接続せず、Next.js Route Handler を経由
