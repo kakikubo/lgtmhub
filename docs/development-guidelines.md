@@ -711,7 +711,7 @@ coverage: {
   exclude: ['src/types/**', 'src/**/*.test.ts', 'components/ui/**', 'components/**/*-skeleton.tsx'],
   thresholds: {
     'src/services/**': { branches: 90, functions: 85, lines: 90, statements: 90 },
-    'src/lib/**': { branches: 80, functions: 75, lines: 80, statements: 80 },
+    'src/lib/**': { branches: 80, functions: 80, lines: 80, statements: 80 },
     'app/api/images/**': { branches: 80, functions: 95, lines: 90, statements: 90 },
   }
 }
@@ -725,7 +725,7 @@ glob 閾値は**マッチしたファイル群の集計**に対して効く（�
 
 **コンポーネントテスト（`components/**`, Issue #257）**: `components/` の実ロジックを持つコンポーネント（クライアント/サーバ両方）は `tests/unit/components/` でカバーする。vitest は `test.projects` で環境を分離し、`tests/unit/components/**` のみ `happy-dom` 環境で、それ以外は `node` で動く（`tests/setup/component-setup.ts` で `@testing-library/jest-dom` と RTL の `cleanup` を登録）。`components/ui/**`（vendored な Base UI コンポーネント）と `*-skeleton.tsx`（描画のみ）は計測から除外する。`app/(site)/**` は計測対象に含めない — RSC のページは `cacheComponents` の下で静的シェルが `next build` 時にレンダリングされ、e2e/unit いずれでも実行時カバレッジに現れないため（Issue #257 で e2e カバレッジ収集を検討したが ROI が低く不採用）。`components/**` の閾値は CI 実測を貯めてから別途判断する（未設定）。
 
-この `thresholds` は **CI を含め常に有効なゲート**（ローカル / devcontainer / CI のいずれでも `pnpm run test:coverage` で適用）。v8 の `functions` 計測は Node のマイナーバージョン差で約 12〜13pt 下振れする（ローカル `src/services/**` 100% / `src/lib/**` 90.9% に対し CI(ubuntu/Node 24.x) では 88.23% / 77.5%）ため、`functions` のみ CI 実測フロアの下にバッファを取った値（services 85 / lib 75）へ引き下げて env 差を吸収している。`branches`/`lines`/`statements` は v8-to-istanbul でソースレンジにマップされ安定し CI 実測でも 90/80 を通過するため据え置く。閾値未達は `vitest` が非 0 終了するため `test` ジョブのゲートとなる。Codecov は別途**可視化**（PR コメント・時系列・バッジ）に用いる。採用アプローチと却下理由は Issue #113 / `.steering/20260517-coverage-threshold-ci-gate/` を参照。詳細は「CI/CDパイプライン > Codecov」も参照。
+この `thresholds` は **CI を含め常に有効なゲート**（ローカル / devcontainer / CI のいずれでも `pnpm run test:coverage` で適用）。Issue #113 当時は v8 の `functions` 計測が CI で約 12〜13pt 下振れしたため `functions` のみ引き下げていたが、現在は CI 8 run とローカルの実測が per-file で一致し下振れは観測されない（Issue #266）。そのため `functions` も実測基準で設定している: `src/lib/**` は実測 84.78%（39/46）に対し他指標と揃えて 80、`src/services/**` は実測 89.74%（35/39）に対し 85。いずれも未テスト関数が 3 つ追加されると落ちる幅。`src/lib/**` の主な未カバーは unit テストでモックされる `src/lib/supabase/*` のクライアント生成関数。閾値未達は `vitest` が非 0 終了するため `test` ジョブのゲートとなる。Codecov は別途**可視化**（PR コメント・時系列・バッジ）に用いる。採用アプローチと却下理由は Issue #113 / `.steering/20260517-coverage-threshold-ci-gate/` を参照。詳細は「CI/CDパイプライン > Codecov」も参照。
 
 ### 統合テスト (Vitest + Supabase Local)
 
@@ -916,8 +916,8 @@ jobs:
       # test:unit / test:integration の 2 回実行をやめ、test:coverage
       # (= vitest run --coverage) の 1 パスに統合。include/exclude により
       # unit + integration をまとめて実行し (e2e は対象外)、カバレッジを計測する。
-      # カバレッジ閾値は vitest.config.ts で CI を含め常時ゲート。v8 の function
-      # 計測の Node マイナー差は functions 閾値を CI 実測ベースに調整して吸収済み。
+      # カバレッジ閾値は vitest.config.ts で CI を含め常時ゲート。閾値は CI と
+      # ローカルで一致する実測値を基準にしている。
       # 閾値未達・テスト失敗いずれも vitest が非 0 終了し test ジョブのゲートとなる。
       - run: pnpm run test:coverage
       # カバレッジを Codecov にアップロードして PR / main で可視化する。
@@ -1006,7 +1006,7 @@ jobs:
 
 `ci.yml` の `test` ジョブで `pnpm run test:coverage` を実行し、生成された `coverage/lcov.info` を `codecov/codecov-action@v5` で Codecov にアップロードする。`test` ジョブは `push: [main]` と `pull_request` 両方で走るため、**PR と main マージ後の双方**でカバレッジが Codecov に記録され、PR には差分コメントが付く。README のカバレッジバッジも Codecov を参照する。
 
-- **可視化が責務（ゲートは vitest 側）**: カバレッジ閾値は `vitest.config.ts` の `thresholds` で **CI を含め常時ゲート**（`src/services/**` は branches/lines/statements 90% ・ functions 85%、`src/lib/**` は branches/lines/statements 80% ・ functions 75%）。v8 の `functions` 計測は Node のマイナーバージョン差で約 12〜13pt 下振れするため、`functions` のみ CI 実測フロア（services 88.23% / lib 77.5%）の下にバッファを取った値へ引き下げて env 差を吸収している（採用アプローチと却下案は Issue #113 を参照。Node patch 固定／functions 除外／istanbul 化は却下し、CI 実測ベースの閾値調整を採用）。Codecov は閾値ゲートを持たず可視化に専念し、`codecov.yml` の project / patch ステータスも `informational: true`（二重ゲートにしない）。なお**閾値未達・テスト失敗いずれも `vitest` が非 0 終了するため、`test` ジョブのゲートとして機能する**。
+- **可視化が責務（ゲートは vitest 側）**: カバレッジ閾値は `vitest.config.ts` の `thresholds` で **CI を含め常時ゲート**（`src/services/**` は branches/lines/statements 90% ・ functions 85%、`src/lib/**` は 4 指標とも 80%）。Issue #113 で `functions` のみ CI の下振れ分を引き下げていたが、下振れが観測されなくなったため `src/lib/**` の `functions` を 75 → 80 に戻した（Issue #266）。Codecov は閾値ゲートを持たず可視化に専念し、`codecov.yml` の project / patch ステータスも `informational: true`（二重ゲートにしない）。なお**閾値未達・テスト失敗いずれも `vitest` が非 0 終了するため、`test` ジョブのゲートとして機能する**。
 - **token は任意**: public リポジトリのため `CODECOV_TOKEN` 未設定でも tokenless でアップロードできる。レート制限回避のため設定する場合は GitHub Secrets に `CODECOV_TOKEN` を登録する。アップロード失敗で `test` ジョブを落とさないよう `fail_ci_if_error: false`。
 - **集計対象**: 計測範囲は `vitest.config.ts` の `coverage.include`（`src/**` + `app/api/**`）で決まる。`codecov.yml` の `ignore` は `coverage.exclude`（`src/types/**` / `*.test.ts`）と整合させ、型定義とテストコードを Codecov 側でも母数から外す。`app/(site)/**` は計測対象に含めていない — RSC のページ/レイアウトは `environment: 'node'` の unit テストから import されず、実際には e2e (Playwright) がカバーしているため、e2e カバレッジを収集していない現状で include に加えるとテスト済みのコードが恒久的に 0% と表示されてしまう（Issue #255）。
 - **バージョン管理**: `codecov/codecov-action` は `renovate.json` の `github-actions` グループで自動更新対象（固定運用ではない）。
