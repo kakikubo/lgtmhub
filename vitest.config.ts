@@ -46,12 +46,12 @@ export default defineConfig({
         'components/ui/**',
         'components/**/*-skeleton.tsx',
       ],
-      // 閾値は CI を含め常時ゲート。v8 の function 計測は Node マイナー差で
-      // 約 12〜13pt 下振れする (ローカル services 100% / lib 90.9% に対し
-      // CI(ubuntu/Node 24.x) で 88.23% / 77.5%) ため、functions のみ CI 実測
-      // フロアの下にバッファを取った値へ引き下げる (services 85 / lib 75)。
-      // branches/lines/statements は v8-to-istanbul でソースレンジにマップされ
-      // 安定し CI 実測でも 90/80 を通過するため据え置く (Issue #113)。
+      // 閾値は CI を含め常時ゲート。#113 当時は v8 の functions 計測が CI で
+      // 12〜13pt 下振れしたため functions だけ引き下げていたが、現在は CI 8 run と
+      // ローカルが per-file で一致し下振れは無い (Issue #266)。lib は実測 84.78%
+      // (39/46) に対し他指標と揃えて 80、services は実測 89.74% (35/39) に対し 85。
+      // いずれも未テスト関数の追加 3 つで落ちる幅で、主な未カバーは unit テストで
+      // モックされる src/lib/supabase/* のクライアント生成関数。
       // app/api/images/** の閾値は CI 実測 (statements 95.49 / branches 85 /
       // functions 100 / lines 95.41) の下にバッファを取った値 (Issue #259)。
       // glob 閾値はマッチしたファイル群の「集計」に対して効く (ファイル単位ではない)。
@@ -62,7 +62,7 @@ export default defineConfig({
       // ゲートとして機能しない (実際に呼ばれる経路は e2e が担保する)。
       thresholds: {
         'src/services/**': { branches: 90, functions: 85, lines: 90, statements: 90 },
-        'src/lib/**': { branches: 80, functions: 75, lines: 80, statements: 80 },
+        'src/lib/**': { branches: 80, functions: 80, lines: 80, statements: 80 },
         'app/api/images/**': { branches: 80, functions: 95, lines: 90, statements: 90 },
       },
     },
