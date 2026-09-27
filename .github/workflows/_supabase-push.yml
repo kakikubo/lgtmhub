@@ -50,10 +50,10 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - uses: supabase/setup-cli@v3.0.0
+      - uses: supabase/setup-cli@v3.0.1
         with:
           # ローカル開発環境および ci.yml の e2e ジョブと揃える
-          version: 2.117.0
+          version: 2.118.0
 
       - name: Link to ${{ inputs.remote_name }} project
         run: supabase link --project-ref "${{ secrets.project_ref }}"
