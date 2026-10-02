@@ -22,7 +22,7 @@ LGTM 画像を GitHub 上のコードレビューに気軽に貼り付けられ�
 | ツール | バージョン | 備考 |
 |--------|-----------|------|
 | Node.js | v24.x | mise / nvm 等でバージョン管理推奨 |
-| pnpm | 12.x | Corepack 経由で利用(`corepack enable`)。バージョンは `package.json` の `packageManager` で固定。公開から 24h 未満の npm パッケージは `minimumReleaseAge` で install 拒否 |
+| pnpm | 12.x | Corepack 経由で利用(`corepack enable`)。バージョンは `package.json` の `packageManager` で固定。公開から 24h 未満の npm パッケージは `minimumReleaseAge` で install 拒否。Corepack で pnpm 12 を使うには Node.js 24.12.0 以上(同梱 Corepack 0.34.5 以上)が必要([トラブルシュート](#corepack-pnpm-が-cannot-find-module-binpnpmcjs-で失敗する)参照) |
 | Docker | 最新 | Supabase Local 起動に必要 |
 
 開発環境は devcontainer での起動も可能(`.devcontainer/devcontainer.json` 参照)。
@@ -144,6 +144,8 @@ pnpm run test:e2e
 
 `pnpm install` 後、`prepare` スクリプト(`lefthook install`)により `.git/hooks/pre-commit` が配置されます。`git commit` 時にステージ済みのファイル(`*.{js,jsx,ts,tsx,json,jsonc,css}`)に対して `biome check --write` が走り、整形差分の再ステージと lint エラー時のコミット中断を自動で行います。
 
+Biome は `./node_modules/.bin/biome` を直接実行するため、Corepack や Node.js のバージョンに左右されません。事前に `pnpm install` で依存関係を入れておいてください。
+
 既存フック(`core.hooksPath` を独自設定している場合など)との競合解消手順は [`docs/development-guidelines.md`](./docs/development-guidelines.md#フォーマット規約) を参照してください。
 
 ---
@@ -204,6 +206,39 @@ pnpm run db:start
 ```
 
 `pnpm run db:nuke` は内部で `supabase stop --no-backup` を実行し、`supabase_db_lgtmhub` / `supabase_storage_lgtmhub` の Docker volume を削除します。通常の停止(`pnpm run db:stop`)は volume を保持するため、ローカルデータを失いません。
+
+### `corepack pnpm` が `Cannot find module .../bin/pnpm.cjs` で失敗する
+
+エラー例:
+
+```text
+Error: Cannot find module '/Users/<user>/.cache/node/corepack/v1/pnpm/12.5.1/bin/pnpm.cjs'
+  code: 'MODULE_NOT_FOUND',
+```
+
+原因: Corepack 0.34.4 以下は pnpm の実行ファイルを常に `bin/pnpm.cjs` として解決しますが、pnpm 12 の配布物には `bin/pnpm.mjs` しかありません。Corepack 0.34.5 で修正済みで、Node.js 24 系では 24.12.0 から同梱されています(Node.js 24.9.0 などは Corepack 0.34.0 を同梱しているため該当します)。
+
+> **注意**: Corepack は解決した実行ファイルのパスをキャッシュ(`~/.cache/node/corepack/v1/pnpm/<version>/.corepack`)に保存し、以後はそれを使い回します。Corepack を新しくしても、古い Corepack が作ったキャッシュが残っている限り同じエラーが続きます。
+
+復旧手順:
+
+1. Node.js を 24.12.0 以上に上げる(上げられない場合は Corepack だけを更新する)
+   ```bash
+   npm install -g corepack@latest
+   ```
+2. 古い Corepack が作ったキャッシュを探して削除する(次回実行時に再取得されます)
+   ```bash
+   # "pnpm":"./bin/pnpm.cjs" が記録されている pnpm 12 系のキャッシュを列挙
+   grep -l '"pnpm":"./bin/pnpm.cjs"' ~/.cache/node/corepack/v1/pnpm/12.*/.corepack
+   # 列挙されたバージョンのディレクトリを削除(例: 12.5.1)
+   rm -rf ~/.cache/node/corepack/v1/pnpm/12.5.1
+   ```
+3. 復旧を確認する
+   ```bash
+   corepack pnpm --version
+   ```
+
+`git commit` 時の lefthook は Corepack を経由しないため、このエラーの影響を受けません。影響を受けるのは `corepack pnpm ...` や、`corepack enable` で入った `pnpm` コマンドです。なお、Node.js 25 以降は Corepack が同梱されません。
 
 ---
 
