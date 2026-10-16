@@ -23,3 +23,6 @@ overrides:
   fast-uri: ^4.0.0 # バックスラッシュ authority 区切りによる host confusion
   brace-expansion: ^5.0.8 # 展開長が無制限で OOM クラッシュする DoS
   smol-toml: ^1.7.1 # 不正な TOML による DoS (GHSA-7w5x-hrqm-74c2)。markdownlint-cli2 が 1.7.0 を固定ピンしている
+minimumReleaseAgeExclude:
+  # Renovate security update: next@16.3.8
+  - next@16.3.8
