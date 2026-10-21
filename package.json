@@ -61,7 +61,7 @@
     "@types/react-dom": "^19.0.0",
     "@vitest/coverage-v8": "^5.0.0",
     "danger": "^14.0.0",
-    "happy-dom": "^20.10.6",
+    "happy-dom": "^21.0.0",
     "lefthook": "^2.1.6",
     "markdownlint-cli2": "^0.23.2",
     "postcss": "^8.4.0",
