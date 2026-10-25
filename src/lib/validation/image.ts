@@ -1,11 +1,7 @@
+// スキーマ生成より前に jitless を効かせる (Issue #276)。必ず先頭に置く。
+import '@/src/lib/validation/zod-config';
 import { z } from 'zod';
 import { keysetCursorQuerySchema } from '@/src/lib/pagination/keyset-cursor';
-
-// Zod v4 は初回 parse 時に `Function('')` で JIT の可否を判定し、CSP に script-src eval 違反を
-// 報告させる (try/catch で握りつぶすので動作は壊れない)。'unsafe-eval' を許可する代わりに
-// JIT を無効化して判定自体をさせない (Issue #276)。クライアントの zod 利用は必ずこの
-// モジュールを経由する (favorite.ts もここを import する) ため、設定はここに置く。
-z.config({ jitless: true });
 
 export const createImageRequestSchema = z.object({
   imageUrl: z

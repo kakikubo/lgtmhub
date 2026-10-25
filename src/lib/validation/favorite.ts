@@ -1,3 +1,5 @@
+// スキーマ生成より前に jitless を効かせる (Issue #276)。必ず先頭に置く。
+import '@/src/lib/validation/zod-config';
 import { z } from 'zod';
 import { keysetCursorQuerySchema } from '@/src/lib/pagination/keyset-cursor';
 import { imageListItemSchema } from '@/src/lib/validation/image';
