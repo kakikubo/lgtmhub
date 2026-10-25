@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { NotFoundError } from '@/src/lib/errors';
+import { encodeKeysetCursor, type KeysetCursor } from '@/src/lib/pagination/keyset-cursor';
 import { LIST_FAVORITES_DEFAULT_LIMIT } from '@/src/lib/validation/favorite';
 import { FavoriteRepository } from '@/src/repositories/favorite-repository';
 import { ImageRepository } from '@/src/repositories/image-repository';
@@ -9,7 +10,7 @@ import type { PublicLgtmImage } from '@/src/types/image';
 
 export interface ListFavoritesParams {
   userId: string;
-  cursor?: string;
+  cursor?: KeysetCursor;
   limit?: number;
 }
 
@@ -72,7 +73,8 @@ export class FavoriteService {
    *
    * `ImageService.listImages` と同じ規約:
    * - `limit` ちょうどで返ってきた場合のみ `nextCursor` を返す (最終ページでは null)
-   * - `nextCursor` は前ページ末尾の **お気に入り登録日時** の ISO 文字列
+   * - `nextCursor` は前ページ末尾の `{ createdAt, id }` JSON 文字列
+   *   (`createdAt` = お気に入り登録日時、`id` = favorites.id)
    *
    * 論理削除済み画像の除外は Repository の `lgtm_images!inner` + `status='active'` が担う。
    */
@@ -86,7 +88,13 @@ export class FavoriteService {
 
     const images = records.map((record) => record.image);
     const last = records[records.length - 1];
-    const nextCursor = records.length === limit && last ? last.favoritedAt.toISOString() : null;
+    const nextCursor =
+      records.length === limit && last
+        ? encodeKeysetCursor({
+            createdAt: last.favoritedAt.toISOString(),
+            id: last.id,
+          })
+        : null;
     return { images, nextCursor };
   }
 

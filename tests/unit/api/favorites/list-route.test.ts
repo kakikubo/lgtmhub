@@ -52,7 +52,7 @@ async function callGet(query = '') {
 }
 
 describe('GET /api/favorites', () => {
-  it('cursor が ISO8601 でなければ 400 を返し認証も Service 呼び出しも行わない', async () => {
+  it('cursor が複合 keyset JSON でなければ 400 を返し認証も Service 呼び出しも行わない', async () => {
     const res = await callGet('?cursor=not-a-date');
 
     expect(res.status).toBe(400);
@@ -99,12 +99,16 @@ describe('GET /api/favorites', () => {
     createClient.mockResolvedValue(buildSupabase({ user: { id: 'user-1' } }));
     const listFavorites = vi.fn().mockResolvedValue({ images: [], nextCursor: null });
     buildFavoriteService.mockReturnValue({ listFavorites });
+    const cursor = {
+      createdAt: '2026-08-19T00:00:00.000Z',
+      id: '00000000-0000-4000-8000-0000000000aa',
+    };
 
-    await callGet('?cursor=2026-08-19T00:00:00.000Z&limit=5');
+    await callGet(`?cursor=${encodeURIComponent(JSON.stringify(cursor))}&limit=5`);
 
     expect(listFavorites).toHaveBeenCalledWith({
       userId: 'user-1',
-      cursor: '2026-08-19T00:00:00.000Z',
+      cursor,
       limit: 5,
     });
   });

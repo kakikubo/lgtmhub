@@ -11,6 +11,7 @@ import { safeFetch } from '@/src/lib/http/safe-fetch';
 import { calculatePHash, isDuplicate } from '@/src/lib/image/calculate-phash';
 import { composeLgtmImage } from '@/src/lib/image/compose-lgtm';
 import { validateImage } from '@/src/lib/image/validate-image';
+import { encodeKeysetCursor, type KeysetCursor } from '@/src/lib/pagination/keyset-cursor';
 import { LIST_IMAGES_DEFAULT_LIMIT } from '@/src/lib/validation/image';
 import { DailyUploadCountRepository } from '@/src/repositories/daily-upload-count-repository';
 import { ImageRepository } from '@/src/repositories/image-repository';
@@ -25,7 +26,7 @@ export const MAX_DAILY_UPLOADS = 10;
 export const BLOB_CACHE_CONTROL_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 export interface ListImagesParams {
-  cursor?: string;
+  cursor?: KeysetCursor;
   limit?: number;
 }
 
@@ -355,15 +356,21 @@ export class ImageService {
    *
    * - `limit` ちょうどで返ってきた場合のみ `nextCursor` を返す
    *   (= 次ページが存在する可能性がある)。最終ページでは `null`。
-   * - `nextCursor` は前ページ末尾の `createdAt.toISOString()`。次のリクエストで
-   *   `?cursor=<nextCursor>` を渡すと、Repository が `lt('created_at', cursor)` で次ページを取得する。
+   * - `nextCursor` は前ページ末尾の `{ createdAt, id }` を JSON 文字列化したもの。
+   *   次のリクエストで `?cursor=<nextCursor>` を渡すと、Repository が複合 keyset で次ページを取得する。
    */
   async listImages(params: ListImagesParams = {}): Promise<ListImagesResult> {
     const limit = params.limit ?? LIST_IMAGES_DEFAULT_LIMIT;
     const records = await this.imageRepo.list({ cursor: params.cursor, limit });
     const images = records.map(toPublic);
     const last = records[records.length - 1];
-    const nextCursor = records.length === limit && last ? last.createdAt.toISOString() : null;
+    const nextCursor =
+      records.length === limit && last
+        ? encodeKeysetCursor({
+            createdAt: last.createdAt.toISOString(),
+            id: last.id,
+          })
+        : null;
     return { images, nextCursor };
   }
 

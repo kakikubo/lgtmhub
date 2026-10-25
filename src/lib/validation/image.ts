@@ -1,10 +1,7 @@
+// スキーマ生成より前に jitless を効かせる (Issue #276)。必ず先頭に置く。
+import '@/src/lib/validation/zod-config';
 import { z } from 'zod';
-
-// Zod v4 は初回 parse 時に `Function('')` で JIT の可否を判定し、CSP に script-src eval 違反を
-// 報告させる (try/catch で握りつぶすので動作は壊れない)。'unsafe-eval' を許可する代わりに
-// JIT を無効化して判定自体をさせない (Issue #276)。クライアントの zod 利用は必ずこの
-// モジュールを経由する (favorite.ts もここを import する) ため、設定はここに置く。
-z.config({ jitless: true });
+import { keysetCursorQuerySchema } from '@/src/lib/pagination/keyset-cursor';
 
 export const createImageRequestSchema = z.object({
   imageUrl: z
@@ -21,7 +18,8 @@ export const LIST_IMAGES_DEFAULT_LIMIT = 16;
 export const LIST_IMAGES_MAX_LIMIT = 50;
 
 export const listImagesQuerySchema = z.object({
-  cursor: z.string().datetime({ message: 'cursor は ISO 8601 形式で指定してください' }).optional(),
+  // Issue #327: (createdAt, id) 複合 keyset。ワイヤ形式は JSON 文字列。
+  cursor: keysetCursorQuerySchema.optional(),
   limit: z.coerce
     .number()
     .int('limit は整数で指定してください')

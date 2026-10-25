@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { DatabaseError, NotFoundError } from '@/src/lib/errors';
+import { buildKeysetOrFilter, type KeysetCursor } from '@/src/lib/pagination/keyset-cursor';
 import type { Database } from '@/src/types/database.types';
 import type { ImageStatus, LgtmImage } from '@/src/types/image';
 
@@ -25,7 +26,7 @@ export interface ActivePHashEntry {
 }
 
 export interface ListImagesOptions {
-  cursor?: string;
+  cursor?: KeysetCursor;
   limit: number;
 }
 
@@ -223,7 +224,8 @@ export class ImageRepository {
 
   /**
    * 一覧表示用に閲覧可能な (status='active') 画像を新着順で取得する。
-   * cursor は前ページ末尾の created_at (ISO 8601) を渡し、`<` で次ページを取得する。
+   * 並びは `(created_at desc, id desc)`。cursor は前ページ末尾の `{ createdAt, id }` を渡し、
+   * PostgREST `.or()` の複合 keyset で次ページを取得する (Issue #327)。
    */
   async list(options: ListImagesOptions): Promise<LgtmImage[]> {
     let query = this.supabase
@@ -231,10 +233,11 @@ export class ImageRepository {
       .select('*')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .limit(options.limit);
 
     if (options.cursor) {
-      query = query.lt('created_at', options.cursor);
+      query = query.or(buildKeysetOrFilter(options.cursor));
     }
 
     const { data, error } = await query;

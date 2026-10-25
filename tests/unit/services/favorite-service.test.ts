@@ -45,6 +45,7 @@ function buildFavorite(overrides: Partial<Favorite> = {}): Favorite {
 function buildFavoriteWithImage(index: number): FavoriteWithImage {
   const favoritedAt = new Date(Date.UTC(2026, 7, 20, 0, 0, index));
   return {
+    id: `00000000-0000-4000-8000-0000000000${String(index).padStart(2, '0')}`,
     image: {
       id: `image-${index}`,
       imageUrl: `https://blob.example.com/lgtm/image-${index}.webp`,
@@ -149,7 +150,7 @@ describe('FavoriteService.listFavorites', () => {
     expect(result).toEqual({ images: [], nextCursor: null });
   });
 
-  it('limit ちょうど返ってきたら末尾のお気に入り登録日時を nextCursor にする', async () => {
+  it('limit ちょうど返ってきたら末尾の複合カーソルを nextCursor にする', async () => {
     const { service, favoriteRepo } = createService();
     const records = [buildFavoriteWithImage(0), buildFavoriteWithImage(1)];
     favoriteRepo.listWithImages.mockResolvedValue(records);
@@ -157,7 +158,12 @@ describe('FavoriteService.listFavorites', () => {
     const result = await service.listFavorites({ userId: USER_ID, limit: 2 });
 
     expect(result.images).toHaveLength(2);
-    expect(result.nextCursor).toBe(records[1]?.favoritedAt.toISOString());
+    expect(result.nextCursor).toBe(
+      JSON.stringify({
+        createdAt: records[1]?.favoritedAt.toISOString(),
+        id: records[1]?.id,
+      }),
+    );
   });
 
   it('limit 未満なら nextCursor は null (最終ページ)', async () => {
@@ -172,12 +178,16 @@ describe('FavoriteService.listFavorites', () => {
   it('cursor をそのまま Repository へ渡す', async () => {
     const { service, favoriteRepo } = createService();
     favoriteRepo.listWithImages.mockResolvedValue([]);
+    const cursor = {
+      createdAt: '2026-08-19T00:00:00.000Z',
+      id: '00000000-0000-4000-8000-0000000000aa',
+    };
 
-    await service.listFavorites({ userId: USER_ID, cursor: '2026-08-19T00:00:00.000Z', limit: 5 });
+    await service.listFavorites({ userId: USER_ID, cursor, limit: 5 });
 
     expect(favoriteRepo.listWithImages).toHaveBeenCalledWith({
       userId: USER_ID,
-      cursor: '2026-08-19T00:00:00.000Z',
+      cursor,
       limit: 5,
     });
   });

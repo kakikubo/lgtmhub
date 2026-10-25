@@ -277,27 +277,35 @@ interface ListStub {
     eq: ReturnType<typeof vi.fn>;
     order: ReturnType<typeof vi.fn>;
     limit: ReturnType<typeof vi.fn>;
-    lt: ReturnType<typeof vi.fn>;
+    or: ReturnType<typeof vi.fn>;
   };
 }
 
 function createListStub(result: ListResult): ListStub {
-  const lt = vi.fn().mockResolvedValue(result);
-  // limit の戻り値は (cursor 無しの) await 解決値 と (cursor 有りの) 次の chain の両方を兼ねる:
-  // 1. await query (=limit の解決) → ListResult
-  // 2. query.lt(...) → ListResult
-  // PromiseLike を返しつつ lt メソッドを持つオブジェクトにすることで両対応する
-  const limitReturn: { lt: typeof lt; then: PromiseLike<ListResult>['then'] } = {
-    lt,
-    then: (onfulfilled, onrejected) => Promise.resolve(result).then(onfulfilled, onrejected),
+  // select → eq → order → order → limit (→ or) と繋いだ後に await するため、
+  // 自身を返し続けつつ Promise としても解決できる chainable なスタブにする。
+  const spies = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    order: vi.fn(),
+    limit: vi.fn(),
+    or: vi.fn(),
   };
-  const limit = vi.fn().mockReturnValue(limitReturn);
-  const order = vi.fn().mockReturnValue({ limit });
-  const eq = vi.fn().mockReturnValue({ order });
-  const select = vi.fn().mockReturnValue({ eq });
-  const from = vi.fn().mockReturnValue({ select });
+  const builder: Record<string, unknown> = {
+    then: (
+      onfulfilled?: (value: ListResult) => unknown,
+      onrejected?: (reason: unknown) => unknown,
+    ) => Promise.resolve(result).then(onfulfilled, onrejected),
+  };
+  for (const [name, spy] of Object.entries(spies)) {
+    builder[name] = (...args: unknown[]) => {
+      spy(...args);
+      return builder;
+    };
+  }
+  const from = vi.fn().mockReturnValue(builder);
   const client = { from } as unknown as SupabaseClient<Database>;
-  return { client, spies: { from, select, eq, order, limit, lt } };
+  return { client, spies: { from, ...spies } };
 }
 
 interface ActiveIdsResult {
@@ -583,7 +591,7 @@ describe('ImageRepository.updateAfterRegenerate', () => {
 });
 
 describe('ImageRepository.list', () => {
-  it('cursor 無し: status=active を created_at desc で limit 件取得する', async () => {
+  it('cursor 無し: status=active を created_at desc, id desc で limit 件取得する', async () => {
     const stub = createListStub({ data: [buildRow({ id: 'image-1' })], error: null });
     const repo = new ImageRepository(stub.client);
     const results = await repo.list({ limit: 20 });
@@ -592,19 +600,44 @@ describe('ImageRepository.list', () => {
     expect(stub.spies.select).toHaveBeenCalledWith('*');
     expect(stub.spies.eq).toHaveBeenCalledWith('status', 'active');
     expect(stub.spies.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(stub.spies.order).toHaveBeenCalledWith('id', { ascending: false });
     expect(stub.spies.limit).toHaveBeenCalledWith(20);
-    expect(stub.spies.lt).not.toHaveBeenCalled();
+    expect(stub.spies.or).not.toHaveBeenCalled();
     expect(results).toHaveLength(1);
     expect(results[0]?.id).toBe('image-1');
     expect(results[0]?.createdAt).toEqual(new Date('2026-05-04T00:00:00.000Z'));
   });
 
-  it('cursor 有り: lt("created_at", cursor) が呼ばれる', async () => {
+  it('cursor 有り: 複合 keyset の or フィルタが呼ばれる', async () => {
+    const cursor = {
+      createdAt: '2026-05-04T00:00:00.000Z',
+      id: '00000000-0000-4000-8000-000000000099',
+    };
     const stub = createListStub({ data: [], error: null });
     const repo = new ImageRepository(stub.client);
-    await repo.list({ limit: 5, cursor: '2026-05-04T00:00:00.000Z' });
-    expect(stub.spies.lt).toHaveBeenCalledWith('created_at', '2026-05-04T00:00:00.000Z');
+    await repo.list({ limit: 5, cursor });
+    expect(stub.spies.or).toHaveBeenCalledWith(
+      `created_at.lt."${cursor.createdAt}",and(created_at.eq."${cursor.createdAt}",id.lt.${cursor.id})`,
+    );
     expect(stub.spies.limit).toHaveBeenCalledWith(5);
+  });
+
+  it('同一 created_at の行がページ境界をまたいでも id で tie-break できるフィルタを組む', async () => {
+    const sameTs = '2026-05-04T12:00:00.000Z';
+    const cursor = {
+      createdAt: sameTs,
+      id: '00000000-0000-4000-8000-000000000002',
+    };
+    const stub = createListStub({
+      data: [buildRow({ id: '00000000-0000-4000-8000-000000000001', created_at: sameTs })],
+      error: null,
+    });
+    const results = await new ImageRepository(stub.client).list({ limit: 1, cursor });
+
+    expect(stub.spies.or).toHaveBeenCalledWith(
+      `created_at.lt."${sameTs}",and(created_at.eq."${sameTs}",id.lt.${cursor.id})`,
+    );
+    expect(results[0]?.id).toBe('00000000-0000-4000-8000-000000000001');
   });
 
   it('行が空のときは空配列を返す', async () => {
