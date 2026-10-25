@@ -48,7 +48,7 @@ importers:
         specifier: ^1.14.0
         version: 1.61.0(@types/react@19.3.0)(react@19.3.1)
       next:
-        specifier: ~16.4.1
+        specifier: ~16.4.3
         version: 16.4.3(@babel/core@7.29.7(supports-color@10.2.2))(@playwright/test@1.64.1)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       opentype.js:
         specifier: ^2.0.0
