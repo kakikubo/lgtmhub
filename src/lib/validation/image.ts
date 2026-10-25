@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { keysetCursorQuerySchema } from '@/src/lib/pagination/keyset-cursor';
 
 // Zod v4 は初回 parse 時に `Function('')` で JIT の可否を判定し、CSP に script-src eval 違反を
 // 報告させる (try/catch で握りつぶすので動作は壊れない)。'unsafe-eval' を許可する代わりに
@@ -21,7 +22,8 @@ export const LIST_IMAGES_DEFAULT_LIMIT = 16;
 export const LIST_IMAGES_MAX_LIMIT = 50;
 
 export const listImagesQuerySchema = z.object({
-  cursor: z.string().datetime({ message: 'cursor は ISO 8601 形式で指定してください' }).optional(),
+  // Issue #327: (createdAt, id) 複合 keyset。ワイヤ形式は JSON 文字列。
+  cursor: keysetCursorQuerySchema.optional(),
   limit: z.coerce
     .number()
     .int('limit は整数で指定してください')

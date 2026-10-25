@@ -53,6 +53,7 @@ function createDeleteStub(result: {
 }
 
 interface EmbeddedRow {
+  id: string;
   created_at: string;
   lgtm_images: {
     id: string;
@@ -66,6 +67,7 @@ interface EmbeddedRow {
 
 function buildEmbeddedRow(overrides: Partial<EmbeddedRow> = {}): EmbeddedRow {
   return {
+    id: 'fav-1',
     created_at: '2026-08-20T00:00:00.000Z',
     lgtm_images: {
       id: IMAGE_ID,
@@ -80,7 +82,7 @@ function buildEmbeddedRow(overrides: Partial<EmbeddedRow> = {}): EmbeddedRow {
 }
 
 /**
- * listWithImages は select → eq → eq → order → limit (→ lt) と繋いだ後に await するため、
+ * listWithImages は select → eq → eq → order → order → limit (→ or) と繋いだ後に await するため、
  * 自身を返し続けつつ Promise としても解決できる chainable なスタブを用意する。
  */
 function createListStub(result: { data: EmbeddedRow[] | null; error: PostgrestErrorLike | null }) {
@@ -89,7 +91,7 @@ function createListStub(result: { data: EmbeddedRow[] | null; error: PostgrestEr
     eq: vi.fn(),
     order: vi.fn(),
     limit: vi.fn(),
-    lt: vi.fn(),
+    or: vi.fn(),
   };
   const builder: Record<string, unknown> = {
     then: (resolve: (value: typeof result) => unknown) => Promise.resolve(result).then(resolve),
@@ -223,8 +225,10 @@ describe('FavoriteRepository.listWithImages', () => {
       isAnimated: false,
       createdAt: new Date('2026-08-20T00:00:00.000Z'),
     });
+    expect(rows[0]?.id).toBe('fav-1');
     expect(rows[0]?.favoritedAt).toEqual(new Date('2026-08-20T00:00:00.000Z'));
     expect(calls.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(calls.order).toHaveBeenCalledWith('id', { ascending: false });
     expect(calls.limit).toHaveBeenCalledWith(20);
   });
 
@@ -239,21 +243,54 @@ describe('FavoriteRepository.listWithImages', () => {
     expect(calls.eq).toHaveBeenCalledWith('lgtm_images.status', 'active');
   });
 
-  it('cursor 指定時のみ created_at の lt フィルタを付ける', async () => {
+  it('cursor 指定時のみ複合 keyset の or フィルタを付ける', async () => {
+    const cursor = {
+      createdAt: '2026-08-19T00:00:00.000Z',
+      id: '00000000-0000-4000-8000-0000000000aa',
+    };
     const withCursor = createListStub({ data: [], error: null });
     await new FavoriteRepository(withCursor.supabase).listWithImages({
       userId: USER_ID,
       limit: 20,
-      cursor: '2026-08-19T00:00:00.000Z',
+      cursor,
     });
-    expect(withCursor.calls.lt).toHaveBeenCalledWith('created_at', '2026-08-19T00:00:00.000Z');
+    expect(withCursor.calls.or).toHaveBeenCalledWith(
+      `created_at.lt."${cursor.createdAt}",and(created_at.eq."${cursor.createdAt}",id.lt.${cursor.id})`,
+    );
 
     const withoutCursor = createListStub({ data: [], error: null });
     await new FavoriteRepository(withoutCursor.supabase).listWithImages({
       userId: USER_ID,
       limit: 20,
     });
-    expect(withoutCursor.calls.lt).not.toHaveBeenCalled();
+    expect(withoutCursor.calls.or).not.toHaveBeenCalled();
+  });
+
+  it('同一 created_at の行がページ境界をまたいでも id で tie-break できるフィルタを組む', async () => {
+    const sameTs = '2026-08-20T00:00:00.000Z';
+    const cursor = {
+      createdAt: sameTs,
+      id: '00000000-0000-4000-8000-000000000002',
+    };
+    const stub = createListStub({
+      data: [
+        buildEmbeddedRow({
+          id: '00000000-0000-4000-8000-000000000001',
+          created_at: sameTs,
+        }),
+      ],
+      error: null,
+    });
+    const rows = await new FavoriteRepository(stub.supabase).listWithImages({
+      userId: USER_ID,
+      limit: 1,
+      cursor,
+    });
+
+    expect(stub.calls.or).toHaveBeenCalledWith(
+      `created_at.lt."${sameTs}",and(created_at.eq."${sameTs}",id.lt.${cursor.id})`,
+    );
+    expect(rows[0]?.id).toBe('00000000-0000-4000-8000-000000000001');
   });
 
   it('data が null なら空配列を返す', async () => {

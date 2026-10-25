@@ -55,17 +55,24 @@ describe('listFavoritesQuerySchema', () => {
     }
   });
 
-  it('ISO 8601 の cursor を受理する', () => {
-    const result = listFavoritesQuerySchema.safeParse({ cursor: '2026-08-20T00:00:00.000Z' });
+  it('複合 keyset の cursor JSON を受理する', () => {
+    const cursor = JSON.stringify({
+      createdAt: '2026-08-20T00:00:00.000Z',
+      id: '00000000-0000-4000-8000-0000000000aa',
+    });
+    const result = listFavoritesQuerySchema.safeParse({ cursor });
     expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.cursor).toEqual({
+        createdAt: '2026-08-20T00:00:00.000Z',
+        id: '00000000-0000-4000-8000-0000000000aa',
+      });
+    }
   });
 
-  it('ISO 8601 でない cursor を拒否する', () => {
-    const result = listFavoritesQuerySchema.safeParse({ cursor: '2026/08/20' });
+  it('旧 ISO 単独 cursor を拒否する', () => {
+    const result = listFavoritesQuerySchema.safeParse({ cursor: '2026-08-20T00:00:00.000Z' });
     expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0]?.message).toContain('ISO 8601');
-    }
   });
 
   it('limit を数値へ coerce する', () => {

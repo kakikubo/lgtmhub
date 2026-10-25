@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { DatabaseError, DuplicateFavoriteError, NotFoundError } from '@/src/lib/errors';
+import { buildKeysetOrFilter, type KeysetCursor } from '@/src/lib/pagination/keyset-cursor';
 import type { Database } from '@/src/types/database.types';
 import type { Favorite } from '@/src/types/favorite';
 import type { PublicLgtmImage } from '@/src/types/image';
@@ -13,12 +14,14 @@ const FOREIGN_KEY_VIOLATION = '23503';
 
 export interface ListFavoritesOptions {
   userId: string;
-  cursor?: string;
+  cursor?: KeysetCursor;
   limit: number;
 }
 
 // お気に入り一覧 1 件分。画像本体 + お気に入り登録日時。
+// `id` は favorites.id（複合 keyset カーソル用。画像 id ではない）。
 export interface FavoriteWithImage {
+  id: string;
   image: PublicLgtmImage;
   favoritedAt: Date;
 }
@@ -47,8 +50,13 @@ function toFavorite(row: FavoriteRow): Favorite {
  * `createdAt` には **お気に入り登録日時** を詰める (画像の登録日時ではない)。
  * 一覧の並び順・カーソルがお気に入り登録日時基準であり、UI もこの値でページングするため。
  */
-function toFavoriteWithImage(favoritedAt: string, image: EmbeddedImage): FavoriteWithImage {
+function toFavoriteWithImage(
+  favoriteId: string,
+  favoritedAt: string,
+  image: EmbeddedImage,
+): FavoriteWithImage {
   return {
+    id: favoriteId,
     image: {
       id: image.id,
       imageUrl: image.image_url,
@@ -110,24 +118,26 @@ export class FavoriteRepository {
    *
    * `lgtm_images!inner` にすることで status のフィルタが内部結合として効き、
    * 論理削除済み画像のお気に入りは行ごと返らない (left join だと画像が null の行が残る)。
-   * cursor は前ページ末尾の favorites.created_at (ISO 8601) を渡し `<` で次ページを取得する。
+   * 並びは `(created_at desc, id desc)`。cursor は前ページ末尾の `{ createdAt, id }`
+   * （id は favorites.id）を渡し、PostgREST `.or()` の複合 keyset で次ページを取得する (Issue #327)。
    */
   async listWithImages(options: ListFavoritesOptions): Promise<FavoriteWithImage[]> {
     let query = this.supabase
       .from('favorites')
-      .select(`created_at, lgtm_images!inner(${EMBEDDED_IMAGE_COLUMNS})`)
+      .select(`id, created_at, lgtm_images!inner(${EMBEDDED_IMAGE_COLUMNS})`)
       .eq('user_id', options.userId)
       .eq('lgtm_images.status', 'active')
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .limit(options.limit);
 
     if (options.cursor) {
-      query = query.lt('created_at', options.cursor);
+      query = query.or(buildKeysetOrFilter(options.cursor));
     }
 
     const { data, error } = await query;
     if (error) throw new DatabaseError(error.message);
-    return (data ?? []).map((row) => toFavoriteWithImage(row.created_at, row.lgtm_images));
+    return (data ?? []).map((row) => toFavoriteWithImage(row.id, row.created_at, row.lgtm_images));
   }
 
   /**

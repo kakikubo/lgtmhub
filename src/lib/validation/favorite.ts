@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { keysetCursorQuerySchema } from '@/src/lib/pagination/keyset-cursor';
 import { imageListItemSchema } from '@/src/lib/validation/image';
 
 // POST /api/favorites のリクエストボディ
@@ -19,7 +20,8 @@ export const LIST_FAVORITES_DEFAULT_LIMIT = 20;
 export const LIST_FAVORITES_MAX_LIMIT = 50;
 
 export const listFavoritesQuerySchema = z.object({
-  cursor: z.string().datetime({ message: 'cursor は ISO 8601 形式で指定してください' }).optional(),
+  // Issue #327: (createdAt, id) 複合 keyset。ワイヤ形式は JSON 文字列。id は favorites.id。
+  cursor: keysetCursorQuerySchema.optional(),
   limit: z.coerce
     .number()
     .int('limit は整数で指定してください')

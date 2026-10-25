@@ -55,7 +55,7 @@ async function callGet(query = '') {
 }
 
 describe('GET /api/images', () => {
-  it('cursor が ISO8601 でなければ 400 を返し Service を呼ばない', async () => {
+  it('cursor が複合 keyset JSON でなければ 400 を返し Service を呼ばない', async () => {
     createAnonClient.mockReturnValue({});
 
     const res = await callGet('?cursor=not-a-date');

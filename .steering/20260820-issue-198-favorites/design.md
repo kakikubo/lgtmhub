@@ -22,7 +22,7 @@ components/favorite-store.ts   ┴─ app/api/favorites/*  ───────
 **責務**:
 - `public.favorites` テーブル作成（`id` / `user_id` / `lgtm_image_id` / `created_at`）
 - `(user_id, lgtm_image_id)` UNIQUE 制約
-- 一覧クエリ用インデックス `(user_id, created_at desc)`
+- 一覧クエリ用インデックス `(user_id, created_at desc, id desc)`（Issue #327 で複合化）
 - RLS 有効化 + SELECT / INSERT / DELETE の 3 ポリシー（すべて `auth.uid() = user_id`）
 
 **実装の要点**:
@@ -55,7 +55,7 @@ export interface Favorite {
 
 - `createFavoriteRequestSchema` = `{ lgtmImageId: uuid }`
 - `favoriteImageIdParamSchema` = `{ lgtmImageId: uuid }`（DELETE の path param）
-- `listFavoritesQuerySchema` = `{ cursor?: ISO8601, limit?: 1..50 }`、既定 `LIST_FAVORITES_DEFAULT_LIMIT = 20`
+- `listFavoritesQuerySchema` = `{ cursor?: { createdAt, id } (JSON 文字列), limit?: 1..50 }`、既定 `LIST_FAVORITES_DEFAULT_LIMIT = 20`（Issue #327 で複合 keyset 化）
 - `createFavoriteResponseSchema` = `{ id, lgtmImageId }`
 - `listFavoritesResponseSchema` = `{ images: imageListItemSchema[], nextCursor: string | null }`（`image.ts` の `imageListItemSchema` を再利用）
 - `favoriteImageIdsResponseSchema` = `{ lgtmImageIds: string[] }`
@@ -74,7 +74,7 @@ export interface Favorite {
   論理削除済み画像の行自体が返らない（left join だと `null` 行が残る）。
 - 埋め込み結果の型は Supabase の型生成では配列に推論されうるため、`Database` 型から組み立てた
   明示的な row 型で受け、`toPublicImage` で camelCase に変換する。
-- 並び順は `favorites.created_at desc`。カーソルは `lt('created_at', cursor)`（`ImageRepository.list` と同型）。
+- 並び順は `favorites.created_at desc, id desc`。カーソルは `{ createdAt, id }` 複合 keyset（PostgREST `.or()`。`ImageRepository.list` と同型。Issue #327）。
 
 ### 5. `src/services/favorite-service.ts`
 
@@ -179,8 +179,8 @@ export interface Favorite {
 2. 未ログイン: ログイン誘導を描画して終了
 3. FavoriteService.listFavorites({ userId, limit: 20 })
 4. FavoriteRepository.listWithImages が favorites × lgtm_images!inner(status='active') を
-   created_at desc で limit 件取得
-5. limit ちょうどなら nextCursor = 末尾の favorites.created_at
+   created_at desc, id desc で limit 件取得
+5. limit ちょうどなら nextCursor = 末尾の `{ createdAt: favorites.created_at, id: favorites.id }` JSON
 6. FavoriteImages が ImageGrid + LoadMoreButton(endpoint='/api/favorites') を描画
 ```
 
@@ -282,7 +282,7 @@ docs/*.md                                                 (変更: 未実装注�
 
 ## パフォーマンス考慮事項
 
-- `favorites (user_id, created_at desc)` インデックスで一覧のカーソルページネーションを index scan にする。
+- `favorites (user_id, created_at desc, id desc)` インデックスで一覧の複合 keyset ページネーションを index scan にする。
 - `GET /api/favorites/ids` は「自分のお気に入り件数」に比例する。個人リストなので現実的には数百件規模で、
   1 セッション 1 回の取得なら問題ない。件数が肥大化したら「表示中の画像 ID を渡して絞る」方式へ切り替える。
 - 一覧は JOIN 1 回で画像本体まで取得し、N+1 を作らない。

@@ -20,18 +20,34 @@ async function clickLoadMore() {
   });
 }
 
+const INITIAL_CURSOR = JSON.stringify({
+  createdAt: '2026-05-18T00:00:00.000Z',
+  id: '00000000-0000-4000-8000-000000000001',
+});
+const NEXT_CURSOR = JSON.stringify({
+  createdAt: '2026-05-17T00:00:00.000Z',
+  id: '00000000-0000-4000-8000-000000000002',
+});
+const FAVORITES_CURSOR = JSON.stringify({
+  createdAt: '2026-08-20T00:00:00.000Z',
+  id: '00000000-0000-4000-8000-0000000000aa',
+});
+
 describe('LoadMoreButton', () => {
   it('クリックで cursor 付き API を叩き、取得分を追加表示する', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(200, { images: [makeApiImage({ id: 'next-1' })], nextCursor: null }),
     );
-    render(<LoadMoreButton initialCursor="2026-05-18T00:00:00.000Z" />);
+    render(<LoadMoreButton initialCursor={INITIAL_CURSOR} />);
 
     await clickLoadMore();
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/images?cursor=2026-05-18T00%3A00%3A00.000Z', {
-      cache: 'no-store',
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/images?cursor=${encodeURIComponent(INITIAL_CURSOR)}`,
+      {
+        cache: 'no-store',
+      },
+    );
     expect(screen.getByTestId('image-grid-extra')).toBeInTheDocument();
     // nextCursor が null になったのでボタンは消える
     expect(screen.queryByTestId('load-more-button')).not.toBeInTheDocument();
@@ -41,10 +57,10 @@ describe('LoadMoreButton', () => {
     fetchMock.mockResolvedValue(
       jsonResponse(200, {
         images: [makeApiImage({ id: 'next-1' })],
-        nextCursor: '2026-05-17T00:00:00.000Z',
+        nextCursor: NEXT_CURSOR,
       }),
     );
-    render(<LoadMoreButton initialCursor="2026-05-18T00:00:00.000Z" />);
+    render(<LoadMoreButton initialCursor={INITIAL_CURSOR} />);
 
     await clickLoadMore();
 
@@ -54,18 +70,21 @@ describe('LoadMoreButton', () => {
   // Issue #198: お気に入り一覧はレスポンス形状が同一なので endpoint 差し替えだけで再利用する
   it('endpoint を渡すとその API を叩く', async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, { images: [], nextCursor: null }));
-    render(<LoadMoreButton initialCursor="2026-08-20T00:00:00.000Z" endpoint="/api/favorites" />);
+    render(<LoadMoreButton initialCursor={FAVORITES_CURSOR} endpoint="/api/favorites" />);
 
     await clickLoadMore();
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/favorites?cursor=2026-08-20T00%3A00%3A00.000Z', {
-      cache: 'no-store',
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/favorites?cursor=${encodeURIComponent(FAVORITES_CURSOR)}`,
+      {
+        cache: 'no-store',
+      },
+    );
   });
 
   it('API が失敗したらエラーメッセージを表示する', async () => {
     fetchMock.mockResolvedValue(jsonResponse(500, {}));
-    render(<LoadMoreButton initialCursor="2026-05-18T00:00:00.000Z" />);
+    render(<LoadMoreButton initialCursor={INITIAL_CURSOR} />);
 
     await clickLoadMore();
 

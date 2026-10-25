@@ -342,11 +342,11 @@ describe('ImageService.listImages', () => {
     expect(result.nextCursor).toBeNull();
   });
 
-  it('返却件数 = limit のとき、末尾 createdAt の ISO 文字列を nextCursor に設定する', async () => {
+  it('返却件数 = limit のとき、末尾の複合カーソルを nextCursor に設定する', async () => {
     const mocks = buildMocks();
     const records = Array.from({ length: 3 }, (_, i) =>
       buildImage({
-        id: `image-${i + 1}`,
+        id: `00000000-0000-4000-8000-00000000000${i + 1}`,
         createdAt: new Date(Date.UTC(2026, 4, 4, 12, 0, i)),
       }),
     );
@@ -357,7 +357,12 @@ describe('ImageService.listImages', () => {
 
     expect(mocks.imageRepo.list).toHaveBeenCalledWith({ cursor: undefined, limit: 3 });
     expect(result.images).toHaveLength(3);
-    expect(result.nextCursor).toBe('2026-05-04T12:00:02.000Z');
+    expect(result.nextCursor).toBe(
+      JSON.stringify({
+        createdAt: '2026-05-04T12:00:02.000Z',
+        id: '00000000-0000-4000-8000-000000000003',
+      }),
+    );
   });
 
   it('返却件数 < limit のとき、nextCursor は null', async () => {
@@ -375,12 +380,16 @@ describe('ImageService.listImages', () => {
   it('cursor を渡すと repository.list へ伝播する', async () => {
     const mocks = buildMocks();
     mocks.imageRepo.list.mockResolvedValue([]);
+    const cursor = {
+      createdAt: '2026-05-04T11:00:00.000Z',
+      id: '00000000-0000-4000-8000-000000000099',
+    };
 
     const service = await buildService(mocks);
-    await service.listImages({ cursor: '2026-05-04T11:00:00.000Z', limit: 10 });
+    await service.listImages({ cursor, limit: 10 });
 
     expect(mocks.imageRepo.list).toHaveBeenCalledWith({
-      cursor: '2026-05-04T11:00:00.000Z',
+      cursor,
       limit: 10,
     });
   });

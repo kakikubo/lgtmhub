@@ -219,7 +219,7 @@ GET /api/images
 **クエリパラメータ**:
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|----|-----------|----|
-| `cursor` | string | - | ページネーション用カーソル（`createdAt` ISO文字列） |
+| `cursor` | string | - | ページネーション用カーソル（`{ createdAt, id }` の JSON 文字列。`createdAt` は ISO 8601、`id` は `lgtm_images.id`） |
 | `limit` | number | 16 | 取得件数（最大50、デフォルトは `LIST_IMAGES_DEFAULT_LIMIT`） |
 
 **レスポンス**:
@@ -233,7 +233,7 @@ GET /api/images
       "createdAt": "2026-05-02T00:00:00Z"
     }
   ],
-  "nextCursor": "2026-05-01T23:59:59Z"
+  "nextCursor": "{\"createdAt\":\"2026-05-01T23:59:59.000Z\",\"id\":\"uuid\"}"
 }
 ```
 
@@ -465,7 +465,7 @@ GET /api/favorites
 **クエリパラメータ**:
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|----|-----------|----|
-| `cursor` | string | - | ページネーション用カーソル（`favorites.created_at` ISO文字列） |
+| `cursor` | string | - | ページネーション用カーソル（`{ createdAt, id }` の JSON 文字列。`createdAt` はお気に入り登録日時、`id` は `favorites.id`） |
 | `limit` | number | 20 | 取得件数（最大50） |
 
 **レスポンス**: 画像一覧 API（`GET /api/images`）と同じ形。カード / グリッド / ページネーションの
@@ -484,7 +484,7 @@ GET /api/favorites
       "createdAt": "2026-05-02T00:00:00Z"
     }
   ],
-  "nextCursor": "2026-05-01T23:59:59Z"
+  "nextCursor": "{\"createdAt\":\"2026-05-01T23:59:59.000Z\",\"id\":\"favorite-uuid\"}"
 }
 ```
 
@@ -494,7 +494,7 @@ GET /api/favorites
 `lgtm_images!inner(...)` + `lgtm_images.status = 'active'` により行ごと除外される。
 
 **エラーレスポンス**:
-- 400 Bad Request: `cursor` が ISO 8601 でない / `limit` が不正な値
+- 400 Bad Request: `cursor` が複合 keyset JSON でない / `limit` が不正な値
 - 401 Unauthorized: 未ログイン
 - 500 Internal Server Error: それ以外
 
@@ -759,13 +759,13 @@ app/
 
 ```typescript
 interface ListImagesParams {
-  cursor?: string;       // 前ページ末尾の createdAt (ISO 8601 / UTC)
+  cursor?: { createdAt: string; id: string }; // 前ページ末尾の (createdAt, id)
   limit?: number;        // デフォルト 16 (LIST_IMAGES_DEFAULT_LIMIT)、最大 50
 }
 
 interface ListImagesResult {
   images: PublicLgtmImage[];   // {id, imageUrl, uploaderId, createdAt} のみ公開
-  nextCursor: string | null;   // 次ページが無ければ null
+  nextCursor: string | null;   // { createdAt, id } の JSON。次ページが無ければ null
 }
 
 class ImageService {
@@ -785,13 +785,13 @@ class ImageService {
 ```typescript
 interface ListFavoritesParams {
   userId: string;
-  cursor?: string;       // 前ページ末尾のお気に入り登録日時 (ISO 8601 / UTC)
+  cursor?: { createdAt: string; id: string }; // createdAt=お気に入り登録日時, id=favorites.id
   limit?: number;        // デフォルト 20 (LIST_FAVORITES_DEFAULT_LIMIT)、最大 50
 }
 
 interface ListFavoritesResult {
   images: PublicLgtmImage[];   // createdAt にはお気に入り登録日時が入る
-  nextCursor: string | null;   // 次ページが無ければ null
+  nextCursor: string | null;   // { createdAt, id } の JSON。次ページが無ければ null
 }
 
 class FavoriteService {
