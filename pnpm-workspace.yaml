@@ -23,6 +23,6 @@ overrides:
   fast-uri: ^4.0.0 # バックスラッシュ authority 区切りによる host confusion
   brace-expansion: ^5.0.8 # 展開長が無制限で OOM クラッシュする DoS
   smol-toml: ^1.7.1 # 不正な TOML による DoS (GHSA-7w5x-hrqm-74c2)。markdownlint-cli2 が 1.7.0 を固定ピンしている
-  markdown-it: ^15.0.3 # smartquotes / 複数行リンク参照定義の二次計算量による DoS (GHSA-r7fv-28h4-cvq7 / GHSA-gfr2-rv44-r23c)。markdownlint-cli2 が 15.0.1 を固定ピンしている
-  "@vercel/cli-config>zod": ^4.6.6 # 巨大な制約付きコレクション検証でのメモリ枯渇 (GHSA-mrhx-c7xc-m3w5)。@vercel/blob 配下の @vercel/cli-config が 4.1.11 を固定ピンしている
-  body-parser: ^2.4.0 # 圧縮ボディ末尾の余剰バイトによる DoS (GHSA-27r3-jxmh-p828)。devDep の shadcn 配下 (@modelcontextprotocol/sdk>express) のみ
+  markdown-it: ^15.0.3 # smartquotes / link reference の二乗時間 DoS (GHSA-r7fv-28h4-cvq7, GHSA-gfr2-rv44-r23c)。markdownlint-cli2 0.23 が 15.0.1 を固定ピンしている
+  zod: ^4.6.6 # GHSA-mrhx-c7xc-m3w5。@vercel/blob>@vercel/oidc>@vercel/cli-config が 4.1.11 を固定ピンしている
+  body-parser: ^2.4.0 # GHSA-27r3-jxmh-p828。devDep の shadcn>@modelcontextprotocol/sdk>express 配下のみ
