@@ -8,6 +8,7 @@ import {
   DuplicateImageError,
   ForbiddenError,
   NotFoundError,
+  RateLimitExceededError,
   UnauthorizedError,
 } from '@/src/lib/errors';
 
@@ -46,6 +47,14 @@ describe('errors', () => {
     const err = new DailyLimitExceededError();
     expect(err.code).toBe('DAILY_LIMIT_EXCEEDED');
     expect(err.message).toContain('10枚');
+  });
+
+  it('RateLimitExceededError は RATE_LIMIT_EXCEEDED と Retry-After 秒数を持つ', () => {
+    const err = new RateLimitExceededError(60);
+    expect(err.code).toBe('RATE_LIMIT_EXCEEDED');
+    expect(err.retryAfterSeconds).toBe(60);
+    expect(err.message).toContain('リクエストが多すぎます');
+    expect(err).toBeInstanceOf(AppError);
   });
 
   it('BadRequestError は BAD_REQUEST コードを返す', () => {

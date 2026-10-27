@@ -5,12 +5,14 @@ import {
   DuplicateImageError,
   ForbiddenError,
   NotFoundError,
+  RateLimitExceededError,
 } from '@/src/lib/errors';
 
 const createClient = vi.fn();
 const buildImageService = vi.fn();
 const requireAdmin = vi.fn();
 const revalidateTag = vi.fn();
+const consumeRegenerate = vi.fn();
 
 vi.mock('next/cache', () => ({
   revalidateTag: (tag: string) => revalidateTag(tag),
@@ -30,6 +32,10 @@ vi.mock('@/src/services/image-service', () => ({
   buildImageService: () => buildImageService(),
 }));
 
+vi.mock('@/src/services/rate-limit-service', () => ({
+  buildRateLimitService: () => ({ consumeRegenerate }),
+}));
+
 const VALID_UUID = '00000000-0000-4000-8000-000000000001';
 
 beforeEach(() => {
@@ -37,6 +43,8 @@ beforeEach(() => {
   buildImageService.mockReset();
   requireAdmin.mockReset();
   revalidateTag.mockReset();
+  consumeRegenerate.mockReset();
+  consumeRegenerate.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -80,6 +88,19 @@ describe('POST /api/images/[id]/regenerate', () => {
 
     const res = await callRegenerate(VALID_UUID);
     expect(res.status).toBe(403);
+    expect(buildImageService).not.toHaveBeenCalled();
+    expect(consumeRegenerate).not.toHaveBeenCalled();
+  });
+
+  it('レートリミット超過なら 429 を返し再生成しない', async () => {
+    createClient.mockResolvedValue({});
+    requireAdmin.mockResolvedValue({ userId: 'admin-1' });
+    consumeRegenerate.mockRejectedValue(new RateLimitExceededError(60));
+
+    const res = await callRegenerate(VALID_UUID, {});
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get('Retry-After')).toBe('60');
     expect(buildImageService).not.toHaveBeenCalled();
   });
 

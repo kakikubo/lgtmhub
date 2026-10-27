@@ -79,7 +79,11 @@ interface Mocks {
     listActiveIds: ReturnType<typeof vi.fn>;
     findManyActiveByIds: ReturnType<typeof vi.fn>;
   };
-  countRepo: { getCount: ReturnType<typeof vi.fn>; increment: ReturnType<typeof vi.fn> };
+  countRepo: {
+    getCount: ReturnType<typeof vi.fn>;
+    increment: ReturnType<typeof vi.fn>;
+    release: ReturnType<typeof vi.fn>;
+  };
   blob: {
     put: ReturnType<typeof vi.fn<BlobClient['put']>>;
     del: ReturnType<typeof vi.fn<BlobClient['del']>>;
@@ -103,6 +107,7 @@ function buildMocks(): Mocks {
     countRepo: {
       getCount: vi.fn().mockResolvedValue(0),
       increment: vi.fn().mockResolvedValue(1),
+      release: vi.fn().mockResolvedValue(undefined),
     },
     blob: {
       put: vi
@@ -159,21 +164,21 @@ function setupHappyPathMocks(): void {
 }
 
 describe('ImageService.createImage', () => {
-  it('preflight で 1 日の上限を超えていれば DailyLimitExceededError を throw する', async () => {
+  it('日次上限の increment が失敗したら取得前に DailyLimitExceededError を throw する', async () => {
     const mocks = buildMocks();
-    mocks.countRepo.getCount.mockResolvedValue(10);
+    mocks.countRepo.increment.mockRejectedValue(new DailyLimitExceededError());
 
     const service = await buildService(mocks);
 
     await expect(service.createImage('user-1', 'https://example.com/x.jpg')).rejects.toBeInstanceOf(
       DailyLimitExceededError,
     );
-    expect(mocks.countRepo.getCount).toHaveBeenCalledWith('user-1', '2026-05-04');
+    expect(mocks.countRepo.increment).toHaveBeenCalledWith('user-1', '2026-05-04', 10);
     expect(safeFetch).not.toHaveBeenCalled();
-    expect(mocks.countRepo.increment).not.toHaveBeenCalled();
+    expect(mocks.countRepo.release).not.toHaveBeenCalled();
   });
 
-  it('既存画像と pHash が重複したら DuplicateImageError を throw し、increment / Blob は呼ばれない', async () => {
+  it('既存画像と pHash が重複したら DuplicateImageError を throw し、枠を戻して Blob は作らない', async () => {
     const mocks = buildMocks();
     mocks.imageRepo.listActivePHashes.mockResolvedValue([
       { id: 'existing-1', pHash: 'a'.repeat(1024) },
@@ -191,13 +196,13 @@ describe('ImageService.createImage', () => {
     await expect(promise).rejects.toMatchObject({ existingImageId: 'existing-1' });
 
     expect(isDuplicate).toHaveBeenCalledTimes(1);
-    expect(mocks.countRepo.increment).not.toHaveBeenCalled();
+    expect(mocks.countRepo.increment).toHaveBeenCalledWith('user-1', '2026-05-04', 10);
+    expect(mocks.countRepo.release).toHaveBeenCalledWith('user-1', '2026-05-04');
     expect(mocks.blob.put).not.toHaveBeenCalled();
     expect(mocks.imageRepo.create).not.toHaveBeenCalled();
   });
 
-  it('正常系: Blob 保存 → increment → DB 登録 の順で実行する', async () => {
-    // Blob put を先に済ませることで、合成失敗時に daily 枠を無駄消費しない
+  it('正常系: increment → Blob 保存 → DB 登録 の順で実行し、枠は戻さない', async () => {
     const mocks = buildMocks();
     setupHappyPathMocks();
     mocks.imageRepo.create.mockResolvedValue(buildImage());
@@ -220,7 +225,8 @@ describe('ImageService.createImage', () => {
     const result = await service.createImage('user-1', 'https://example.com/x.jpg');
 
     expect(result.id).toBe('image-1');
-    expect(callOrder).toEqual(['blob.put', 'increment', 'imageRepo.create']);
+    expect(callOrder).toEqual(['increment', 'blob.put', 'imageRepo.create']);
+    expect(mocks.countRepo.release).not.toHaveBeenCalled();
     expect(mocks.blob.put).toHaveBeenCalledWith(
       expect.stringMatching(/^lgtm\/[0-9a-f-]+\.webp$/),
       Buffer.from('webp'),
@@ -263,24 +269,7 @@ describe('ImageService.createImage', () => {
     );
   });
 
-  it('atomic increment が DailyLimitExceededError を throw した場合、DB は触らず新 Blob は del でロールバックする (TOCTOU レース敗北)', async () => {
-    // Blob put は増分カウント前に走るため、TOCTOU 敗北時は del で孤児を回収する
-    const mocks = buildMocks();
-    setupHappyPathMocks();
-    mocks.countRepo.getCount.mockResolvedValue(9);
-    mocks.countRepo.increment.mockRejectedValue(new DailyLimitExceededError());
-
-    const service = await buildService(mocks);
-    await expect(service.createImage('user-1', 'https://example.com/x.jpg')).rejects.toBeInstanceOf(
-      DailyLimitExceededError,
-    );
-
-    expect(mocks.blob.put).toHaveBeenCalled();
-    expect(mocks.imageRepo.create).not.toHaveBeenCalled();
-    expect(mocks.blob.del).toHaveBeenCalledWith('https://blob.example/lgtm/x.webp');
-  });
-
-  it('DB 登録に失敗したら Blob を del() でロールバックして例外を再 throw する', async () => {
+  it('DB 登録に失敗したら Blob を消し、消費した日次枠を戻す', async () => {
     const mocks = buildMocks();
     setupHappyPathMocks();
     mocks.imageRepo.create.mockRejectedValue(new DatabaseError('insert failed'));
@@ -294,6 +283,7 @@ describe('ImageService.createImage', () => {
     expect(mocks.countRepo.increment).toHaveBeenCalled();
     expect(mocks.blob.put).toHaveBeenCalled();
     expect(mocks.blob.del).toHaveBeenCalledWith('https://blob.example/lgtm/x.webp');
+    expect(mocks.countRepo.release).toHaveBeenCalledWith('user-1', '2026-05-04');
   });
 });
 

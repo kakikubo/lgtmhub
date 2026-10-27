@@ -57,6 +57,16 @@ describe('HomeImages', () => {
     expect(screen.getByTestId('home-images')).toHaveAttribute('data-mode', 'random');
   });
 
+  it('ランダム取得が 429 ならレートリミットの文言を出す', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(429, { error: 'too many' }));
+    render(<HomeImages {...baseProps} />);
+
+    await clickRandom();
+
+    expect(screen.getByText(/リクエストが多すぎます/)).toBeInTheDocument();
+    expect(screen.getByTestId('home-images')).toHaveAttribute('data-mode', 'default');
+  });
+
   it('ランダム取得が失敗したらエラーを表示し default モードのまま', async () => {
     fetchMock.mockResolvedValue(jsonResponse(503, {}));
     render(<HomeImages {...baseProps} />);

@@ -68,6 +68,10 @@ export function HomeImages({
     try {
       // 押下のたびに別の 16 枚を取得するためキャッシュを無効化する
       const res = await fetch('/api/images/random', { cache: 'no-store' });
+      if (res.status === 429) {
+        setError('リクエストが多すぎます。しばらく待ってから再度お試しください');
+        return;
+      }
       if (!res.ok) throw new Error(`status ${res.status}`);
       const json = randomImagesResponseSchema.parse(await res.json());
       const images: PublicLgtmImage[] = json.images.map((img) => ({

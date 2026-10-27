@@ -281,6 +281,7 @@ GET /api/images/random
 - ランダム状態はクライアントの一時状態。リロード・再訪問で通常表示（新着順 16 枚 + もっと読み込む）へ自動的に戻る。
 
 **エラーレスポンス**:
+- 429 Too Many Requests: 同一 IP から 60 秒間に 30 回を超えた（`Retry-After: 60`、`Cache-Control: no-store`）
 - 500 Internal Server Error: サーバー内部エラー
 
 ---
@@ -303,12 +304,14 @@ POST /api/images
 **処理フロー**:
 
 1. セッション確認（未ログインなら 401）
-2. 当日の登録枚数チェック（10枚以上なら 429）
-3. 外部URL取得・SSRF検証・フォーマット/サイズ検証（失敗なら 400）
-4. pHash計算 → DB全件と比較し重複検出（重複なら 409・`existingImageId`を返却）
-5. LGTM文字合成 + WebP変換 + 長辺 400px にリサイズ（元アスペクト比保持）。アニメーションGIF / アニメーションWebP入力 (フレーム数 ≤ 150) は全フレームに同じ LGTM 文字を焼き込んだアニメーション WebP として保存し、`is_animated = true` で記録する
-6. Vercel Blob にアップロード
-7. `lgtm_images` レコード作成 + `daily_upload_counts` を atomic にインクリメント
+2. リクエストレート制限（同一ユーザー 60 秒 5 回、または同一 IP 60 秒 20 回を超えたら 429。`Retry-After: 60`）
+3. 入力検証
+4. `daily_upload_counts` を atomic に +1（10 枚以上なら 429。取得・合成より前）
+5. 外部URL取得・SSRF検証・フォーマット/サイズ検証（失敗なら 400。消費した日次枠は戻す）
+6. pHash計算 → DB全件と比較し重複検出（重複なら 409・`existingImageId`を返却。消費した日次枠は戻す）
+7. LGTM文字合成 + WebP変換 + 長辺 400px にリサイズ（元アスペクト比保持）。アニメーションGIF / アニメーションWebP入力 (フレーム数 ≤ 150) は全フレームに同じ LGTM 文字を焼き込んだアニメーション WebP として保存し、`is_animated = true` で記録する
+8. Vercel Blob にアップロード
+9. `lgtm_images` レコード作成（失敗時は Blob を削除し、消費した日次枠を戻す）
 
 詳細は本ドキュメント末尾の「ユースケース: 画像登録フロー」シーケンス図を参照。
 
@@ -324,7 +327,7 @@ POST /api/images
 - 400 Bad Request: URLが無効、対応外フォーマット、ファイルサイズ超過
 - 401 Unauthorized: 未ログイン
 - 409 Conflict: 重複画像あり（`existingImageId` を返す）
-- 429 Too Many Requests: 1日の登録上限（10枚）超過
+- 429 Too Many Requests: リクエストレート制限、または 1日の登録上限（10枚）超過
 - 500 Internal Server Error: 画像取得・合成失敗
 
 ---
@@ -383,7 +386,7 @@ POST /api/images/:id/regenerate
 5. `revalidateTag(HOME_IMAGES_CACHE_TAG, 'max')` で一覧・詳細のキャッシュを破棄。
 6. `console.info` で `requesterId` / `imageId` / `urlChanged` / `previousImageUrl` / `newImageUrl` を監査ログ出力（監査カラムは追加しない）。
 
-**日次アップロード上限は加算しない**（新規投稿ではなく既存の作り直しのため）。
+**日次アップロード上限は加算しない**（新規投稿ではなく既存の作り直しのため）。同一管理者から 60 秒間に 5 回を超える再生成は 429（`Retry-After: 60`）。
 
 **レスポンス**: `200 OK`
 ```json
@@ -396,6 +399,7 @@ POST /api/images/:id/regenerate
 - 403 Forbidden: 非管理者
 - 404 Not Found: 画像が存在しない / 論理削除済み
 - 409 Conflict: 差し替え先が他の active 画像と実質同一（重複判定は自レコードを除外）
+- 429 Too Many Requests: リクエストレート制限
 - 500 Internal Server Error: それ以外
 
 ---
@@ -550,14 +554,19 @@ sequenceDiagram
     U->>FE: 画像URLを入力して送信
     FE->>API: POST /api/images { imageUrl }
     API->>API: セッション確認（未ログインなら401）
-    API->>DB: 本日の登録数を確認
-    DB-->>API: count
-    alt count >= 10
+    API->>DB: リクエストレート制限を消費
+    alt レート超過
+        API-->>FE: 429 Too Many Requests
+        FE-->>U: 「リクエストが多すぎます」
+    end
+    API->>DB: daily_upload_counts を atomic に +1
+    alt 日次上限超過
         API-->>FE: 429 Too Many Requests
         FE-->>U: 「本日の登録上限に達しました」
     end
     API->>Ext: 画像URL取得（fetch）
     alt 取得失敗 or 非対応フォーマット or サイズ超過
+        API->>DB: 日次枠を 1 戻す
         API-->>FE: 400 Bad Request
         FE-->>U: エラーメッセージ
     end
@@ -565,6 +574,7 @@ sequenceDiagram
     Sharp-->>API: pHash値
     API->>DB: 同一pHashの画像を検索
     alt 重複あり
+        API->>DB: 日次枠を 1 戻す
         API-->>FE: 409 Conflict { existingImageId }
         FE-->>U: 既存画像ページへリダイレクト
     end
@@ -572,7 +582,7 @@ sequenceDiagram
     Sharp-->>API: 合成済み画像バッファ
     API->>Blob: 画像をアップロード
     Blob-->>API: 公開URL
-    API->>DB: lgtm_imagesレコード作成 + daily_upload_counts更新
+    API->>DB: lgtm_imagesレコード作成
     DB-->>API: 作成済みレコード
     API-->>FE: 201 Created { id, imageUrl }
     FE-->>U: 「登録完了！」+ 画像詳細へ遷移
@@ -818,7 +828,8 @@ class FavoriteService {
 | SSRF（外部URL取得時） | プライベートIPレンジ（10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8）へのリクエストをブロック |
 | 不正な画像形式 | Sharpのメタデータ検証でMIMEタイプを確認（JPEG/PNG/GIF/WebPのみ許可） |
 | 他ユーザーの画像削除 | APIレベルで `uploaderId === requesterId` を検証（Supabase RLSでも二重チェック） |
-| 1日10枚制限の回避 | `daily_upload_counts` をDB側でatomicにインクリメント |
+| 1日10枚制限の回避 | `daily_upload_counts` を取得・合成の前に DB 側で atomic にインクリメントし、失敗時は枠を戻す |
+| 高コスト API の連打 | `rate_limit_buckets` の固定ウィンドウ。`/api/images/random` は IP、`POST /api/images` は IP とユーザー、再生成は管理者ユーザー |
 | セッション偽装 | Supabase Auth JWTを全APIルートで検証 |
 
 ### Supabase RLS ポリシー

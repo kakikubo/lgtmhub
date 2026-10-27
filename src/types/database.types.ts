@@ -155,6 +155,24 @@ export type Database = {
           },
         ]
       }
+      rate_limit_buckets: {
+        Row: {
+          count: number
+          key: string
+          window_start: string
+        }
+        Insert: {
+          count: number
+          key: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          key?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           avatar_url: string
@@ -190,8 +208,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      consume_rate_limit: {
+        Args: { p_key: string; p_limit: number; p_window_seconds: number }
+        Returns: boolean
+      }
       increment_daily_upload_count: {
         Args: { p_date: string; p_max?: number; p_user_id: string }
+        Returns: number
+      }
+      release_daily_upload_count: {
+        Args: { p_date: string; p_user_id: string }
         Returns: number
       }
     }

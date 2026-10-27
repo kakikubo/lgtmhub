@@ -8,12 +8,14 @@ import {
   DuplicateImageError,
   ForbiddenError,
   NotFoundError,
+  RateLimitExceededError,
   UnauthorizedError,
 } from '@/src/lib/errors';
 import { createClient } from '@/src/lib/supabase/server';
 import { regenerateImageRequestSchema } from '@/src/lib/validation/image';
 import { HOME_IMAGES_CACHE_TAG } from '@/src/services/cache/list-home-images';
 import { buildImageService } from '@/src/services/image-service';
+import { buildRateLimitService } from '@/src/services/rate-limit-service';
 
 // アニメーション GIF → アニメーション WebP の同期合成は最大 150 フレーム ×
 // LGTM オーバーレイで数秒〜十数秒かかる。/api/images (POST) と同じ 60 秒に拡張する。
@@ -41,6 +43,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: message }, { status: 400 });
     }
 
+    await buildRateLimitService().consumeRegenerate(userId);
+
     const service = buildImageService(supabase);
     const { image, previousImageUrl, urlChanged } = await service.regenerateImage(
       parsedParams.data.id,
@@ -61,6 +65,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json({ id: image.id, imageUrl: image.imageUrl }, { status: 200 });
   } catch (err) {
+    if (err instanceof RateLimitExceededError) {
+      return NextResponse.json(
+        { error: err.message },
+        { status: 429, headers: { 'Retry-After': String(err.retryAfterSeconds) } },
+      );
+    }
     if (err instanceof DuplicateImageError) {
       return NextResponse.json(
         { error: err.message, existingImageId: err.existingImageId },

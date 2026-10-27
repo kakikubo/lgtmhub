@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DatabaseError } from '@/src/lib/errors';
+import { DatabaseError, RateLimitExceededError } from '@/src/lib/errors';
 import { randomImagesResponseSchema } from '@/src/lib/validation/image';
 
 const createClient = vi.fn();
 const buildImageService = vi.fn();
+const consumeRandom = vi.fn();
 
 // route は cacheComponents 下で dynamic 化するため `connection()` を呼ぶ。
 // 単体テストには Next のリクエストスコープが無いので no-op に差し替える (NextResponse は実物を維持)。
@@ -23,6 +24,10 @@ vi.mock('@/src/services/image-service', () => ({
   buildImageService: () => buildImageService(),
 }));
 
+vi.mock('@/src/services/rate-limit-service', () => ({
+  buildRateLimitService: () => ({ consumeRandom }),
+}));
+
 const IMAGE = {
   id: 'img-1',
   imageUrl: 'https://blob.example.com/lgtm/img-1.webp',
@@ -36,6 +41,8 @@ const IMAGE = {
 beforeEach(() => {
   createClient.mockReset();
   buildImageService.mockReset();
+  consumeRandom.mockReset();
+  consumeRandom.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -44,7 +51,10 @@ afterEach(() => {
 
 async function callGet() {
   const { GET } = await import('@/app/api/images/random/route');
-  return GET();
+  const request = new Request('http://localhost/api/images/random', {
+    headers: { 'x-real-ip': '203.0.113.5' },
+  });
+  return GET(request as never);
 }
 
 describe('GET /api/images/random', () => {
@@ -80,5 +90,18 @@ describe('GET /api/images/random', () => {
 
     expect(res.status).toBe(500);
     consoleErrorSpy.mockRestore();
+  });
+
+  it('レートリミット超過なら 429 を返し、画像取得はしない', async () => {
+    consumeRandom.mockRejectedValue(new RateLimitExceededError(60));
+
+    const res = await callGet();
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get('Retry-After')).toBe('60');
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(buildImageService).not.toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.error).toContain('リクエストが多すぎます');
   });
 });

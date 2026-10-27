@@ -78,6 +78,18 @@ describe('DailyUploadCountRepository.increment', () => {
     );
   });
 
+  it('release は RPC エラーを DatabaseError にする', async () => {
+    const supabase = createRpcStub({ data: null, error: { message: 'rpc failed' } });
+    const repo = new DailyUploadCountRepository(supabase);
+    await expect(repo.release('user-1', '2026-05-04')).rejects.toBeInstanceOf(DatabaseError);
+  });
+
+  it('release が成功したら例外を出さない', async () => {
+    const supabase = createRpcStub({ data: 3, error: null });
+    const repo = new DailyUploadCountRepository(supabase);
+    await expect(repo.release('user-1', '2026-05-04')).resolves.toBeUndefined();
+  });
+
   it('P0001 でもメッセージが異なる場合は DatabaseError として扱う', async () => {
     const supabase = createRpcStub({
       data: null,
