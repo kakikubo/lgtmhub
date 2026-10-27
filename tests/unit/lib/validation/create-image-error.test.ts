@@ -45,6 +45,14 @@ describe('mapCreateImageError', () => {
     expect(result.existingImageId).toBeUndefined();
   });
 
+  it('429: レートリミットの本文をそのまま返す', () => {
+    const result = mapCreateImageError(429, {
+      error: 'リクエストが多すぎます。しばらく待ってから再度お試しください',
+    });
+    expect(result.message).toContain('リクエストが多すぎます');
+    expect(result.message).not.toContain('本日の登録上限');
+  });
+
   it('429: 上限到達メッセージを返す', () => {
     const result = mapCreateImageError(429, { error: '本日の登録上限(10枚)に達しました' });
     expect(result.message).toContain('本日の登録上限');

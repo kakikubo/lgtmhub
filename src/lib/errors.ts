@@ -36,6 +36,13 @@ export class DailyLimitExceededError extends AppError {
   }
 }
 
+export class RateLimitExceededError extends AppError {
+  constructor(public readonly retryAfterSeconds: number) {
+    super('リクエストが多すぎます。しばらく待ってから再度お試しください', 'RATE_LIMIT_EXCEEDED');
+    this.name = 'RateLimitExceededError';
+  }
+}
+
 export class BadRequestError extends AppError {
   constructor(message: string) {
     super(message, 'BAD_REQUEST');

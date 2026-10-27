@@ -1,12 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { del, put } from '@vercel/blob';
-import {
-  DailyLimitExceededError,
-  DuplicateImageError,
-  ForbiddenError,
-  NotFoundError,
-} from '@/src/lib/errors';
+import { DuplicateImageError, ForbiddenError, NotFoundError } from '@/src/lib/errors';
 import { safeFetch } from '@/src/lib/http/safe-fetch';
 import { calculatePHash, isDuplicate } from '@/src/lib/image/calculate-phash';
 import { composeLgtmImage } from '@/src/lib/image/compose-lgtm';
@@ -182,57 +177,47 @@ export class ImageService {
    * 画像登録のオーケストレーション。
    *
    * 順序の意図:
-   *   1. preflight `getCount` で「明らかに上限超え」を早期に弾く (UX のため)
-   *   2. 取得 → 検証 → pHash → 重複判定 → 合成 を行う
-   *   3. atomic な `increment` で「上限内なら +1」をレース無く確定する。
-   *      ここで失敗 (DailyLimitExceededError) しても Blob はまだアップロードしていないので
-   *      ロールバックは不要。
-   *   4. Blob 保存 → DB 登録の順で実行する。DB 登録が最後なので、DB に
-   *      "Blob 不在の active 行" が残るケースが構造的に存在しない。
-   *   5. DB 登録が失敗した場合のみ Blob を `del()` でロールバックする。
-   *      この場合、当日の枠は 1 つ消費済みのままだが、レアな異常系のため許容する。
+   *   1. atomic な `increment` を取得・合成より前に行う。上限超過は
+   *      高コスト処理の前に DailyLimitExceededError で終わる (Issue #275)。
+   *   2. 取得 → 検証 → pHash → 重複判定 → 合成 → Blob put。
+   *   3. DB 登録。DB 登録が最後なので、"Blob 不在の active 行" は残らない。
+   *   4. 2 または 3 が失敗したら、消費した日次枠を `release` で戻す。
+   *      Blob を作った後の失敗は `del()` も行う。
    */
   async createImage(uploaderId: string, imageUrl: string): Promise<LgtmImage> {
     const today = formatUtcDate(this.clock());
 
-    const currentCount = await this.countRepo.getCount(uploaderId, today);
-    if (currentCount >= MAX_DAILY_UPLOADS) {
-      throw new DailyLimitExceededError();
-    }
+    // 上限チェックと +1 は RPC 内で atomic。並列リクエストはここで弾かれる。
+    await this.countRepo.increment(uploaderId, today, MAX_DAILY_UPLOADS);
 
-    // 取得 → 検証 → pHash → 重複判定 → 合成 → Blob put をまとめて実行する。
-    // 重複判定は「閲覧可能な画像」のみを対象とする (status='active')。
-    // 論理削除済み画像は導線上参照できないため、再登録できる方が UX として自然。
-    // 全件突き合わせは 10 万件超で pgvector 移行を検討する (architecture.md 参照)。
-    const variant = await buildLgtmVariant(this.imageRepo, this.blob, imageUrl, undefined);
-
-    // 上限チェック + atomic increment は RPC 内で完結する (TOCTOU レース対策)。
-    // Blob put の後に呼ぶことで「DB commit 直前」まで消費を遅延させ、pHash / 合成失敗時に
-    // 枠を無駄に消費しないようにする。ここで失敗したら新 Blob をロールバックする。
     try {
-      await this.countRepo.increment(uploaderId, today);
+      // 重複判定は「閲覧可能な画像」のみを対象とする (status='active')。
+      // 論理削除済み画像は導線上参照できないため、再登録できる方が UX として自然。
+      // 全件突き合わせは 10 万件超で pgvector 移行を検討する (architecture.md 参照)。
+      const variant = await buildLgtmVariant(this.imageRepo, this.blob, imageUrl, undefined);
+
+      try {
+        return await this.imageRepo.create({
+          uploaderId,
+          originalUrl: imageUrl,
+          imageUrl: variant.blobUrl,
+          pHash: variant.pHash,
+          width: variant.width,
+          height: variant.height,
+          fileSizeBytes: variant.fileSizeBytes,
+          mimeType: 'image/webp',
+          // アニメーション WebP / 静止 WebP の判定は compose 結果に従う (Issue #201)
+          isAnimated: variant.isAnimated,
+          status: 'active',
+        });
+      } catch (err) {
+        await this.blob.del(variant.blobUrl).catch(() => undefined);
+        throw err;
+      }
     } catch (err) {
-      await this.blob.del(variant.blobUrl).catch(() => undefined);
-      throw err;
-    }
-
-    try {
-      return await this.imageRepo.create({
-        uploaderId,
-        originalUrl: imageUrl,
-        imageUrl: variant.blobUrl,
-        pHash: variant.pHash,
-        width: variant.width,
-        height: variant.height,
-        fileSizeBytes: variant.fileSizeBytes,
-        mimeType: 'image/webp',
-        // アニメーション WebP / 静止 WebP の判定は compose 結果に従う (Issue #201)
-        isAnimated: variant.isAnimated,
-        status: 'active',
+      await this.countRepo.release(uploaderId, today).catch((releaseErr: unknown) => {
+        console.warn('[createImage] failed to release daily upload count', releaseErr);
       });
-    } catch (err) {
-      // DB 登録失敗時は Blob をロールバックして孤児ファイルを残さない
-      await this.blob.del(variant.blobUrl).catch(() => undefined);
       throw err;
     }
   }

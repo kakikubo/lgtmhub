@@ -37,6 +37,9 @@ export function mapCreateImageError(status: number, body: unknown): CreateImageE
         existingImageId,
       };
     case 429:
+      if (errorText?.includes('リクエストが多すぎます')) {
+        return { message: errorText };
+      }
       return {
         message: '本日の登録上限(10枚)に達しました。明日再度お試しください',
       };

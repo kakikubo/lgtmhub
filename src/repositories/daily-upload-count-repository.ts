@@ -24,10 +24,11 @@ export class DailyUploadCountRepository {
    * 上限内のときだけ atomic に +1 する。RPC が `daily_limit_exceeded` を raise した場合は
    * `DailyLimitExceededError` に変換することで、Service 層は instanceof で扱える。
    */
-  async increment(userId: string, date: string): Promise<number> {
+  async increment(userId: string, date: string, max = 10): Promise<number> {
     const { data, error } = await this.supabase.rpc('increment_daily_upload_count', {
       p_user_id: userId,
       p_date: date,
+      p_max: max,
     });
 
     if (error) {
@@ -43,5 +44,17 @@ export class DailyUploadCountRepository {
       throw new DatabaseError('increment_daily_upload_count が予期しない値を返しました');
     }
     return data;
+  }
+
+  /**
+   * `increment` で消費した 1 枠を戻す。取得・合成・DB 登録が失敗したときだけ呼ぶ。
+   */
+  async release(userId: string, date: string): Promise<void> {
+    const { error } = await this.supabase.rpc('release_daily_upload_count', {
+      p_user_id: userId,
+      p_date: date,
+    });
+
+    if (error) throw new DatabaseError(error.message);
   }
 }

@@ -10,7 +10,7 @@ service を呼ぶ。参照: app/api/images/route.ts
   レスポンス側のスキーマも定義する。クライアントが fetch 結果を safeParse して
   型ズレを実行時検出するため。参照: src/lib/validation/image.ts
 - エラー変換は catch で instanceof を具体サブクラス → AppError の順に並べる
-  (DuplicateImageError→409, DailyLimitExceededError→429, NotFoundError→404,
+  (DuplicateImageError→409, RateLimitExceededError→429, DailyLimitExceededError→429, NotFoundError→404,
   UnauthorizedError→401, ForbiddenError→403, BadRequestError→400, AppError→500)。
   error.code 文字列では分岐しない
 - 'use cache' + cacheTag されたデータを変更する route は revalidateTag を呼ぶ。

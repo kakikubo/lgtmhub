@@ -177,6 +177,7 @@ Presentation → API → Service → Data
   - Supabase Row Level Security（RLS）を全テーブルで有効化
   - クライアントから直接Supabaseに接続せず、Next.js Route Handler を経由
   - E2E 専用の `/api/auth/test-signin` は `E2E_TEST_MODE === 'true'` かつ `VERCEL_ENV !== 'production'` のときのみ有効。Vercel 本番では環境変数が誤混入しても 403 を返す
+  - `GET /api/images/random` と高コストな `POST /api/images` / 再生成は `rate_limit_buckets` で固定ウィンドウ制限する。RPC は `service_role` からのみ実行する（Issue #275）
 - **機密情報管理**:
   - Vercel環境変数で管理（コミット禁止）
   - 主な環境変数:

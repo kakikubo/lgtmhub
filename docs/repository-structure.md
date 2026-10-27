@@ -43,6 +43,7 @@ lgtmhub/
 │   ├── services/               # Service Layer（ビジネスロジック）
 │   │   ├── image-service.ts
 │   │   ├── favorite-service.ts
+│   │   ├── rate-limit-service.ts
 │   │   ├── user-profile-service.ts
 │   │   └── cache/
 │   │       └── list-home-images.ts # トップページ一覧のキャッシュ境界
@@ -50,6 +51,7 @@ lgtmhub/
 │   │   ├── image-repository.ts
 │   │   ├── favorite-repository.ts
 │   │   ├── daily-upload-count-repository.ts
+│   │   ├── rate-limit-repository.ts
 │   │   └── user-profile-repository.ts
 │   ├── lib/                    # 技術ユーティリティ（フレームワーク非依存）
 │   │   ├── errors.ts               # ドメインエラークラス集約
@@ -62,7 +64,8 @@ lgtmhub/
 │   │   │   ├── calculate-phash.ts  # pHash計算
 │   │   │   └── validate-image.ts   # フォーマット・サイズ検証
 │   │   ├── http/
-│   │   │   └── safe-fetch.ts       # SSRF対策付きfetch
+│   │   │   ├── safe-fetch.ts       # SSRF対策付きfetch
+│   │   │   └── client-ip.ts        # クライアント IP の取り出し
 │   │   ├── profile/
 │   │   │   └── resolve-uploader-display.ts # 投稿者の表示名・アバター解決
 │   │   ├── validation/             # zod スキーマ集約（API入力検証）
@@ -72,7 +75,8 @@ lgtmhub/
 │   │   └── supabase/
 │   │       ├── client.ts           # クライアントサイドSupabase
 │   │       ├── server.ts           # サーバーサイドSupabase
-│   │       └── anon.ts             # 匿名（未認証）向けSupabase
+│   │       ├── anon.ts             # 匿名（未認証）向けSupabase
+│   │       └── service.ts          # service_role（サーバー専用）
 │   └── types/                  # 共通型定義
 │       ├── image.ts
 │       ├── favorite.ts
@@ -238,6 +242,7 @@ app/api/images/route.ts  →  src/services/image-service.ts  →  src/repositori
 
 **配置ファイル**:
 - `image-service.ts`: 画像登録・削除・一覧取得のオーケストレーション
+- `rate-limit-service.ts`: API ごとの固定ウィンドウ制限（超過時は `RateLimitExceededError`）
 - `favorite-service.ts`: お気に入りの追加・解除・一覧取得・お気に入り済み画像 ID 取得
 - `user-profile-service.ts`: ユーザープロフィールの単一 / 複数取得 (画像一覧の N+1 回避を含む)
 - `cache/list-home-images.ts`: トップページ初期一覧の `'use cache'` 境界。ImageService を呼ぶため lib ではなくここに置く
@@ -271,7 +276,8 @@ src/services/
 **配置ファイル**:
 - `image-repository.ts`: `lgtm_images` テーブルのCRUD、pHash検索
 - `favorite-repository.ts`: `favorites` テーブルのCRUD、`lgtm_images` との内部結合による一覧取得
-- `daily-upload-count-repository.ts`: 日次カウントのUPSERT・取得
+- `daily-upload-count-repository.ts`: 日次カウントのUPSERT・取得・失敗時の減算
+- `rate-limit-repository.ts`: `consume_rate_limit` RPC の呼び出し
 - `user-profile-repository.ts`: `user_profiles` テーブルの取得（単一 / 複数）
 
 **命名規則**:

@@ -4,6 +4,7 @@ import {
   BadRequestError,
   DailyLimitExceededError,
   DuplicateImageError,
+  RateLimitExceededError,
   UnauthorizedError,
 } from '@/src/lib/errors';
 import {
@@ -15,6 +16,7 @@ import { HOME_IMAGES_CACHE_TAG } from '@/src/services/cache/list-home-images';
 const createClient = vi.fn();
 const buildImageService = vi.fn();
 const revalidateTag = vi.fn();
+const consumeUpload = vi.fn();
 
 vi.mock('next/cache', () => ({
   // 他の route テストと違い可変長で受ける。POST は revalidateTag(tag, 'max') と
@@ -32,6 +34,10 @@ vi.mock('@/src/services/image-service', () => ({
   buildImageService: () => buildImageService(),
 }));
 
+vi.mock('@/src/services/rate-limit-service', () => ({
+  buildRateLimitService: () => ({ consumeUpload }),
+}));
+
 const USER = { id: 'user-1' };
 const VALID_URL = 'https://example.com/cat.png';
 
@@ -46,6 +52,8 @@ beforeEach(() => {
   createClient.mockReset();
   buildImageService.mockReset();
   revalidateTag.mockReset();
+  consumeUpload.mockReset();
+  consumeUpload.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -70,6 +78,7 @@ describe('POST /api/images', () => {
 
     expect(res.status).toBe(401);
     expect(buildImageService).not.toHaveBeenCalled();
+    expect(consumeUpload).not.toHaveBeenCalled();
   });
 
   it('body が JSON として壊れていれば 400 を返す', async () => {
@@ -128,6 +137,19 @@ describe('POST /api/images', () => {
     const body = createImageErrorResponseSchema.parse(await res.json());
     expect(body.existingImageId).toBe('img-existing');
     expect(revalidateTag).not.toHaveBeenCalled();
+  });
+
+  it('レートリミット超過なら 429 を返し Service を呼ばない', async () => {
+    mockAuthenticatedAs(USER);
+    consumeUpload.mockRejectedValue(new RateLimitExceededError(60));
+
+    const res = await callPost({ imageUrl: VALID_URL });
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get('Retry-After')).toBe('60');
+    expect(buildImageService).not.toHaveBeenCalled();
+    const body = createImageErrorResponseSchema.parse(await res.json());
+    expect(body.error).toContain('リクエストが多すぎます');
   });
 
   it('1日の登録上限を超えていれば 429 を返す', async () => {

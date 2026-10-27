@@ -5,13 +5,16 @@ import {
   BadRequestError,
   DailyLimitExceededError,
   DuplicateImageError,
+  RateLimitExceededError,
   UnauthorizedError,
 } from '@/src/lib/errors';
+import { clientIp } from '@/src/lib/http/client-ip';
 import { createAnonClient } from '@/src/lib/supabase/anon';
 import { createClient } from '@/src/lib/supabase/server';
 import { createImageRequestSchema, listImagesQuerySchema } from '@/src/lib/validation/image';
 import { HOME_IMAGES_CACHE_TAG } from '@/src/services/cache/list-home-images';
 import { buildImageService } from '@/src/services/image-service';
+import { buildRateLimitService } from '@/src/services/rate-limit-service';
 
 // アニメーション GIF → アニメーション WebP の同期合成は最大 150 フレーム ×
 // LGTM オーバーレイで数秒〜十数秒かかる。Vercel デフォルトの 10 秒では足りないため
@@ -70,6 +73,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    await buildRateLimitService().consumeUpload(user.id, clientIp(request.headers));
     const service = buildImageService(supabase);
     const image = await service.createImage(user.id, parsed.data.imageUrl);
     revalidateTag(HOME_IMAGES_CACHE_TAG, 'max');
@@ -79,6 +83,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: err.message, existingImageId: err.existingImageId },
         { status: 409 },
+      );
+    }
+    if (err instanceof RateLimitExceededError) {
+      return NextResponse.json(
+        { error: err.message },
+        { status: 429, headers: { 'Retry-After': String(err.retryAfterSeconds) } },
       );
     }
     if (err instanceof DailyLimitExceededError) {
