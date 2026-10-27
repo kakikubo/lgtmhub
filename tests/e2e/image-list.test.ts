@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { devices, expect, type Page, test } from '@playwright/test';
 import { PRIORITY_IMAGE_COUNT, SEED_IMAGE_COUNT } from './fixtures/seed-images';
 
 // Issue #279: 以前は「grid が出ていなければ test.skip()」というガードを各所に置いていたため、
@@ -172,6 +172,52 @@ test.describe('一覧カードのホバーコピーボタン (Issue #169)', () =
     // 立てないため、ホバーが外れた時点でオーバーレイは消える。
     await page.getByRole('heading', { name: 'Make every LGTM count.' }).hover();
     await expect(copyButton).toHaveCSS('opacity', '0');
+  });
+});
+
+// Issue #374: Tailwind v4 の group-hover は @media (hover: hover) 内にしか出ない。
+// タッチ端末ではホバーも :focus-visible も起きないため、hover: none のときだけ常時表示する。
+// Playwright のモバイルデバイスは viewport と touch だけを模倣し、(hover: none) は立てない。
+test.describe('タッチ端末の一覧カード操作 (Issue #374)', () => {
+  // defaultBrowserType を含む device 全体は describe 内の test.use に渡せない。
+  const pixel5 = devices['Pixel 5'];
+  test.use({
+    viewport: pixel5.viewport,
+    userAgent: pixel5.userAgent,
+    deviceScaleFactor: pixel5.deviceScaleFactor,
+    isMobile: pixel5.isMobile,
+    hasTouch: pixel5.hasTouch,
+  });
+
+  test('ホバーできない端末ではコピーとお気に入りが最初から操作できる', async ({
+    page,
+    context,
+  }) => {
+    const client = await context.newCDPSession(page);
+    await client.send('Emulation.setEmulatedMedia', {
+      features: [
+        { name: 'hover', value: 'none' },
+        { name: 'pointer', value: 'coarse' },
+      ],
+    });
+
+    await context.grantPermissions(['clipboard-write']);
+    const grid = await gotoAndGetGrid(page);
+    expect(await page.evaluate(() => window.matchMedia('(hover: none)').matches)).toBe(true);
+
+    const firstCard = grid.locator('li').first();
+    const copyButton = firstCard.getByTestId('copy-markdown-button');
+    const favoriteButton = firstCard.getByTestId('favorite-button');
+
+    await expect(copyButton).toHaveCSS('opacity', '1');
+    await expect(copyButton).toHaveCSS('pointer-events', 'auto');
+    await expect(favoriteButton).toHaveCSS('opacity', '1');
+    await expect(favoriteButton).toHaveCSS('pointer-events', 'auto');
+
+    // 未ログインのお気に入りは OAuth へ進むため押さない。コピーで操作できることを確認する。
+    await copyButton.click();
+    await expect(copyButton).toHaveAttribute('data-copy-state', 'copied');
+    await expect(page).toHaveURL(/\/$/);
   });
 });
 
