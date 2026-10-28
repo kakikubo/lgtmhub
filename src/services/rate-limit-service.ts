@@ -12,7 +12,12 @@ export const UPLOAD_IP_RATE_LIMIT = { limit: 20, windowSeconds: 60 } as const;
 export const REGENERATE_RATE_LIMIT = { limit: 5, windowSeconds: 60 } as const;
 
 export class RateLimitService {
-  constructor(private readonly repo: RateLimitRepository) {}
+  /**
+   * `repo` が null のときはインフラ未準備（SERVICE_ROLE 未設定など）とみなし、
+   * 制限せず通す。RPC / DB 障害時も同様に fail-open する。
+   * 超過判定だけは厳守し RateLimitExceededError を再 throw する。
+   */
+  constructor(private readonly repo: RateLimitRepository | null) {}
 
   async consumeRandom(ip: string): Promise<void> {
     await this.consume(`random:ip:${ip}`, RANDOM_RATE_LIMIT.limit, RANDOM_RATE_LIMIT.windowSeconds);
@@ -40,7 +45,20 @@ export class RateLimitService {
   }
 
   private async consume(key: string, limit: number, windowSeconds: number): Promise<void> {
-    const allowed = await this.repo.consume(key, limit, windowSeconds);
+    if (!this.repo) {
+      return;
+    }
+
+    let allowed: boolean;
+    try {
+      allowed = await this.repo.consume(key, limit, windowSeconds);
+    } catch (err) {
+      // マイグレーション未適用・RPC 障害などで制限基盤が落ちても、
+      // ランダム表示や登録 API 全体を 500 にしない（Issue #275 後の本番障害対策）。
+      console.error('[RateLimitService] consume failed; fail-open', { key, err });
+      return;
+    }
+
     if (!allowed) {
       throw new RateLimitExceededError(windowSeconds);
     }
@@ -48,5 +66,10 @@ export class RateLimitService {
 }
 
 export function buildRateLimitService(): RateLimitService {
-  return new RateLimitService(new RateLimitRepository(createServiceRoleClient()));
+  try {
+    return new RateLimitService(new RateLimitRepository(createServiceRoleClient()));
+  } catch (err) {
+    console.error('[RateLimitService] service role client unavailable; fail-open', err);
+    return new RateLimitService(null);
+  }
 }
