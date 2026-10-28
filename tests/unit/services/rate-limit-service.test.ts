@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
-import { RateLimitExceededError } from '@/src/lib/errors';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DatabaseError, RateLimitExceededError } from '@/src/lib/errors';
+import { createServiceRoleClient } from '@/src/lib/supabase/service';
 import type { RateLimitRepository } from '@/src/repositories/rate-limit-repository';
 import {
+  buildRateLimitService,
   RANDOM_RATE_LIMIT,
   RateLimitService,
   REGENERATE_RATE_LIMIT,
@@ -9,12 +11,20 @@ import {
   UPLOAD_USER_RATE_LIMIT,
 } from '@/src/services/rate-limit-service';
 
+vi.mock('@/src/lib/supabase/service', () => ({
+  createServiceRoleClient: vi.fn(),
+}));
+
 function buildService(consume: ReturnType<typeof vi.fn>) {
   const repo = { consume } as unknown as RateLimitRepository;
   return new RateLimitService(repo);
 }
 
 describe('RateLimitService', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('ランダムは IP キーで消費する', async () => {
     const consume = vi.fn().mockResolvedValue(true);
     await buildService(consume).consumeRandom('203.0.113.5');
@@ -65,5 +75,32 @@ describe('RateLimitService', () => {
       REGENERATE_RATE_LIMIT.limit,
       REGENERATE_RATE_LIMIT.windowSeconds,
     );
+  });
+
+  it('repo が null なら制限せず通す', async () => {
+    await expect(new RateLimitService(null).consumeRandom('203.0.113.5')).resolves.toBeUndefined();
+  });
+
+  it('RPC 障害時は fail-open し、超過エラーは再 throw する', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const failing = vi.fn().mockRejectedValue(new DatabaseError('function missing'));
+    await expect(buildService(failing).consumeRandom('203.0.113.5')).resolves.toBeUndefined();
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    const denied = vi.fn().mockResolvedValue(false);
+    await expect(buildService(denied).consumeRandom('203.0.113.5')).rejects.toBeInstanceOf(
+      RateLimitExceededError,
+    );
+  });
+
+  it('SERVICE_ROLE 未設定でも buildRateLimitService は throw せず fail-open する', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(createServiceRoleClient).mockImplementation(() => {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY が未設定です');
+    });
+
+    const service = buildRateLimitService();
+    await expect(service.consumeRandom('203.0.113.5')).resolves.toBeUndefined();
+    expect(consoleErrorSpy).toHaveBeenCalled();
   });
 });
