@@ -69,4 +69,17 @@ describe('Header', () => {
     expect(screen.getByRole('button', { name: 'ログアウト' })).toBeInTheDocument();
     expect(findById).toHaveBeenCalledWith('user-1');
   });
+
+  it('プロフィール取得が失敗したら例外を投げず未ログイン表示に倒す (Issue #373)', async () => {
+    getUser.mockResolvedValue({ data: { user: { id: 'user-1' } } });
+    const error = new Error('db down');
+    findById.mockRejectedValue(error);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(await Header());
+
+    expect(screen.getByRole('button', { name: 'GitHub でログイン' })).toBeInTheDocument();
+    expect(screen.queryByTestId('header-register-link')).not.toBeInTheDocument();
+    expect(consoleError).toHaveBeenCalledWith('[Header] failed to load user profile', error);
+  });
 });
