@@ -147,8 +147,34 @@ test.describe('一覧カードのホバーコピーボタン (Issue #169)', () =
 
     // アイコン化に伴い表示テキストではなく data-copy-state でコピー完了を判定する (Issue #174)。
     await expect(copyButton).toHaveAttribute('data-copy-state', 'copied');
+    // aria-label の書き換えは読み上げられないため、カード内の live region で通知する (Issue #377)
+    await expect(firstCard.getByRole('status')).toHaveText('コピーしました');
     // ボタンクリックでリンク遷移していない (トップに留まる)。
     await expect(page).toHaveURL(/\/$/);
+  });
+
+  // 非 HTTPS や権限拒否でクリップボード書き込みが失敗したときに、黙って終わらないことの確認 (Issue #377)
+  test('クリップボード書き込みに失敗すると失敗表示になり、live region で通知する', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      navigator.clipboard.writeText = () =>
+        Promise.reject(new DOMException('denied', 'NotAllowedError'));
+    });
+    const grid = await gotoAndGetGrid(page);
+
+    const firstCard = grid.locator('li').first();
+    await firstCard.getByTestId('image-card-link').hover();
+
+    const copyButton = firstCard.getByTestId('copy-markdown-button');
+    await copyButton.click();
+
+    await expect(copyButton).toHaveAttribute('data-copy-state', 'failed');
+    await expect(copyButton).toHaveAccessibleName('コピーできませんでした');
+    await expect(firstCard.getByRole('status')).toHaveText('コピーできませんでした');
+    // 表示は一定時間で元に戻る
+    await expect(copyButton).toHaveAttribute('data-copy-state', 'idle');
+    await expect(firstCard.getByRole('status')).toHaveText('');
   });
 
   // マウスでコピーボタンを押すと :focus が残るため、group-focus-within ではホバーを
