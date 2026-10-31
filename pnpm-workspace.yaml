@@ -26,3 +26,4 @@ overrides:
   markdown-it: ^15.0.3 # smartquotes / link reference の二乗時間 DoS (GHSA-r7fv-28h4-cvq7, GHSA-gfr2-rv44-r23c)。markdownlint-cli2 0.23 が 15.0.1 を固定ピンしている
   zod: ^4.6.6 # GHSA-mrhx-c7xc-m3w5。@vercel/blob>@vercel/oidc>@vercel/cli-config が 4.1.11 を固定ピンしている
   body-parser: ^2.4.0 # GHSA-27r3-jxmh-p828。devDep の shadcn>@modelcontextprotocol/sdk>express 配下のみ
+  katex: ^0.19.1 # GHSA-238p-pmpm-9mq7。devDep の markdownlint-cli2>markdownlint>micromark-extension-math が ^0.16.0 で止まっている
