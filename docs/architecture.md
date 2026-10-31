@@ -94,7 +94,7 @@ Presentation → API → Service → Data
 |------|------|-----|-----------|
 | local | 開発 | `http://localhost:3000` | Supabase Local（Docker）/ Vercel Blob（dev token） |
 | preview | PR毎のプレビュー | `https://lgtmhub-pr-{n}.vercel.app` | Supabase（preview project）/ Vercel Blob（preview store） |
-| production | 本番 | `https://lgtmhub.vercel.app`（仮） | Supabase（prod project）/ Vercel Blob（prod store） |
+| production | 本番 | `https://lgtmhub.vercel.app` | Supabase（prod project）/ Vercel Blob（prod store） |
 
 ### CI/CD
 
