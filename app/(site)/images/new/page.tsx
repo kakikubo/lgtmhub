@@ -1,6 +1,11 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { ImageRegisterForm } from '@/components/image-register-form';
 import { createClient } from '@/src/lib/supabase/server';
+
+export const metadata: Metadata = {
+  title: '画像をアップロード',
+};
 
 export default async function NewImagePage() {
   const supabase = await createClient();

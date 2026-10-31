@@ -3,7 +3,7 @@ import { FavoritesContent } from '@/components/favorites-content';
 import { ImageGridSkeleton } from '@/components/image-grid-skeleton';
 
 export const metadata = {
-  title: 'お気に入り | LGTMHub',
+  title: 'お気に入り',
 };
 
 export default function FavoritesPage() {
