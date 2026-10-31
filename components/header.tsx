@@ -40,7 +40,8 @@ export async function Header() {
                 {profile.avatarUrl ? (
                   <Image
                     src={profile.avatarUrl}
-                    alt={profile.displayName}
+                    // 直後に表示名のテキストがあるため装飾扱いにし、二重読み上げを避ける
+                    alt=""
                     width={32}
                     height={32}
                     className="rounded-full"
