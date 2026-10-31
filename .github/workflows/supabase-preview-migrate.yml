@@ -31,6 +31,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # reusable workflow 呼び出しジョブには timeout-minutes / runs-on を書けない。
+  # 上限は _supabase-push.yml 側の push ジョブで設定する。
   push:
     if: >-
       contains(github.event.pull_request.labels.*.name, 'apply-preview-migration')

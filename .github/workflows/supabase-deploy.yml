@@ -19,6 +19,9 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'supabase/config.toml'
+      # 呼び出し側 YAML の修正でも未適用 migration を流せるようにする
+      - '.github/workflows/supabase-deploy.yml'
+      - '.github/workflows/_supabase-push.yml'
   workflow_dispatch:
 
 permissions:
@@ -31,6 +34,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # reusable workflow 呼び出しジョブには timeout-minutes / runs-on を書けない。
+  # 上限は _supabase-push.yml 側の push ジョブで設定する。
   prod:
     uses: ./.github/workflows/_supabase-push.yml
     with:
