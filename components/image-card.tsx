@@ -6,8 +6,10 @@ import type { PublicLgtmImage } from '@/src/types/image';
 
 // ホバー / キーボードフォーカス時だけ現れるオーバーレイボタンの共通クラス。
 // お気に入り登録済みのハートは FavoriteButton 側で opacity-100 に上書きされ常時表示になる。
+// タッチ端末は hover: none で、Tailwind v4 の group-hover は @media (hover: hover) 内にしか出ない。
+// 任意バリアントで常時表示・操作可能に戻す (Issue #374)。ベースの opacity-0 より後に出力される。
 const OVERLAY_BUTTON_CLASS =
-  'opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-has-[:focus-visible]:opacity-100 group-has-[:focus-visible]:pointer-events-auto';
+  'opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-has-[:focus-visible]:opacity-100 group-has-[:focus-visible]:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto';
 
 export function ImageCard({
   image,
@@ -44,6 +46,8 @@ export function ImageCard({
         前者だとマウスでボタンをクリックした後もボタンが :focus を保持し続け、
         ホバーを外してもオーバーレイが消えない (Issue #169 の不具合)。:focus-visible は
         キーボード操作時のみ立つため、マウスクリック後はホバーが外れた時点で確実に消える。
+        hover: none ではホバーも :focus-visible も起きないため、@media (hover: none) で常時表示する
+        (Issue #374)。
       */}
       <div className="absolute right-2 top-2 flex items-center gap-1">
         <FavoriteButton lgtmImageId={image.id} variant="icon" className={OVERLAY_BUTTON_CLASS} />
