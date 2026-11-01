@@ -6,9 +6,9 @@
 
 | 技術 | バージョン | 選定理由 |
 |------|-----------|----------|
-| Node.js | v24.11.0 | CLAUDE.mdで指定。Next.js 16のサポート対象、非同期I/Oに優れSharpの画像処理を高速に実行可能 |
-| TypeScript | 6.x | CLAUDE.mdで指定。静的型付けでバグを早期検出、Supabase / Next.jsの型生成が充実 |
-| pnpm | 10.x | CLAUDE.mdで指定。Corepack 経由で利用し、`package.json` の `packageManager` でバージョンを固定 |
+| Node.js | 24.x | CLAUDE.mdで指定。Next.js 16のサポート対象、非同期I/Oに優れSharpの画像処理を高速に実行可能。`package.json` の `engines` で 24.x に固定。Corepack で pnpm 12 を使うには 24.12.0 以上が必要（README 参照） |
+| TypeScript | 7.x | CLAUDE.mdで指定。静的型付けでバグを早期検出、Supabase / Next.jsの型生成が充実 |
+| pnpm | 12.x | CLAUDE.mdで指定。Corepack 経由で利用し、`package.json` の `packageManager` でバージョンを固定 |
 
 ### フレームワーク・ライブラリ
 
@@ -17,11 +17,11 @@
 | Next.js | 16.x | フルスタックフレームワーク | App Router採用でSSR・APIルート・画像最適化を統合的に提供。Vercelとの親和性が最高 |
 | React | 19.x | UIライブラリ | Next.js 16が要求。Server Components対応 |
 | Tailwind CSS | 4.x | スタイリング | ユーティリティクラスで高速にUI構築、デザイントークンの一元管理が容易 |
-| Sharp | 0.34.x | 画像処理 | LGTM文字合成・WebP変換・リサイズ・pHash計算をNode.js上で高速処理 |
+| Sharp | 0.35.x | 画像処理 | LGTM文字合成・WebP変換・リサイズ・pHash計算をNode.js上で高速処理 |
 | @supabase/supabase-js | 2.x | DB・認証クライアント | Supabase公式SDK、TypeScript型生成と統合 |
-| @supabase/ssr | 0.5.x | Next.js SSR用ヘルパー | Server Components / Route Handlerでセッション管理 |
-| @vercel/blob | 0.27.x | CDNストレージクライアント | Vercel Blob公式SDK、サーバーサイドからのアップロード対応 |
-| zod | 3.x | スキーマバリデーション | APIリクエストの型安全な検証、Supabaseと組み合わせて入力検証 |
+| @supabase/ssr | 0.12.x | Next.js SSR用ヘルパー | Server Components / Route Handlerでセッション管理 |
+| @vercel/blob | 2.x | CDNストレージクライアント | Vercel Blob公式SDK、サーバーサイドからのアップロード対応 |
+| zod | 4.x | スキーマバリデーション | APIリクエストの型安全な検証、Supabaseと組み合わせて入力検証 |
 
 ### 開発ツール
 
@@ -364,38 +364,16 @@ Next.js 16 の **Cache Components**（Next.js 15 までの実験的 PPR を安�
 
 ### バージョン管理方針
 
-```json
-{
-  "dependencies": {
-    "next": "~16.2.0",                 // パッチ固定（マイナー以上は手動アップデート）
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "@supabase/supabase-js": "^2.45.0",
-    "@supabase/ssr": "^0.10.0",
-    "@vercel/blob": "^2.3.0",
-    "sharp": "^0.34.0",
-    "zod": "^4.4.0",
-    "tailwindcss": "^4.2.0"
-  },
-  "devDependencies": {
-    "typescript": "~6.0.3",
-    "vitest": "^3.0.0",
-    "@playwright/test": "^1.50.0",
-    "@biomejs/biome": "^2.4.0",
-    "lefthook": "^2.1.0",
-    "supabase": "^2.0.0"
-  }
-}
-```
+依存パッケージとバージョン指定は [`package.json`](../package.json) を正とする。バージョンは Renovate で頻繁に更新されるため、ここには値を転記せず range 記法の方針だけを記す。
 
 **方針**:
-- ランタイム依存は `^` でマイナーアップを許容、Next.jsのみパッチ固定（`~16.2.0`）
-- TypeScript はパッチのみ自動更新（`~`）
+- ランタイム依存は `^` でマイナーアップを許容、Next.js のみ `~` でパッチ固定（マイナー以上は手動アップデート）
+- TypeScript もパッチのみ自動更新（`~`）
 - 依存関係の更新 PR は Renovate App が自動で作成する（`renovate.json` 参照、運用ポリシーは `docs/development-guidelines.md`「依存関係管理 (Renovate)」セクション）
 - pnpm audit を CI で実行し、High 以上の脆弱性検出時は失敗扱い
 
 **注意事項（メジャーバージョンが古いドキュメント想定から更新されたパッケージ）**:
-- `@supabase/ssr` v0.10 系: Cookie ハンドラが `getAll/setAll` ベース（旧 `get/set/remove` から変更）
+- `@supabase/ssr` v0.10 以降: Cookie ハンドラが `getAll/setAll` ベース（旧 `get/set/remove` から変更）
 - `@vercel/blob` v2 系: `put()` のシグネチャが v0.x から変更。実装時に [公式ドキュメント](https://vercel.com/docs/storage/vercel-blob) を確認
 - `zod` v4 系: `z.string().url()` の挙動など一部の API が v3 から変更。`development-guidelines.md` のサンプルは v4 互換
 

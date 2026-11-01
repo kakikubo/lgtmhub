@@ -4,9 +4,9 @@
 
 | ツール | バージョン | 備考 |
 |--------|-----------|------|
-| Node.js | v24.11.0 | CLAUDE.mdで指定 |
-| TypeScript | 6.x | バージョン詳細は `docs/architecture.md`「依存関係管理 > バージョン管理方針」を参照 |
-| pnpm | 10.x | Corepack 経由(`corepack enable`)。バージョンは `package.json` の `packageManager` で固定 |
+| Node.js | 24.x | CLAUDE.mdで指定。`package.json` の `engines` で 24.x に固定。Corepack で pnpm 12 を使うには 24.12.0 以上が必要（README 参照） |
+| TypeScript | 7.x | バージョン詳細は `docs/architecture.md`「依存関係管理 > バージョン管理方針」を参照 |
+| pnpm | 12.x | Corepack 経由(`corepack enable`)。バージョンは `package.json` の `packageManager` で固定 |
 
 開発環境は devcontainer での起動を前提とする（CLAUDE.md 参照）。
 
@@ -859,7 +859,16 @@ CI の Supabase Local は空 DB で起動するため **全テストが何もア
 
 ### GitHub Actions
 
-> 以下は構成を説明するためのサンプル。`actions/*` などのバージョンは `renovate.json` の `github-actions` グループで自動更新されるため、**常に実際の `.github/workflows/ci.yml` を正**とする（サンプルのバージョン表記をそのままコピーしない）。
+ワークフロー定義は [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) を正とする。`actions/*` などのバージョンは `renovate.json` の `github-actions` グループで自動更新されるため、ここには YAML を転記せずジョブ構成と設計意図だけを記す。
+
+| ジョブ | 主な内容 | 設計意図 |
+|--------|---------|---------|
+| `lint-and-typecheck` | `pnpm run check` / `pnpm run typecheck` / `pnpm run lint:md` | lint 系のゲートを 1 ジョブに集約 |
+| `test` | `pnpm run test:coverage` → Codecov へアップロード | unit + integration を 1 パスで実行しカバレッジ閾値をゲートにする。DB は Supabase CLI ではなく素の Postgres サービスコンテナ（RLS の検証はローカルの Supabase Local で行う） |
+| `e2e` | `supabase start` → `pnpm run build` → `pnpm run test:e2e` | 本物の Supabase スタックを Docker で起動し実 DB を叩く。`NEXT_PUBLIC_*` は build 時にインライン化されるため `pnpm run build` の前に `$GITHUB_ENV` 経由で注入する |
+| `security` | `pnpm audit --audit-level high` | High 以上の脆弱性で失敗 |
+
+全ジョブ共通で `pnpm install --frozen-lockfile` を使い、トリガーは `push: [main]` と `pull_request`。
 
 ハングしたジョブが GitHub Actions のデフォルト上限（6 時間）まで走り続けないよう、各ジョブに `timeout-minutes` を設定する。目安は実測の 2〜3 倍（lint / test / security ほか 10 分、e2e 20 分）。`ci.yml` 以外（Danger、Release Drafter、Supabase Push）も同じ方針で 10 分とする。
 
@@ -869,134 +878,6 @@ e2e の `playwright-report/`（HTML レポート）と `test-results/`（`trace:
 
 Markdown lint（`pnpm run lint:md`）は独立ジョブにせず `lint-and-typecheck` ジョブのステップとして実行する。別ジョブにすると checkout / pnpm setup / `pnpm install --frozen-lockfile` の固定コストを丸ごともう一度払うことになり、1 秒未満の検査に対して割に合わないため。lint 系のゲートという意味づけも `pnpm run check` と同じ。
 
-```yaml
-# .github/workflows/ci.yml
-name: CI
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  lint-and-typecheck:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run check
-      - run: pnpm run typecheck
-      - run: pnpm run lint:md
-
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    # 設計意図: CI 上では Supabase CLI（Docker）の起動コストを避け、
-    # 統合テストの DB 接続先として素の Postgres コンテナを使用する。
-    # RLS ポリシーの検証はローカル開発時の `pnpm run db:start`（Supabase Local）で行い、
-    # CI ではテーブル制約・トランザクション・SQL 互換性のみを検証する方針。
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      # test:unit / test:integration の 2 回実行をやめ、test:coverage
-      # (= vitest run --coverage) の 1 パスに統合。include/exclude により
-      # unit + integration をまとめて実行し (e2e は対象外)、カバレッジを計測する。
-      # カバレッジ閾値は vitest.config.ts で CI を含め常時ゲート。閾値は CI と
-      # ローカルで一致する実測値を基準にしている。
-      # 閾値未達・テスト失敗いずれも vitest が非 0 終了し test ジョブのゲートとなる。
-      - run: pnpm run test:coverage
-      # カバレッジを Codecov にアップロードして PR / main で可視化する。
-      # public リポジトリのため CODECOV_TOKEN 未設定でも tokenless で動作し、
-      # アップロード可否を CI のゲートにしない (fail_ci_if_error: false)。
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/lcov.info
-          fail_ci_if_error: false
-
-  e2e:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # 設計意図: e2e ジョブは supabase/setup-cli + supabase start で本物の
-    # PostgreSQL + PostgREST + Auth + Storage を Docker で立ち上げ、Server Component
-    # / Route Handler が実 DB を叩けるようにする。NEXT_PUBLIC_* は build 時に
-    # インライン化されるため、必ず `pnpm run build` の前に `$GITHUB_ENV` 経由で注入する。
-    env:
-      GITHUB_OAUTH_CLIENT_ID: ''
-      GITHUB_OAUTH_CLIENT_SECRET: ''
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - uses: supabase/setup-cli@v1
-        with:
-          version: 2.98.0
-      - run: supabase start
-      - name: Export Supabase env to GITHUB_ENV
-        run: |
-          set -euo pipefail
-          status=$(supabase status -o json)
-          echo "NEXT_PUBLIC_SUPABASE_URL=$(echo "$status" | jq -er '.API_URL')" >> "$GITHUB_ENV"
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(echo "$status" | jq -er '.ANON_KEY')" >> "$GITHUB_ENV"
-      - uses: actions/cache@v4
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-      - if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-      - if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
-      - run: pnpm run build
-      - run: pnpm run test:e2e
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
-          retention-days: 7
-          if-no-files-found: ignore
-      - if: always()
-        run: supabase stop --no-backup
-
-  security:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --audit-level high
-```
-
 #### Danger（PR サイズチェック）
 
 `.github/workflows/danger.yml` で `pull_request` イベントごとに `pnpm exec danger ci --failOnErrors` を実行する。判定ロジックは `dangerfile.js` に集約しており、「PRの大きさの目安」セクションの行数閾値（500行）を超過した場合は `fail()` となり、`--failOnErrors` により Danger ジョブが失敗（CI エラー）する。ファイル数閾値（10ファイル）超過は `warn()`（コメント警告のみ）。markdown ファイル（`*.md` / `*.mdx`）は集計対象外。既存 `ci.yml` とは独立した workflow とし、API 書き込みの副作用が他ジョブに波及しないようにしている。
@@ -1005,11 +886,11 @@ jobs:
 
 #### Codecov（カバレッジ可視化）
 
-`ci.yml` の `test` ジョブで `pnpm run test:coverage` を実行し、生成された `coverage/lcov.info` を `codecov/codecov-action@v5` で Codecov にアップロードする。`test` ジョブは `push: [main]` と `pull_request` 両方で走るため、**PR と main マージ後の双方**でカバレッジが Codecov に記録され、PR には差分コメントが付く。README のカバレッジバッジも Codecov を参照する。
+`ci.yml` の `test` ジョブで `pnpm run test:coverage` を実行し、生成された `coverage/lcov.info` を `codecov/codecov-action` で Codecov にアップロードする（action のバージョンは `ci.yml` を正とする）。`test` ジョブは `push: [main]` と `pull_request` 両方で走るため、**PR と main マージ後の双方**でカバレッジが Codecov に記録され、PR には差分コメントが付く。README のカバレッジバッジも Codecov を参照する。
 
 - **可視化が責務（ゲートは vitest 側）**: カバレッジ閾値は `vitest.config.ts` の `thresholds` で **CI を含め常時ゲート**（`src/services/**` は branches/lines/statements 90% ・ functions 85%、`src/lib/**` は 4 指標とも 80%）。Issue #113 で `functions` のみ CI の下振れ分を引き下げていたが、下振れが観測されなくなったため `src/lib/**` の `functions` を 75 → 80 に戻した（Issue #266）。Codecov は閾値ゲートを持たず可視化に専念し、`codecov.yml` の project / patch ステータスも `informational: true`（二重ゲートにしない）。なお**閾値未達・テスト失敗いずれも `vitest` が非 0 終了するため、`test` ジョブのゲートとして機能する**。
 - **token は任意**: public リポジトリのため `CODECOV_TOKEN` 未設定でも tokenless でアップロードできる。レート制限回避のため設定する場合は GitHub Secrets に `CODECOV_TOKEN` を登録する。アップロード失敗で `test` ジョブを落とさないよう `fail_ci_if_error: false`。
-- **集計対象**: 計測範囲は `vitest.config.ts` の `coverage.include`（`src/**` + `app/api/**`）で決まる。`codecov.yml` の `ignore` は `coverage.exclude`（`src/types/**` / `*.test.ts`）と整合させ、型定義とテストコードを Codecov 側でも母数から外す。`app/(site)/**` は計測対象に含めていない — RSC のページ/レイアウトは `environment: 'node'` の unit テストから import されず、実際には e2e (Playwright) がカバーしているため、e2e カバレッジを収集していない現状で include に加えるとテスト済みのコードが恒久的に 0% と表示されてしまう（Issue #255）。
+- **集計対象**: 計測範囲は `vitest.config.ts` の `coverage.include`（`src/**` + `app/api/**` + `components/**`）で決まる。`codecov.yml` の `ignore` は `coverage.exclude`（`src/types/**` / `*.test.ts`）と整合させ、型定義とテストコードを Codecov 側でも母数から外す。`app/(site)/**` は計測対象に含めていない — RSC のページ/レイアウトは `environment: 'node'` の unit テストから import されず、実際には e2e (Playwright) がカバーしているため、e2e カバレッジを収集していない現状で include に加えるとテスト済みのコードが恒久的に 0% と表示されてしまう（Issue #255）。
 - **バージョン管理**: `codecov/codecov-action` は `renovate.json` の `github-actions` グループで自動更新対象（固定運用ではない）。
 - **初回の手動セットアップ（リポジトリ管理者作業）**: Codecov (codecov.io) に GitHub アカウントでサインインし `kakikubo/lgtmhub` を有効化する。これにより PR コメントとダッシュボードが有効になる。必要に応じて `CODECOV_TOKEN` を GitHub Secrets に登録する。
 
@@ -1043,31 +924,12 @@ jobs:
 
 ### package.json scripts
 
-```json
-{
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "biome lint .",
-    "lint:md": "markdownlint-cli2",
-    "format": "biome format --write .",
-    "check": "biome check .",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration",
-    "test:e2e": "playwright test",
-    "test:coverage": "vitest run --coverage",
-    "db:start": "supabase start",
-    "db:stop": "supabase stop",
-    "db:reset": "supabase db reset",
-    "db:nuke": "supabase stop --no-backup",
-    "db:push": "supabase db push",
-    "db:types": "supabase gen types typescript --local > src/types/database.types.ts"
-  }
-}
-```
+スクリプト定義は [`package.json`](../package.json) の `scripts` を正とする。要点は次のとおり。
+
+- CI の `test` ジョブは `test:coverage`（`vitest run --coverage`）の 1 パスで unit + integration を実行する。`test:unit` / `test:integration` はローカルで対象を絞るためのもの
+- `test:integration` は `--passWithNoTests` 付き。`tests/integration` にテストが無い状態でも失敗させない
+- `db:nuke` は Docker volume を破棄して Supabase Local を停止する（`db:stop` は volume を保持する）
+- `db:types` は Supabase Local のスキーマから `src/types/database.types.ts` を生成する
 
 ---
 
