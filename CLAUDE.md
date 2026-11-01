@@ -3,7 +3,7 @@
 ## 技術スタック
 
 - Next.js App Router (cacheComponents 有効) + Supabase + Vercel
-- 開発環境: devcontainer / Node.js v24 / TypeScript 6.x
+- 開発環境: devcontainer / Node.js v24 / TypeScript 7.x
 - パッケージマネージャー: pnpm (Corepack 経由、`package.json` の `packageManager` でバージョン固定)。npm・yarn は使わない
 - lint/format は Biome、unit は Vitest、e2e は Playwright
 

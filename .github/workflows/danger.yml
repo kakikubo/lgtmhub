@@ -13,7 +13,7 @@ jobs:
     # 設計意図: 既存 ci.yml の lint/test/e2e と独立させ、Danger（GitHub API への
     # コメント書き込み）が落ちても他のジョブの結果に影響しないようにする。
     # 計測対象・除外ルール・閾値は docs/development-guidelines.md
-    # 「PRの大きさの目安」と dangerfile.ts に集約する。
+    # 「PRの大きさの目安」と dangerfile.js に集約する。
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
