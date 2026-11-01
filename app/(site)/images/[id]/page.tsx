@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -6,6 +7,8 @@ import { FavoriteButton } from '@/components/favorite-button';
 import { ImageDetailActions } from '@/components/image-detail-actions';
 import { ImageRegenerateAction } from '@/components/image-regenerate-action';
 import { UploaderProfileRow } from '@/components/uploader-profile-row';
+import { buildImageDetailMetadata } from '@/src/lib/metadata/image-detail';
+import { createAnonClient } from '@/src/lib/supabase/anon';
 import { createClient } from '@/src/lib/supabase/server';
 import { buildImageService } from '@/src/services/image-service';
 import { buildUserProfileService } from '@/src/services/user-profile-service';
@@ -65,6 +68,21 @@ function DetailView({ image, uploader, isOwner, isAdmin }: DetailViewProps) {
       ) : null}
     </section>
   );
+}
+
+export async function generateMetadata({ params }: ImageDetailPageProps): Promise<Metadata> {
+  const { id } = await params;
+
+  // 公開情報 (status='active') だけを読むため Cookie 不要の anon client を使う。
+  // 取得失敗・存在しない場合は空を返し、ページ本体の notFound() (noindex) に任せる
+  const image = await buildImageService(createAnonClient())
+    .getImageDetail(id)
+    .catch((err: unknown): PublicLgtmImageDetail | null => {
+      console.error('[ImageDetailPage] failed to load image for metadata', err);
+      return null;
+    });
+
+  return image ? buildImageDetailMetadata(image) : {};
 }
 
 export default async function ImageDetailPage({ params }: ImageDetailPageProps) {

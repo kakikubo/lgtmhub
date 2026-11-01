@@ -395,6 +395,17 @@ describe('ImageService.listImages', () => {
   });
 });
 
+describe('ImageService.listActiveImageIds', () => {
+  it('Repository の listActiveIds の結果をそのまま返す', async () => {
+    const mocks = buildMocks();
+    mocks.imageRepo.listActiveIds.mockResolvedValue(['id-1', 'id-2']);
+
+    const service = await buildService(mocks);
+
+    await expect(service.listActiveImageIds()).resolves.toEqual(['id-1', 'id-2']);
+  });
+});
+
 describe('ImageService.listRandomImages', () => {
   it('active が 0 件なら findManyActiveByIds を呼ばず空配列を返す', async () => {
     const mocks = buildMocks();

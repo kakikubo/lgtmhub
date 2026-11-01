@@ -366,6 +366,13 @@ export class ImageService {
   }
 
   /**
+   * 閲覧可能な (status='active') 画像の id を全件返す。sitemap 生成用。
+   */
+  async listActiveImageIds(): Promise<string[]> {
+    return this.imageRepo.listActiveIds();
+  }
+
+  /**
    * 全 active 画像からサーバーサイドでランダムに最大 `limit` 枚を抽出する。
    *
    * 表示中 16 枚のクライアントシャッフルではなく「母集団全体からの抽出」を満たすため、
