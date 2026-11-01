@@ -10,7 +10,16 @@ export async function Header() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const profile = user ? await buildUserProfileService(supabase).findById(user.id) : null;
+  // Header は (site)/layout.tsx に置かれ、同階層の error.tsx では捕捉できない (Issue #373)。
+  // 取得失敗で全ページを落とさないよう、未ログイン相当の表示へ degrade する
+  const profile = user
+    ? await buildUserProfileService(supabase)
+        .findById(user.id)
+        .catch((err: unknown) => {
+          console.error('[Header] failed to load user profile', err);
+          return null;
+        })
+    : null;
 
   return (
     <header className="border-b">
