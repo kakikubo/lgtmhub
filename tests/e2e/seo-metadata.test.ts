@@ -7,32 +7,39 @@ import { SEED_IMAGES } from './fixtures/seed-images';
 const SEED_IMAGE = SEED_IMAGES[0];
 
 test.describe('SEO メタデータ', () => {
-  test('画像詳細ページに画像固有の title と OGP / Twitter Card が出る', async ({ page }) => {
-    await page.goto(`/images/${SEED_IMAGE.id}`);
-    await expect(page.getByTestId('image-detail-page')).toBeVisible();
+  test.describe('クローラーとしてアクセス', () => {
+    // generateMetadata の結果は通常のブラウザには <body> 末尾へストリーミングされる。
+    // 共有プレビューを作るクローラー (htmlLimitedBots) には <head> にブロッキング出力されるため、
+    // クローラーの UA で「プレビューに使われる <head>」を検証する
+    test.use({ userAgent: 'Twitterbot/1.0' });
 
-    await expect(page).toHaveTitle(`LGTM 画像 (${SEED_IMAGE.id.slice(0, 8)}) | LGTMHub`);
+    test('画像詳細ページに画像固有の title と OGP / Twitter Card が出る', async ({ page }) => {
+      await page.goto(`/images/${SEED_IMAGE.id}`);
+      await expect(page.getByTestId('image-detail-page')).toBeVisible();
 
-    // 相対 URL は metadataBase で絶対 URL に解決される
-    const meta = (selector: string) => page.locator(`head ${selector}`).first();
-    await expect(meta('meta[property="og:image"]')).toHaveAttribute(
-      'content',
-      new URL(SEED_IMAGE.imageUrl, 'http://localhost:3000').href,
-    );
-    await expect(meta('meta[property="og:image:width"]')).toHaveAttribute('content', /^\d+$/);
-    await expect(meta('meta[property="og:image:height"]')).toHaveAttribute('content', /^\d+$/);
-    await expect(meta('meta[property="og:url"]')).toHaveAttribute(
-      'content',
-      `http://localhost:3000/images/${SEED_IMAGE.id}`,
-    );
-    await expect(meta('meta[name="twitter:card"]')).toHaveAttribute(
-      'content',
-      'summary_large_image',
-    );
-    await expect(meta('link[rel="canonical"]')).toHaveAttribute(
-      'href',
-      `http://localhost:3000/images/${SEED_IMAGE.id}`,
-    );
+      await expect(page).toHaveTitle(`LGTM 画像 (${SEED_IMAGE.id.slice(0, 8)}) | LGTMHub`);
+
+      // 相対 URL は metadataBase で絶対 URL に解決される
+      const meta = (selector: string) => page.locator(`head ${selector}`).first();
+      await expect(meta('meta[property="og:image"]')).toHaveAttribute(
+        'content',
+        new URL(SEED_IMAGE.imageUrl, 'http://localhost:3000').href,
+      );
+      await expect(meta('meta[property="og:image:width"]')).toHaveAttribute('content', /^\d+$/);
+      await expect(meta('meta[property="og:image:height"]')).toHaveAttribute('content', /^\d+$/);
+      await expect(meta('meta[property="og:url"]')).toHaveAttribute(
+        'content',
+        `http://localhost:3000/images/${SEED_IMAGE.id}`,
+      );
+      await expect(meta('meta[name="twitter:card"]')).toHaveAttribute(
+        'content',
+        'summary_large_image',
+      );
+      await expect(meta('link[rel="canonical"]')).toHaveAttribute(
+        'href',
+        `http://localhost:3000/images/${SEED_IMAGE.id}`,
+      );
+    });
   });
 
   test('トップページは既定の title と OGP を持つ', async ({ page }) => {
