@@ -1,24 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { DatabaseError, NotFoundError } from '@/src/lib/errors';
+import { DatabaseError } from '@/src/lib/errors';
 import { buildKeysetOrFilter, type KeysetCursor } from '@/src/lib/pagination/keyset-cursor';
 import type { Database } from '@/src/types/database.types';
 import type { ImageStatus, LgtmImage } from '@/src/types/image';
 
 type LgtmImageRow = Database['public']['Tables']['lgtm_images']['Row'];
-type LgtmImageInsert = Database['public']['Tables']['lgtm_images']['Insert'];
-
-export interface CreateLgtmImageInput {
-  uploaderId: string;
-  originalUrl: string;
-  imageUrl: string;
-  pHash: string;
-  width: number;
-  height: number;
-  fileSizeBytes: number;
-  mimeType: string;
-  isAnimated: boolean;
-  status?: ImageStatus;
-}
 
 export interface ActivePHashEntry {
   id: string;
@@ -30,18 +16,7 @@ export interface ListImagesOptions {
   limit: number;
 }
 
-export interface UpdateAfterRegenerateInput {
-  imageUrl: string;
-  pHash: string;
-  width: number;
-  height: number;
-  fileSizeBytes: number;
-  isAnimated: boolean;
-  // 差し替え時のみ設定。未指定なら DB の originalUrl は据え置き
-  originalUrl?: string;
-}
-
-function toLgtmImage(row: LgtmImageRow): LgtmImage {
+export function toLgtmImage(row: LgtmImageRow): LgtmImage {
   return {
     id: row.id,
     uploaderId: row.uploader_id,
@@ -59,21 +34,6 @@ function toLgtmImage(row: LgtmImageRow): LgtmImage {
     deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
-  };
-}
-
-function toInsert(input: CreateLgtmImageInput): LgtmImageInsert {
-  return {
-    uploader_id: input.uploaderId,
-    original_url: input.originalUrl,
-    image_url: input.imageUrl,
-    p_hash: input.pHash,
-    width: input.width,
-    height: input.height,
-    file_size_bytes: input.fileSizeBytes,
-    mime_type: input.mimeType,
-    is_animated: input.isAnimated,
-    status: input.status ?? 'active',
   };
 }
 
@@ -95,37 +55,6 @@ export class ImageRepository {
     if (error) throw new DatabaseError(error.message);
     if (!data) return null;
     return toLgtmImage(data);
-  }
-
-  async create(input: CreateLgtmImageInput): Promise<LgtmImage> {
-    const { data, error } = await this.supabase
-      .from('lgtm_images')
-      .insert(toInsert(input))
-      .select('*')
-      .single();
-
-    if (error) throw new DatabaseError(error.message);
-    if (!data) throw new DatabaseError('lgtm_images の作成結果が空でした');
-    return toLgtmImage(data);
-  }
-
-  /**
-   * 論理削除する。所有者・active 状態を WHERE 句で同時に強制し、
-   * RLS と二重で「他人の画像」「既削除」を弾く (多層防御)。
-   *
-   * @returns 更新行数 (0 = 該当なし: 存在しない/他人/既削除, 1 = 成功)
-   */
-  async softDelete(id: string, userId: string): Promise<number> {
-    const { data, error } = await this.supabase
-      .from('lgtm_images')
-      .update({ status: 'deleted', deleted_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('uploader_id', userId)
-      .eq('status', 'active')
-      .select('id');
-
-    if (error) throw new DatabaseError(error.message);
-    return (data ?? []).length;
   }
 
   /**
@@ -155,38 +84,6 @@ export class ImageRepository {
 
     if (error) throw new DatabaseError(error.message);
     return (data ?? []).map((row) => ({ id: row.id, pHash: row.p_hash }));
-  }
-
-  /**
-   * 管理者による再生成後の DB 更新。status='active' な行のみ更新し、
-   * 論理削除済み/存在しない場合は NotFoundError に倒す。
-   * `originalUrl` は差し替え時のみ更新する (undefined なら据え置き)。
-   */
-  async updateAfterRegenerate(id: string, patch: UpdateAfterRegenerateInput): Promise<LgtmImage> {
-    const update: Database['public']['Tables']['lgtm_images']['Update'] = {
-      image_url: patch.imageUrl,
-      p_hash: patch.pHash,
-      width: patch.width,
-      height: patch.height,
-      file_size_bytes: patch.fileSizeBytes,
-      is_animated: patch.isAnimated,
-      updated_at: new Date().toISOString(),
-    };
-    if (patch.originalUrl !== undefined) {
-      update.original_url = patch.originalUrl;
-    }
-
-    const { data, error } = await this.supabase
-      .from('lgtm_images')
-      .update(update)
-      .eq('id', id)
-      .eq('status', 'active')
-      .select('*')
-      .maybeSingle();
-
-    if (error) throw new DatabaseError(error.message);
-    if (!data) throw new NotFoundError('画像', id);
-    return toLgtmImage(data);
   }
 
   /**

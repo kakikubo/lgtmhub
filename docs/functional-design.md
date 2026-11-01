@@ -827,7 +827,8 @@ class FavoriteService {
 |------|------|
 | SSRF（外部URL取得時） | プライベートIPレンジ（10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8）へのリクエストをブロック |
 | 不正な画像形式 | Sharpのメタデータ検証でMIMEタイプを確認（JPEG/PNG/GIF/WebPのみ許可） |
-| 他ユーザーの画像削除 | APIレベルで `uploaderId === requesterId` を検証（Supabase RLSでも二重チェック） |
+| 他ユーザーの画像削除 | APIレベルで `uploaderId === requesterId` を検証（削除 RPC の WHERE 句でも二重チェック） |
+| 登録フローを迂回した直接書き込み | `lgtm_images` の書き込み権限を anon / authenticated から剥奪し、service_role 専用 RPC のみに限定 |
 | 1日10枚制限の回避 | `daily_upload_counts` を取得・合成の前に DB 側で atomic にインクリメントし、失敗時は枠を戻す |
 | 高コスト API の連打 | `rate_limit_buckets` の固定ウィンドウ。`/api/images/random` は IP、`POST /api/images` は IP とユーザー、再生成は管理者ユーザー |
 | セッション偽装 | Supabase Auth JWTを全APIルートで検証 |
@@ -854,18 +855,14 @@ CREATE POLICY "admin can view all images"
     SELECT 1 FROM user_profiles WHERE id = auth.uid() AND is_admin = true
   ));
 
-CREATE POLICY "authenticated users can insert own images"
-  ON lgtm_images FOR INSERT
-  WITH CHECK (auth.uid() = uploader_id);
-
-CREATE POLICY "owner or admin can update images"
-  ON lgtm_images FOR UPDATE
-  USING (auth.uid() = uploader_id OR EXISTS (
-    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND is_admin = true
-  ))
-  WITH CHECK (auth.uid() = uploader_id OR EXISTS (
-    SELECT 1 FROM user_profiles WHERE id = auth.uid() AND is_admin = true
-  ));
+-- 書き込み (登録 / 論理削除 / 再生成) は anon / authenticated から権限を剥奪し、
+-- service_role だけが実行できる SECURITY DEFINER RPC に限定する。
+-- 登録フロー (日次上限・取得・検証・重複判定・合成) を通らない書き込みを DB 側で拒否するため。
+REVOKE INSERT, UPDATE, DELETE ON lgtm_images FROM anon, authenticated;
+-- create_lgtm_image(...)                  : status='active' 固定で 1 行作成
+-- soft_delete_lgtm_image(id, uploader_id) : 本人の active 行だけを論理削除し、更新行数を返す
+-- update_lgtm_image_after_regenerate(...) : requester が管理者でなければ 42501、active 行だけを更新
+-- いずれも EXECUTE は service_role のみ (アプリは ImageWriteRepository から呼ぶ)
 
 -- favorites: 自分のお気に入りのみ操作可能。
 -- UPDATE ポリシーは作らない（お気に入りは「作る / 消す」しかなく更新の余地がない）

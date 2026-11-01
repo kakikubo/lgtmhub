@@ -48,6 +48,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const service = buildImageService(supabase);
     const { image, previousImageUrl, urlChanged } = await service.regenerateImage(
       parsedParams.data.id,
+      userId,
       parsedBody.data.originalUrl,
       { skipOldBlobDeletion: process.env.VERCEL_ENV === 'preview' },
     );

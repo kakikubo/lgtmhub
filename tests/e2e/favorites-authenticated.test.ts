@@ -1,20 +1,15 @@
 import { expect, test } from '@playwright/test';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { TEST_USER_EMAIL, TEST_USER_PASSWORD } from './global-setup';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { serviceRoleClient, signedInClient } from './fixtures/supabase-clients';
 
 // このファイルは playwright.config.ts の `authenticated` プロジェクトでのみ実行され、
 // globalSetup が生成した storageState (ログイン済み cookie) を読み込んだ状態で動く。
 //
 // お気に入りの登録 → 一覧表示 → 解除は「画像が 1 枚以上ある」ことが前提だが、
 // CI の Supabase Local はデータ空で起動する。外部 URL 取得を伴う画像登録 API (POST /api/images) は
-// e2e から叩けないため、テストユーザーとしてサインインした Supabase クライアントで
-// lgtm_images に直接フィクスチャを投入する。
-//
-// service_role ではなく「サインイン済みの authenticated ロール」を使うのは、
-// このプロジェクトの Supabase Local では service_role にテーブル権限が無く
-// (PostgREST が 42501 permission denied を返す)、RLS ポリシー
-// "authenticated users can insert own images" (auth.uid() = uploader_id) 経由なら
-// 本番と同じ経路で書き込めるため。
+// e2e から叩けないため、アプリと同じ service_role 専用 RPC (create_lgtm_image) で
+// テストユーザーを uploader とするフィクスチャを投入する。
+// anon / authenticated には lgtm_images の書き込み権限が無い。
 
 const FIXTURE_ORIGINAL_URL = 'https://example.com/e2e-favorites-fixture.png';
 // public/ の実ファイルを相対パスで指す。next/image の remotePatterns 設定に依存せず、
@@ -34,41 +29,28 @@ const FIXTURE_IMAGE_URL = '/default-avatar.svg';
 // supabase/seed.sql のフィクスチャとも距離が 511 以上離れる (実測)。
 const FIXTURE_P_HASH = '0011'.repeat(256);
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`[e2e:favorites] 環境変数 ${name} が未設定です`);
-  return value;
-}
-
-/** テストユーザーとしてサインイン済みの Supabase クライアントを返す */
-async function signedInClient(): Promise<{ supabase: SupabaseClient; userId: string }> {
-  const supabase = createClient(
-    requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
-    requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: TEST_USER_EMAIL,
-    password: TEST_USER_PASSWORD,
-  });
-  if (error || !data.user) {
-    throw new Error(`[e2e:favorites] テストユーザーのサインインに失敗: ${error?.message}`);
-  }
-  return { supabase, userId: data.user.id };
-}
-
 /**
- * フィクスチャ画像を論理削除する。
- * lgtm_images に DELETE ポリシーは無く (アプリの削除も論理削除)、所有者の UPDATE のみ許可される。
+ * フィクスチャ画像を論理削除する (アプリの削除と同じ soft_delete_lgtm_image RPC)。
+ * 対象の特定はテストユーザー自身の SELECT 権限 (owner can view own images) で行う。
  * 行そのものは次回 globalSetup のテストユーザー再作成時に cascade で消える。
  */
 async function softDeleteFixtures(supabase: SupabaseClient, userId: string): Promise<void> {
-  await supabase
+  const { data, error } = await supabase
     .from('lgtm_images')
-    .update({ status: 'deleted', deleted_at: new Date().toISOString() })
+    .select('id')
     .eq('uploader_id', userId)
     .eq('original_url', FIXTURE_ORIGINAL_URL)
     .eq('status', 'active');
+  if (error) throw new Error(`[e2e:favorites] フィクスチャ検索失敗: ${error.message}`);
+
+  const service = serviceRoleClient();
+  for (const { id } of data) {
+    const { error: rpcError } = await service.rpc('soft_delete_lgtm_image', {
+      p_id: id,
+      p_uploader_id: userId,
+    });
+    if (rpcError) throw new Error(`[e2e:favorites] フィクスチャ削除失敗: ${rpcError.message}`);
+  }
 }
 
 // fullyParallel: true 下でもこのブロック内は宣言順に直列実行する。
@@ -83,19 +65,17 @@ test.describe('お気に入り (ログイン済み)', () => {
     // 前回の実行が残したフィクスチャがあれば先に落としてから入れ直す
     await softDeleteFixtures(supabase, userId);
 
-    const { data, error } = await supabase
-      .from('lgtm_images')
-      .insert({
-        uploader_id: userId,
-        original_url: FIXTURE_ORIGINAL_URL,
-        image_url: FIXTURE_IMAGE_URL,
-        p_hash: FIXTURE_P_HASH,
-        width: 266,
-        height: 199,
-        file_size_bytes: 1024,
-        mime_type: 'image/webp',
-        is_animated: false,
-        status: 'active',
+    const { data, error } = await serviceRoleClient()
+      .rpc('create_lgtm_image', {
+        p_uploader_id: userId,
+        p_original_url: FIXTURE_ORIGINAL_URL,
+        p_image_url: FIXTURE_IMAGE_URL,
+        p_p_hash: FIXTURE_P_HASH,
+        p_width: 266,
+        p_height: 199,
+        p_file_size_bytes: 1024,
+        p_mime_type: 'image/webp',
+        p_is_animated: false,
       })
       .select('id')
       .single();

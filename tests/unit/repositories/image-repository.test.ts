@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { describe, expect, it, vi } from 'vitest';
-import { DatabaseError, NotFoundError } from '@/src/lib/errors';
+import { DatabaseError } from '@/src/lib/errors';
 import { ImageRepository } from '@/src/repositories/image-repository';
 import type { Database } from '@/src/types/database.types';
 
@@ -26,22 +26,9 @@ function buildRow(overrides: Partial<Row> = {}): Row {
   };
 }
 
-interface InsertResult {
-  data: Row | null;
-  error: { message: string } | null;
-}
-
 interface SelectListResult {
   data: { id: string; p_hash: string }[] | null;
   error: { message: string } | null;
-}
-
-function createInsertStub(result: InsertResult): SupabaseClient<Database> {
-  const single = vi.fn().mockResolvedValue(result);
-  const select = vi.fn().mockReturnValue({ single });
-  const insert = vi.fn().mockReturnValue({ select });
-  const from = vi.fn().mockReturnValue({ insert });
-  return { from } as unknown as SupabaseClient<Database>;
 }
 
 function createSelectListStub(result: SelectListResult): SupabaseClient<Database> {
@@ -50,69 +37,6 @@ function createSelectListStub(result: SelectListResult): SupabaseClient<Database
   const from = vi.fn().mockReturnValue({ select });
   return { from } as unknown as SupabaseClient<Database>;
 }
-
-describe('ImageRepository.create', () => {
-  it('成功時に LgtmImage を camelCase で返す', async () => {
-    const supabase = createInsertStub({ data: buildRow(), error: null });
-    const repo = new ImageRepository(supabase);
-
-    const created = await repo.create({
-      uploaderId: 'user-1',
-      originalUrl: 'https://example.com/source.jpg',
-      imageUrl: 'https://blob.example/x.webp',
-      pHash: '0'.repeat(1024),
-      width: 800,
-      height: 600,
-      fileSizeBytes: 12345,
-      mimeType: 'image/webp',
-      isAnimated: false,
-    });
-
-    expect(created.id).toBe('image-1');
-    expect(created.uploaderId).toBe('user-1');
-    expect(created.imageUrl).toBe('https://blob.example/x.webp');
-    expect(created.status).toBe('active');
-    expect(created.deletedAt).toBeNull();
-    expect(created.createdAt).toEqual(new Date('2026-05-04T00:00:00.000Z'));
-  });
-
-  it('error が返れば DatabaseError を throw する', async () => {
-    const supabase = createInsertStub({ data: null, error: { message: 'rls violation' } });
-    const repo = new ImageRepository(supabase);
-
-    await expect(
-      repo.create({
-        uploaderId: 'user-1',
-        originalUrl: 'https://example.com/source.jpg',
-        imageUrl: 'https://blob.example/x.webp',
-        pHash: '0'.repeat(1024),
-        width: 800,
-        height: 600,
-        fileSizeBytes: 12345,
-        mimeType: 'image/webp',
-        isAnimated: false,
-      }),
-    ).rejects.toBeInstanceOf(DatabaseError);
-  });
-
-  it('data が空のときは DatabaseError', async () => {
-    const supabase = createInsertStub({ data: null, error: null });
-    const repo = new ImageRepository(supabase);
-    await expect(
-      repo.create({
-        uploaderId: 'user-1',
-        originalUrl: 'https://example.com/source.jpg',
-        imageUrl: 'https://blob.example/x.webp',
-        pHash: '0'.repeat(1024),
-        width: 800,
-        height: 600,
-        fileSizeBytes: 12345,
-        mimeType: 'image/webp',
-        isAnimated: false,
-      }),
-    ).rejects.toBeInstanceOf(DatabaseError);
-  });
-});
 
 interface MaybeSingleResult {
   data: Row | null;
@@ -200,70 +124,6 @@ describe('ImageRepository.listActivePHashes', () => {
     await expect(repo.listActivePHashes()).rejects.toBeInstanceOf(DatabaseError);
   });
 });
-
-interface SoftDeleteResult {
-  data: { id: string }[] | null;
-  error: { message: string } | null;
-}
-
-interface SoftDeleteStub {
-  client: SupabaseClient<Database>;
-  spies: {
-    from: ReturnType<typeof vi.fn>;
-    update: ReturnType<typeof vi.fn>;
-    eqId: ReturnType<typeof vi.fn>;
-    eqUploader: ReturnType<typeof vi.fn>;
-    eqStatus: ReturnType<typeof vi.fn>;
-    select: ReturnType<typeof vi.fn>;
-  };
-}
-
-function createSoftDeleteStub(result: SoftDeleteResult): SoftDeleteStub {
-  const select = vi.fn().mockResolvedValue(result);
-  const eqStatus = vi.fn().mockReturnValue({ select });
-  const eqUploader = vi.fn().mockReturnValue({ eq: eqStatus });
-  const eqId = vi.fn().mockReturnValue({ eq: eqUploader });
-  const update = vi.fn().mockReturnValue({ eq: eqId });
-  const from = vi.fn().mockReturnValue({ update });
-  const client = { from } as unknown as SupabaseClient<Database>;
-  return { client, spies: { from, update, eqId, eqUploader, eqStatus, select } };
-}
-
-describe('ImageRepository.softDelete', () => {
-  it('1 件更新できたら 1 を返し、status/deleted_at を更新する', async () => {
-    const stub = createSoftDeleteStub({ data: [{ id: 'image-1' }], error: null });
-    const repo = new ImageRepository(stub.client);
-
-    const updated = await repo.softDelete('image-1', 'user-1');
-
-    expect(updated).toBe(1);
-    expect(stub.spies.from).toHaveBeenCalledWith('lgtm_images');
-    const updateArg = stub.spies.update.mock.calls[0]?.[0] as {
-      status: string;
-      deleted_at: string;
-    };
-    expect(updateArg.status).toBe('deleted');
-    expect(typeof updateArg.deleted_at).toBe('string');
-    expect(stub.spies.eqId).toHaveBeenCalledWith('id', 'image-1');
-    expect(stub.spies.eqUploader).toHaveBeenCalledWith('uploader_id', 'user-1');
-    expect(stub.spies.eqStatus).toHaveBeenCalledWith('status', 'active');
-  });
-
-  it('該当行が無い (他人 / 既削除 / 不正 ID) なら 0 を返す', async () => {
-    const stub = createSoftDeleteStub({ data: [], error: null });
-    const repo = new ImageRepository(stub.client);
-
-    expect(await repo.softDelete('image-1', 'user-1')).toBe(0);
-  });
-
-  it('error 時は DatabaseError を throw する', async () => {
-    const stub = createSoftDeleteStub({ data: null, error: { message: 'rls violation' } });
-    const repo = new ImageRepository(stub.client);
-
-    await expect(repo.softDelete('image-1', 'user-1')).rejects.toBeInstanceOf(DatabaseError);
-  });
-});
-
 interface ListResult {
   data: Row[] | null;
   error: { message: string } | null;
@@ -469,127 +329,6 @@ describe('ImageRepository.listActivePHashesExcept', () => {
     await expect(repo.listActivePHashesExcept('a')).rejects.toBeInstanceOf(DatabaseError);
   });
 });
-
-interface UpdateAfterRegenerateResult {
-  data: Row | null;
-  error: { message: string } | null;
-}
-
-interface UpdateAfterRegenerateStub {
-  client: SupabaseClient<Database>;
-  spies: {
-    from: ReturnType<typeof vi.fn>;
-    update: ReturnType<typeof vi.fn>;
-    eqId: ReturnType<typeof vi.fn>;
-    eqStatus: ReturnType<typeof vi.fn>;
-    select: ReturnType<typeof vi.fn>;
-    maybeSingle: ReturnType<typeof vi.fn>;
-  };
-}
-
-function createUpdateAfterRegenerateStub(
-  result: UpdateAfterRegenerateResult,
-): UpdateAfterRegenerateStub {
-  const maybeSingle = vi.fn().mockResolvedValue(result);
-  const select = vi.fn().mockReturnValue({ maybeSingle });
-  const eqStatus = vi.fn().mockReturnValue({ select });
-  const eqId = vi.fn().mockReturnValue({ eq: eqStatus });
-  const update = vi.fn().mockReturnValue({ eq: eqId });
-  const from = vi.fn().mockReturnValue({ update });
-  const client = { from } as unknown as SupabaseClient<Database>;
-  return { client, spies: { from, update, eqId, eqStatus, select, maybeSingle } };
-}
-
-describe('ImageRepository.updateAfterRegenerate', () => {
-  it('正常系: id + status=active で絞り、更新後の行を camelCase で返す', async () => {
-    const stub = createUpdateAfterRegenerateStub({
-      data: buildRow({ id: 'image-1', image_url: 'https://blob.example/new.webp' }),
-      error: null,
-    });
-    const repo = new ImageRepository(stub.client);
-
-    const updated = await repo.updateAfterRegenerate('image-1', {
-      imageUrl: 'https://blob.example/new.webp',
-      pHash: 'b'.repeat(1024),
-      width: 400,
-      height: 300,
-      fileSizeBytes: 4,
-      isAnimated: false,
-    });
-
-    expect(stub.spies.from).toHaveBeenCalledWith('lgtm_images');
-    const updateArg = stub.spies.update.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(updateArg.image_url).toBe('https://blob.example/new.webp');
-    expect(updateArg.p_hash).toBe('b'.repeat(1024));
-    expect(updateArg.width).toBe(400);
-    expect(updateArg.height).toBe(300);
-    expect(updateArg.file_size_bytes).toBe(4);
-    expect(updateArg.is_animated).toBe(false);
-    expect(typeof updateArg.updated_at).toBe('string');
-    // originalUrl 未指定なら original_url は Update に含めない
-    expect(updateArg.original_url).toBeUndefined();
-    expect(stub.spies.eqId).toHaveBeenCalledWith('id', 'image-1');
-    expect(stub.spies.eqStatus).toHaveBeenCalledWith('status', 'active');
-    expect(updated.imageUrl).toBe('https://blob.example/new.webp');
-  });
-
-  it('originalUrl 指定時は Update に original_url が含まれる', async () => {
-    const stub = createUpdateAfterRegenerateStub({
-      data: buildRow({ original_url: 'https://example.com/replaced.jpg' }),
-      error: null,
-    });
-    const repo = new ImageRepository(stub.client);
-
-    await repo.updateAfterRegenerate('image-1', {
-      imageUrl: 'https://blob.example/new.webp',
-      pHash: 'b'.repeat(1024),
-      width: 400,
-      height: 300,
-      fileSizeBytes: 4,
-      isAnimated: false,
-      originalUrl: 'https://example.com/replaced.jpg',
-    });
-
-    const updateArg = stub.spies.update.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(updateArg.original_url).toBe('https://example.com/replaced.jpg');
-  });
-
-  it('該当行が無い (status=deleted / 存在しない) なら NotFoundError', async () => {
-    const stub = createUpdateAfterRegenerateStub({ data: null, error: null });
-    const repo = new ImageRepository(stub.client);
-
-    await expect(
-      repo.updateAfterRegenerate('image-1', {
-        imageUrl: 'https://blob.example/new.webp',
-        pHash: 'b'.repeat(1024),
-        width: 400,
-        height: 300,
-        fileSizeBytes: 4,
-        isAnimated: false,
-      }),
-    ).rejects.toBeInstanceOf(NotFoundError);
-  });
-
-  it('error 時は DatabaseError', async () => {
-    const stub = createUpdateAfterRegenerateStub({
-      data: null,
-      error: { message: 'rls violation' },
-    });
-    const repo = new ImageRepository(stub.client);
-
-    await expect(
-      repo.updateAfterRegenerate('image-1', {
-        imageUrl: 'https://blob.example/new.webp',
-        pHash: 'b'.repeat(1024),
-        width: 400,
-        height: 300,
-        fileSizeBytes: 4,
-        isAnimated: false,
-      }),
-    ).rejects.toBeInstanceOf(DatabaseError);
-  });
-});
-
 describe('ImageRepository.list', () => {
   it('cursor 無し: status=active を created_at desc, id desc で limit 件取得する', async () => {
     const stub = createListStub({ data: [buildRow({ id: 'image-1' })], error: null });
