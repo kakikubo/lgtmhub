@@ -459,10 +459,17 @@ pnpm exec lefthook install --reset-hooks-path
 // 通常のsupbaseクライアント（anonキー）でRLSに委ねる
 const supabase = createClient(); // src/lib/supabase/server.ts
 
-// ✅ 管理者操作のみ service_role を使用（慎重に）
+// ✅ service_role はサーバー専用 RPC の呼び出しにだけ使う（慎重に）
 // サーバーサイドのみ、クライアントには絶対に渡さない
-const adminClient = createAdminClient();
+const serviceClient = createServiceRoleClient(); // src/lib/supabase/service.ts
 ```
+
+`lgtm_images` の書き込み (登録 / 論理削除 / 再生成) と `rate_limit_buckets` は anon / authenticated に
+書き込み権限が無く、service_role だけが実行できる SECURITY DEFINER RPC 経由でのみ書き込める。
+新しく「アプリの検証を通った値だけを書き込ませたい」テーブルを作るときも同じ型にする
+(テーブル権限を revoke → RPC の EXECUTE を service_role にだけ grant)。
+`auth.uid()` で本人確認する RPC (`release_daily_upload_count` など) は service_role から呼ぶと
+`auth.uid()` が null になるため、呼び出し元のクライアントのまま使う。
 
 **型安全なクエリ**:
 
@@ -840,9 +847,9 @@ CI の Supabase Local は空 DB で起動するため **全テストが何もア
 **テストが自分で状態を作り、後始末まで責任を持つことが本質** のシナリオは、テスト自身が
 フィクスチャを投入します。手本は `tests/e2e/favorites-authenticated.test.ts`:
 
-- `beforeAll` で `signInWithPassword` したクライアントから `lgtm_images` へ直接 INSERT する。外部 URL 取得を伴う `POST /api/images` は e2e から叩けないため
-- **service_role は使わない**。本リポジトリの Supabase では service_role にテーブル権限が無く、PostgREST が `42501 permission denied` を返す。RLS ポリシー経由 (`authenticated`) なら本番と同じ経路で書き込める
-- 後始末は `afterAll` で論理削除する (`lgtm_images` に DELETE ポリシーは無い)。行そのものは次回 globalSetup のテストユーザー再作成で cascade 削除される
+- `beforeAll` で service_role クライアントから `create_lgtm_image` RPC を呼んでフィクスチャを投入する。外部 URL 取得を伴う `POST /api/images` は e2e から叩けず、`lgtm_images` は authenticated から直接書き込めないため。クライアントは `tests/e2e/fixtures/supabase-clients.ts` を使う
+- service_role でもテーブルへの直接アクセスはしない。本リポジトリの Supabase Local では service_role にテーブル権限が無く、PostgREST が `42501 permission denied` を返す。SECURITY DEFINER の RPC なら権限差の影響を受けない
+- 後始末は `afterAll` で `soft_delete_lgtm_image` RPC により論理削除する。行そのものは次回 globalSetup のテストユーザー再作成で cascade 削除される
 - 共有 DB 状態を跨ぐテストが並行すると干渉するため、ファイル冒頭で `test.describe.configure({ mode: 'serial' })` を宣言する
 - 楽観更新の UI はクリック直後に遷移すると in-flight のリクエストが中断される。`page.waitForResponse` でレスポンス到着を待ってから次の操作へ進む
 

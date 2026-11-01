@@ -212,6 +212,41 @@ export type Database = {
         Args: { p_key: string; p_limit: number; p_window_seconds: number }
         Returns: boolean
       }
+      create_lgtm_image: {
+        Args: {
+          p_file_size_bytes: number
+          p_height: number
+          p_image_url: string
+          p_is_animated: boolean
+          p_mime_type: string
+          p_original_url: string
+          p_p_hash: string
+          p_uploader_id: string
+          p_width: number
+        }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          file_size_bytes: number
+          height: number
+          id: string
+          image_url: string
+          is_animated: boolean
+          mime_type: string
+          original_url: string
+          p_hash: string
+          status: string
+          updated_at: string
+          uploader_id: string
+          width: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "lgtm_images"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       increment_daily_upload_count: {
         Args: { p_date: string; p_max?: number; p_user_id: string }
         Returns: number
@@ -219,6 +254,45 @@ export type Database = {
       release_daily_upload_count: {
         Args: { p_date: string; p_user_id: string }
         Returns: number
+      }
+      soft_delete_lgtm_image: {
+        Args: { p_id: string; p_uploader_id: string }
+        Returns: number
+      }
+      update_lgtm_image_after_regenerate: {
+        Args: {
+          p_file_size_bytes: number
+          p_height: number
+          p_id: string
+          p_image_url: string
+          p_is_animated: boolean
+          p_original_url?: string
+          p_p_hash: string
+          p_requester_id: string
+          p_width: number
+        }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          file_size_bytes: number
+          height: number
+          id: string
+          image_url: string
+          is_animated: boolean
+          mime_type: string
+          original_url: string
+          p_hash: string
+          status: string
+          updated_at: string
+          uploader_id: string
+          width: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "lgtm_images"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
     }
     Enums: {

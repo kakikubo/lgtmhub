@@ -13,8 +13,9 @@ test.describe('OAuth callback 成功後 (ログイン済み) の挙動', () => {
     await expect(page.getByTestId('header-register-link')).toBeVisible();
     await expect(page.getByText('E2E Test User')).toBeVisible();
     await expect(page.getByRole('button', { name: 'ログアウト' })).toBeVisible();
-    // アバター画像 (handle_new_user トリガで avatar_url が user_profiles に入る)
-    await expect(page.getByRole('img', { name: 'E2E Test User' })).toBeVisible();
+    // アバター画像 (handle_new_user トリガで avatar_url が user_profiles に入る)。
+    // 表示名をテキストで出すため alt="" の装飾画像にしている (Issue #377)
+    await expect(page.getByRole('banner').locator('img[alt=""]')).toBeVisible();
   });
 
   test('トップページに未ログイン誘導が表示されない', async ({ page }) => {

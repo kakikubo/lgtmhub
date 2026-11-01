@@ -28,9 +28,12 @@ test.describe('画像詳細ページ', () => {
     const response = await page.goto('/images/00000000-0000-0000-0000-000000000000');
     expect(response?.status()).toBe(200);
     await expect(page.locator('meta[name="robots"]').first()).toHaveAttribute('content', /noindex/);
-    // Next.js 標準 404 ページの h1 (本ファイルでは not-found.tsx を追加しないためデフォルト出力)。
-    // h2 "This page could not be found." も同時に表示されるが、role+level 指定で h1 のみを狙う
-    await expect(page.getByRole('heading', { name: '404', level: 1 })).toBeVisible();
+    // Issue #373: app/(site)/not-found.tsx の日本語 404。(site) レイアウト内で描画されるので
+    // ヘッダーとトップへの導線が出る
+    await expect(page.getByTestId('not-found-page')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'ページが見つかりません' })).toBeVisible();
+    await expect(page.getByTestId('not-found-home-link')).toHaveAttribute('href', '/');
+    await expect(page.getByRole('link', { name: 'LGTMHub' })).toBeVisible();
   });
 
   // Issue #128: 投稿者情報を一覧から詳細ページへ移動。詳細ページでは

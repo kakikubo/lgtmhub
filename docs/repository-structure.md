@@ -49,6 +49,7 @@ lgtmhub/
 │   │       └── list-home-images.ts # トップページ一覧のキャッシュ境界
 │   ├── repositories/           # Data Layer（DB・Blob アクセス）
 │   │   ├── image-repository.ts
+│   │   ├── image-write-repository.ts
 │   │   ├── favorite-repository.ts
 │   │   ├── daily-upload-count-repository.ts
 │   │   ├── rate-limit-repository.ts
@@ -274,7 +275,8 @@ src/services/
 **役割**: Supabase DB / Vercel Blob / 外部HTTPリクエストを抽象化する。SQLクエリとストレージアクセスをここに閉じ込める。
 
 **配置ファイル**:
-- `image-repository.ts`: `lgtm_images` テーブルのCRUD、pHash検索
+- `image-repository.ts`: `lgtm_images` テーブルの読み取り、pHash検索
+- `image-write-repository.ts`: `lgtm_images` の書き込み (登録 / 論理削除 / 再生成)。service_role 専用 RPC を呼ぶ
 - `favorite-repository.ts`: `favorites` テーブルのCRUD、`lgtm_images` との内部結合による一覧取得
 - `daily-upload-count-repository.ts`: 日次カウントのUPSERT・取得・失敗時の減算
 - `rate-limit-repository.ts`: `consume_rate_limit` RPC の呼び出し
@@ -410,6 +412,7 @@ tests/
 | `src/services/image-service.ts` | `tests/unit/services/image-service.test.ts` |
 | `src/services/cache/list-home-images.ts` | `tests/unit/services/cache/list-home-images.test.ts` |
 | `src/repositories/image-repository.ts` | `tests/unit/repositories/image-repository.test.ts` |
+| `src/repositories/image-write-repository.ts` | `tests/unit/repositories/image-write-repository.test.ts` |
 | `app/api/images/route.ts` | `tests/unit/api/images/list-route.test.ts` / `create-route.test.ts` |
 | `app/api/favorites/route.ts` | `tests/unit/api/favorites/list-route.test.ts` / `create-route.test.ts` |
 | `components/image-card.tsx` | `tests/unit/components/image-card.test.tsx` |

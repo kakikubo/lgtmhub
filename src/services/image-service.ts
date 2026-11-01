@@ -7,9 +7,11 @@ import { calculatePHash, isDuplicate } from '@/src/lib/image/calculate-phash';
 import { composeLgtmImage } from '@/src/lib/image/compose-lgtm';
 import { validateImage } from '@/src/lib/image/validate-image';
 import { encodeKeysetCursor, type KeysetCursor } from '@/src/lib/pagination/keyset-cursor';
+import { createServiceRoleClient } from '@/src/lib/supabase/service';
 import { LIST_IMAGES_DEFAULT_LIMIT } from '@/src/lib/validation/image';
 import { DailyUploadCountRepository } from '@/src/repositories/daily-upload-count-repository';
 import { ImageRepository } from '@/src/repositories/image-repository';
+import { ImageWriteRepository } from '@/src/repositories/image-write-repository';
 import type { Database } from '@/src/types/database.types';
 import type { LgtmImage, PublicLgtmImage, PublicLgtmImageDetail } from '@/src/types/image';
 
@@ -155,6 +157,7 @@ function formatUtcDate(date: Date): string {
 
 export interface ImageServiceDeps {
   imageRepo: ImageRepository;
+  imageWriteRepo: ImageWriteRepository;
   countRepo: DailyUploadCountRepository;
   blob?: BlobClient;
   clock?: () => Date;
@@ -162,12 +165,14 @@ export interface ImageServiceDeps {
 
 export class ImageService {
   private readonly imageRepo: ImageRepository;
+  private readonly imageWriteRepo: ImageWriteRepository;
   private readonly countRepo: DailyUploadCountRepository;
   private readonly blob: BlobClient;
   private readonly clock: () => Date;
 
   constructor(deps: ImageServiceDeps) {
     this.imageRepo = deps.imageRepo;
+    this.imageWriteRepo = deps.imageWriteRepo;
     this.countRepo = deps.countRepo;
     this.blob = deps.blob ?? defaultBlobClient;
     this.clock = deps.clock ?? (() => new Date());
@@ -197,7 +202,7 @@ export class ImageService {
       const variant = await buildLgtmVariant(this.imageRepo, this.blob, imageUrl, undefined);
 
       try {
-        return await this.imageRepo.create({
+        return await this.imageWriteRepo.create({
           uploaderId,
           originalUrl: imageUrl,
           imageUrl: variant.blobUrl,
@@ -208,7 +213,6 @@ export class ImageService {
           mimeType: 'image/webp',
           // アニメーション WebP / 静止 WebP の判定は compose 結果に従う (Issue #201)
           isAnimated: variant.isAnimated,
-          status: 'active',
         });
       } catch (err) {
         await this.blob.del(variant.blobUrl).catch(() => undefined);
@@ -224,6 +228,7 @@ export class ImageService {
 
   /**
    * 管理者による LGTM 画像の再生成 (Issue #195)。認可は Route Handler で `requireAdmin` 通過済み前提。
+   * DB 更新の RPC でも requesterId の管理者判定を行う。
    *
    * 順序の意図:
    *   1. `findActiveById` で対象存在確認 (無ければ NotFound)。
@@ -237,6 +242,7 @@ export class ImageService {
    */
   async regenerateImage(
     imageId: string,
+    requesterId: string,
     overrideOriginalUrl: string | undefined,
     options: { skipOldBlobDeletion?: boolean } = {},
   ): Promise<{ image: LgtmImage; previousImageUrl: string; urlChanged: boolean }> {
@@ -253,7 +259,7 @@ export class ImageService {
 
     let updated: LgtmImage;
     try {
-      updated = await this.imageRepo.updateAfterRegenerate(imageId, {
+      updated = await this.imageWriteRepo.updateAfterRegenerate(imageId, requesterId, {
         imageUrl: variant.blobUrl,
         pHash: variant.pHash,
         width: variant.width,
@@ -296,7 +302,7 @@ export class ImageService {
    *
    * 順序の意図:
    *   1. findActiveById で先に 404 と 403 を判別する (UI に正確なエラー理由を返すため)
-   *   2. softDelete は WHERE で本人 + active を強制 (RLS + アプリ層の多層防御)
+   *   2. softDelete は WHERE で本人 + active を強制 (RPC + アプリ層の多層防御)
    *   3. 1 と 2 の間に他者 (将来の管理者削除など) が削除した場合 (TOCTOU) は
    *      softDelete の更新行数が 0 になり、NotFoundError に倒す
    *
@@ -316,7 +322,7 @@ export class ImageService {
       throw new ForbiddenError();
     }
 
-    const updated = await this.imageRepo.softDelete(id, requesterId);
+    const updated = await this.imageWriteRepo.softDelete(id, requesterId);
     if (updated === 0) {
       throw new NotFoundError('画像', id);
     }
@@ -400,6 +406,9 @@ export class ImageService {
 export function buildImageService(supabase: SupabaseClient<Database>): ImageService {
   return new ImageService({
     imageRepo: new ImageRepository(supabase),
+    // lgtm_images への書き込みは service_role 専用 RPC のみ。日次カウンタの RPC は
+    // auth.uid() で本人確認するため、countRepo は呼び出し元のクライアントのまま。
+    imageWriteRepo: new ImageWriteRepository(createServiceRoleClient),
     countRepo: new DailyUploadCountRepository(supabase),
   });
 }

@@ -121,7 +121,12 @@ describe('POST /api/images/[id]/regenerate', () => {
     const res = await callRegenerate(VALID_UUID, {});
 
     expect(res.status).toBe(200);
-    expect(regenerateImage).toHaveBeenCalledWith(VALID_UUID, undefined, expect.any(Object));
+    expect(regenerateImage).toHaveBeenCalledWith(
+      VALID_UUID,
+      'admin-1',
+      undefined,
+      expect.any(Object),
+    );
     expect(revalidateTag).toHaveBeenCalledWith('lgtm-images:list');
     expect(consoleInfoSpy).toHaveBeenCalled();
 
@@ -149,6 +154,7 @@ describe('POST /api/images/[id]/regenerate', () => {
     expect(res.status).toBe(200);
     expect(regenerateImage).toHaveBeenCalledWith(
       VALID_UUID,
+      'admin-1',
       'https://example.com/new-source.jpg',
       expect.any(Object),
     );
@@ -182,7 +188,12 @@ describe('POST /api/images/[id]/regenerate', () => {
     const res = await callRegenerate(VALID_UUID);
 
     expect(res.status).toBe(200);
-    expect(regenerateImage).toHaveBeenCalledWith(VALID_UUID, undefined, expect.any(Object));
+    expect(regenerateImage).toHaveBeenCalledWith(
+      VALID_UUID,
+      'admin-1',
+      undefined,
+      expect.any(Object),
+    );
 
     consoleInfoSpy.mockRestore();
   });
@@ -201,7 +212,7 @@ describe('POST /api/images/[id]/regenerate', () => {
 
     await callRegenerate(VALID_UUID, {});
 
-    expect(regenerateImage).toHaveBeenCalledWith(VALID_UUID, undefined, {
+    expect(regenerateImage).toHaveBeenCalledWith(VALID_UUID, 'admin-1', undefined, {
       skipOldBlobDeletion: true,
     });
 
@@ -223,7 +234,7 @@ describe('POST /api/images/[id]/regenerate', () => {
 
     await callRegenerate(VALID_UUID, {});
 
-    expect(regenerateImage).toHaveBeenCalledWith(VALID_UUID, undefined, {
+    expect(regenerateImage).toHaveBeenCalledWith(VALID_UUID, 'admin-1', undefined, {
       skipOldBlobDeletion: false,
     });
 

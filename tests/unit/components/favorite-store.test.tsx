@@ -305,6 +305,22 @@ describe('お気に入りのトグル', () => {
 });
 
 describe('トースト', () => {
+  // live region は中身と同時にマウントすると読み上げられないため、空の状態から置いておく (Issue #377)
+  it('live region はトーストの有無に関わらず常時マウントし、中身だけを差し替える', async () => {
+    const button = await setupResolved(jsonResponse(200, { lgtmImageIds: [] }));
+    const region = screen.getByRole('status');
+    expect(region).toHaveAttribute('aria-live', 'polite');
+    expect(region).toBeEmptyDOMElement();
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(500, { error: 'boom' }));
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    expect(screen.getByRole('status')).toBe(region);
+    expect(region).toContainElement(screen.getByTestId('favorite-toast'));
+  });
+
   it('一定時間後に消える', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {

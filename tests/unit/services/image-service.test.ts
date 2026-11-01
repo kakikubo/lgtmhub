@@ -10,6 +10,7 @@ import {
 import { LIST_IMAGES_DEFAULT_LIMIT } from '@/src/lib/validation/image';
 import type { DailyUploadCountRepository } from '@/src/repositories/daily-upload-count-repository';
 import type { ImageRepository } from '@/src/repositories/image-repository';
+import type { ImageWriteRepository } from '@/src/repositories/image-write-repository';
 import { BLOB_CACHE_CONTROL_MAX_AGE_SECONDS, type BlobClient } from '@/src/services/image-service';
 import type { Database } from '@/src/types/database.types';
 import type { LgtmImage } from '@/src/types/image';
@@ -143,6 +144,7 @@ async function buildService(mocks: Mocks) {
   const { ImageService } = await import('@/src/services/image-service');
   return new ImageService({
     imageRepo: mocks.imageRepo as unknown as ImageRepository,
+    imageWriteRepo: mocks.imageRepo as unknown as ImageWriteRepository,
     countRepo: mocks.countRepo as unknown as DailyUploadCountRepository,
     blob: mocks.blob,
     clock: mocks.clock,
@@ -238,7 +240,6 @@ describe('ImageService.createImage', () => {
         originalUrl: 'https://example.com/x.jpg',
         imageUrl: 'https://blob.example/lgtm/x.webp',
         pHash: 'b'.repeat(1024),
-        status: 'active',
         mimeType: 'image/webp',
         isAnimated: false,
       }),
@@ -522,6 +523,7 @@ describe('default BlobClient (@vercel/blob 委譲)', () => {
     const { ImageService } = await import('@/src/services/image-service');
     const service = new ImageService({
       imageRepo: mocks.imageRepo as unknown as ImageRepository,
+      imageWriteRepo: mocks.imageRepo as unknown as ImageWriteRepository,
       countRepo: mocks.countRepo as unknown as DailyUploadCountRepository,
       // blob 未注入 → defaultBlobClient
       clock: mocks.clock,
@@ -550,6 +552,7 @@ describe('default BlobClient (@vercel/blob 委譲)', () => {
     const { ImageService } = await import('@/src/services/image-service');
     const service = new ImageService({
       imageRepo: mocks.imageRepo as unknown as ImageRepository,
+      imageWriteRepo: mocks.imageRepo as unknown as ImageWriteRepository,
       countRepo: mocks.countRepo as unknown as DailyUploadCountRepository,
       clock: mocks.clock,
     });
@@ -673,9 +676,9 @@ describe('ImageService.regenerateImage', () => {
     mocks.imageRepo.findActiveById.mockResolvedValue(null);
 
     const service = await buildService(mocks);
-    await expect(service.regenerateImage('image-missing', undefined)).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
+    await expect(
+      service.regenerateImage('image-missing', 'admin-1', undefined),
+    ).rejects.toBeInstanceOf(NotFoundError);
 
     expect(safeFetch).not.toHaveBeenCalled();
     expect(mocks.blob.put).not.toHaveBeenCalled();
@@ -688,18 +691,19 @@ describe('ImageService.regenerateImage', () => {
     setupRegenerateHappyPath(mocks);
 
     const service = await buildService(mocks);
-    const result = await service.regenerateImage('image-1', undefined);
+    const result = await service.regenerateImage('image-1', 'admin-1', undefined);
 
     expect(safeFetch).toHaveBeenCalledWith('https://example.com/original.jpg');
     // originalUrl は据え置き (Repository には渡さない)
     expect(mocks.imageRepo.updateAfterRegenerate).toHaveBeenCalledWith(
       'image-1',
+      'admin-1',
       expect.objectContaining({
         imageUrl: 'https://blob.example/lgtm/new.webp',
         pHash: 'b'.repeat(1024),
       }),
     );
-    const patch = mocks.imageRepo.updateAfterRegenerate.mock.calls[0]?.[1] as {
+    const patch = mocks.imageRepo.updateAfterRegenerate.mock.calls[0]?.[2] as {
       originalUrl?: string;
     };
     expect(patch.originalUrl).toBeUndefined();
@@ -712,11 +716,16 @@ describe('ImageService.regenerateImage', () => {
     setupRegenerateHappyPath(mocks);
 
     const service = await buildService(mocks);
-    const result = await service.regenerateImage('image-1', 'https://example.com/replaced.jpg');
+    const result = await service.regenerateImage(
+      'image-1',
+      'admin-1',
+      'https://example.com/replaced.jpg',
+    );
 
     expect(safeFetch).toHaveBeenCalledWith('https://example.com/replaced.jpg');
     expect(mocks.imageRepo.updateAfterRegenerate).toHaveBeenCalledWith(
       'image-1',
+      'admin-1',
       expect.objectContaining({
         originalUrl: 'https://example.com/replaced.jpg',
       }),
@@ -729,7 +738,11 @@ describe('ImageService.regenerateImage', () => {
     setupRegenerateHappyPath(mocks);
 
     const service = await buildService(mocks);
-    const result = await service.regenerateImage('image-1', 'https://example.com/original.jpg');
+    const result = await service.regenerateImage(
+      'image-1',
+      'admin-1',
+      'https://example.com/original.jpg',
+    );
 
     expect(result.urlChanged).toBe(false);
   });
@@ -739,7 +752,7 @@ describe('ImageService.regenerateImage', () => {
     setupRegenerateHappyPath(mocks);
 
     const service = await buildService(mocks);
-    await service.regenerateImage('image-1', undefined);
+    await service.regenerateImage('image-1', 'admin-1', undefined);
 
     expect(mocks.imageRepo.listActivePHashesExcept).toHaveBeenCalledWith('image-1');
     expect(mocks.imageRepo.listActivePHashes).not.toHaveBeenCalled();
@@ -750,7 +763,7 @@ describe('ImageService.regenerateImage', () => {
     setupRegenerateHappyPath(mocks);
 
     const service = await buildService(mocks);
-    await service.regenerateImage('image-1', undefined);
+    await service.regenerateImage('image-1', 'admin-1', undefined);
 
     expect(mocks.countRepo.increment).not.toHaveBeenCalled();
     expect(mocks.countRepo.getCount).not.toHaveBeenCalled();
@@ -766,7 +779,7 @@ describe('ImageService.regenerateImage', () => {
     isDuplicate.mockReturnValueOnce(true);
 
     const service = await buildService(mocks);
-    await expect(service.regenerateImage('image-1', undefined)).rejects.toBeInstanceOf(
+    await expect(service.regenerateImage('image-1', 'admin-1', undefined)).rejects.toBeInstanceOf(
       DuplicateImageError,
     );
 
@@ -781,7 +794,9 @@ describe('ImageService.regenerateImage', () => {
     safeFetch.mockRejectedValue(new Error('fetch failed'));
 
     const service = await buildService(mocks);
-    await expect(service.regenerateImage('image-1', undefined)).rejects.toThrow('fetch failed');
+    await expect(service.regenerateImage('image-1', 'admin-1', undefined)).rejects.toThrow(
+      'fetch failed',
+    );
 
     expect(mocks.blob.put).not.toHaveBeenCalled();
     expect(mocks.imageRepo.updateAfterRegenerate).not.toHaveBeenCalled();
@@ -806,7 +821,7 @@ describe('ImageService.regenerateImage', () => {
     });
 
     const service = await buildService(mocks);
-    const result = await service.regenerateImage('image-1', undefined);
+    const result = await service.regenerateImage('image-1', 'admin-1', undefined);
 
     expect(callOrder).toEqual([
       'blob.put',
@@ -822,7 +837,7 @@ describe('ImageService.regenerateImage', () => {
     mocks.imageRepo.updateAfterRegenerate.mockRejectedValue(new DatabaseError('update failed'));
 
     const service = await buildService(mocks);
-    await expect(service.regenerateImage('image-1', undefined)).rejects.toBeInstanceOf(
+    await expect(service.regenerateImage('image-1', 'admin-1', undefined)).rejects.toBeInstanceOf(
       DatabaseError,
     );
 
@@ -837,7 +852,7 @@ describe('ImageService.regenerateImage', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     const service = await buildService(mocks);
-    const result = await service.regenerateImage('image-1', undefined);
+    const result = await service.regenerateImage('image-1', 'admin-1', undefined);
 
     expect(result.image.imageUrl).toBe('https://blob.example/lgtm/new.webp');
     expect(warnSpy).toHaveBeenCalled();
@@ -852,7 +867,7 @@ describe('ImageService.regenerateImage', () => {
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
 
     const service = await buildService(mocks);
-    const result = await service.regenerateImage('image-1', undefined, {
+    const result = await service.regenerateImage('image-1', 'admin-1', undefined, {
       skipOldBlobDeletion: true,
     });
 
