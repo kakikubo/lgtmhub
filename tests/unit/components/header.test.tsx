@@ -56,16 +56,20 @@ describe('Header', () => {
     getUser.mockResolvedValue({ data: { user: { id: 'user-1' } } });
     findById.mockResolvedValue(PROFILE);
 
-    render(await Header());
+    const { container } = render(await Header());
 
     expect(screen.getByTestId('header-register-link')).toHaveAttribute('href', '/images/new');
     expect(screen.getByTestId('header-favorites-link')).toHaveAttribute('href', '/favorites');
     expect(screen.getByText('Octo Cat')).toBeInTheDocument();
     // next/image は unoptimized 指定が無いと src を /_next/image?url=... に書き換えるため、
     // 厳密一致ではなく元 URL がエンコードされて含まれることを確認する
-    expect(screen.getByAltText('Octo Cat').getAttribute('src')).toContain(
+    // 表示名はテキストで出すため、アバターは alt="" の装飾画像にして二重読み上げを避ける (Issue #377)
+    const avatar = container.querySelector('img');
+    expect(avatar).toHaveAttribute('alt', '');
+    expect(avatar?.getAttribute('src')).toContain(
       encodeURIComponent('https://avatars.example.com/octocat.png'),
     );
+    expect(screen.queryByAltText('Octo Cat')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ログアウト' })).toBeInTheDocument();
     expect(findById).toHaveBeenCalledWith('user-1');
   });
