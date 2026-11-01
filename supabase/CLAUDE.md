@@ -20,4 +20,5 @@
   `grant all on all tables in schema public to anon, authenticated, service_role;`
   を実行したうえで、`20260720000000` と `20260820000000` と `20261031000000` の revoke / grant
   部分を再適用する (再適用しないと lgtm_images の直接書き込み拒否 e2e が落ちる)。
+  `20261101000000` の関数 EXECUTE の revoke / grant はテーブル権限と無関係なので再適用は不要。
   なお `favorites` は環境差に依存しないよう、マイグレーション内で必要な権限を明示付与している。

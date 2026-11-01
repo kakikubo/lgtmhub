@@ -464,12 +464,12 @@ const supabase = createClient(); // src/lib/supabase/server.ts
 const serviceClient = createServiceRoleClient(); // src/lib/supabase/service.ts
 ```
 
-`lgtm_images` の書き込み (登録 / 論理削除 / 再生成) と `rate_limit_buckets` は anon / authenticated に
-書き込み権限が無く、service_role だけが実行できる SECURITY DEFINER RPC 経由でのみ書き込める。
+`lgtm_images` の書き込み (登録 / 論理削除 / 再生成)、`daily_upload_counts` の増減、`rate_limit_buckets` は
+anon / authenticated に書き込み権限が無く、service_role だけが実行できる SECURITY DEFINER RPC 経由でのみ書き込める。
 新しく「アプリの検証を通った値だけを書き込ませたい」テーブルを作るときも同じ型にする
 (テーブル権限を revoke → RPC の EXECUTE を service_role にだけ grant)。
-`auth.uid()` で本人確認する RPC (`release_daily_upload_count` など) は service_role から呼ぶと
-`auth.uid()` が null になるため、呼び出し元のクライアントのまま使う。
+service_role から呼ぶ RPC の中では `auth.uid()` が null になるため、本人確認には使えない。
+対象ユーザー ID はサーバーが `requireUser` などで検証した値を引数で渡す。
 
 **型安全なクエリ**:
 

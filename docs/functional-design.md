@@ -829,7 +829,7 @@ class FavoriteService {
 | 不正な画像形式 | Sharpのメタデータ検証でMIMEタイプを確認（JPEG/PNG/GIF/WebPのみ許可） |
 | 他ユーザーの画像削除 | APIレベルで `uploaderId === requesterId` を検証（削除 RPC の WHERE 句でも二重チェック） |
 | 登録フローを迂回した直接書き込み | `lgtm_images` の書き込み権限を anon / authenticated から剥奪し、service_role 専用 RPC のみに限定 |
-| 1日10枚制限の回避 | `daily_upload_counts` を取得・合成の前に DB 側で atomic にインクリメントし、失敗時は枠を戻す |
+| 1日10枚制限の回避 | `daily_upload_counts` を取得・合成の前に DB 側で atomic にインクリメントし、失敗時は枠を戻す。増減の RPC は service_role 専用 |
 | 高コスト API の連打 | `rate_limit_buckets` の固定ウィンドウ。`/api/images/random` は IP、`POST /api/images` は IP とユーザー、再生成は管理者ユーザー |
 | セッション偽装 | Supabase Auth JWTを全APIルートで検証 |
 
@@ -863,6 +863,11 @@ REVOKE INSERT, UPDATE, DELETE ON lgtm_images FROM anon, authenticated;
 -- soft_delete_lgtm_image(id, uploader_id) : 本人の active 行だけを論理削除し、更新行数を返す
 -- update_lgtm_image_after_regenerate(...) : requester が管理者でなければ 42501、active 行だけを更新
 -- いずれも EXECUTE は service_role のみ (アプリは ImageWriteRepository から呼ぶ)
+
+-- daily_upload_counts: 本人の行だけ SELECT 可能。書き込みポリシーは作らない。
+-- increment_daily_upload_count(user_id, date, max) : 上限内のときだけ atomic に +1、超過は P0001
+-- release_daily_upload_count(user_id, date)        : 登録失敗時に 1 枠戻す (0 未満にはしない)
+-- EXECUTE は service_role のみ。引数はサーバーが検証済みの値を渡す (DailyUploadCountRepository)
 
 -- favorites: 自分のお気に入りのみ操作可能。
 -- UPDATE ポリシーは作らない（お気に入りは「作る / 消す」しかなく更新の余地がない）
