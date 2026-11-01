@@ -1,12 +1,16 @@
 import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 
+// ログイン不要の公開 GET。session refresh を通さない。
+// - /api/images: Vercel CDN キャッシュ対象。Set-Cookie が乗ると CDN がキャッシュを諦める (Issue #46 案 #3)
+// - /api/images/random: anon クライアントで読むため、Auth 往復と Set-Cookie は無駄になる (Issue #381)
+// `/api/images/*` を前方一致で外さず完全一致で列挙するのは、認証付き GET を足したときに
+// session refresh が黙って抜けるのを防ぐため。
+const PUBLIC_GET_PATHS = new Set(['/api/images', '/api/images/random']);
+
 export async function proxy(request: NextRequest) {
-  // /api/images GET は Vercel CDN キャッシュ対象 (Issue #46 案 #3)。
-  // session refresh で Set-Cookie がレスポンスに乗ると CDN がキャッシュを諦めるため、
-  // matcher で拾われた後に method/path 条件で early-return する。
   // Next.js の config.matcher は HTTP method 分岐をサポートしないため proxy 本体で判定する。
-  if (request.method === 'GET' && request.nextUrl.pathname === '/api/images') {
+  if (request.method === 'GET' && PUBLIC_GET_PATHS.has(request.nextUrl.pathname)) {
     return NextResponse.next({ request });
   }
 
