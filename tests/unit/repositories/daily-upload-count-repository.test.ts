@@ -4,66 +4,32 @@ import { DailyLimitExceededError, DatabaseError } from '@/src/lib/errors';
 import { DailyUploadCountRepository } from '@/src/repositories/daily-upload-count-repository';
 import type { Database } from '@/src/types/database.types';
 
-interface MaybeSingleResult {
-  data: { count: number } | null;
-  error: { message: string } | null;
-}
-
 interface RpcResult {
   data: number | null;
   error: { message: string; code?: string } | null;
 }
 
-function createGetCountStub(result: MaybeSingleResult): SupabaseClient<Database> {
-  const maybeSingle = vi.fn().mockResolvedValue(result);
-  const eqDate = vi.fn().mockReturnValue({ maybeSingle });
-  const eqUser = vi.fn().mockReturnValue({ eq: eqDate });
-  const select = vi.fn().mockReturnValue({ eq: eqUser });
-  const from = vi.fn().mockReturnValue({ select });
-  return { from, rpc: vi.fn() } as unknown as SupabaseClient<Database>;
-}
-
 function createRpcStub(result: RpcResult): SupabaseClient<Database> {
   const rpc = vi.fn().mockResolvedValue(result);
-  return { from: vi.fn(), rpc } as unknown as SupabaseClient<Database>;
+  return { rpc } as unknown as SupabaseClient<Database>;
 }
-
-describe('DailyUploadCountRepository.getCount', () => {
-  it('行が存在する場合は count を返す', async () => {
-    const supabase = createGetCountStub({ data: { count: 3 }, error: null });
-    const repo = new DailyUploadCountRepository(supabase);
-    expect(await repo.getCount('user-1', '2026-05-04')).toBe(3);
-  });
-
-  it('行が存在しない場合は 0 を返す', async () => {
-    const supabase = createGetCountStub({ data: null, error: null });
-    const repo = new DailyUploadCountRepository(supabase);
-    expect(await repo.getCount('user-1', '2026-05-04')).toBe(0);
-  });
-
-  it('error 時は DatabaseError を throw する', async () => {
-    const supabase = createGetCountStub({ data: null, error: { message: 'oops' } });
-    const repo = new DailyUploadCountRepository(supabase);
-    await expect(repo.getCount('user-1', '2026-05-04')).rejects.toBeInstanceOf(DatabaseError);
-  });
-});
 
 describe('DailyUploadCountRepository.increment', () => {
   it('RPC が返した新カウントを返す', async () => {
     const supabase = createRpcStub({ data: 4, error: null });
-    const repo = new DailyUploadCountRepository(supabase);
+    const repo = new DailyUploadCountRepository(() => supabase);
     expect(await repo.increment('user-1', '2026-05-04')).toBe(4);
   });
 
   it('error 時は DatabaseError を throw する', async () => {
     const supabase = createRpcStub({ data: null, error: { message: 'rpc failed' } });
-    const repo = new DailyUploadCountRepository(supabase);
+    const repo = new DailyUploadCountRepository(() => supabase);
     await expect(repo.increment('user-1', '2026-05-04')).rejects.toBeInstanceOf(DatabaseError);
   });
 
   it('返り値が number でない場合は DatabaseError を throw する', async () => {
     const supabase = createRpcStub({ data: null, error: null });
-    const repo = new DailyUploadCountRepository(supabase);
+    const repo = new DailyUploadCountRepository(() => supabase);
     await expect(repo.increment('user-1', '2026-05-04')).rejects.toBeInstanceOf(DatabaseError);
   });
 
@@ -72,7 +38,7 @@ describe('DailyUploadCountRepository.increment', () => {
       data: null,
       error: { message: 'daily_limit_exceeded', code: 'P0001' },
     });
-    const repo = new DailyUploadCountRepository(supabase);
+    const repo = new DailyUploadCountRepository(() => supabase);
     await expect(repo.increment('user-1', '2026-05-04')).rejects.toBeInstanceOf(
       DailyLimitExceededError,
     );
@@ -80,13 +46,13 @@ describe('DailyUploadCountRepository.increment', () => {
 
   it('release は RPC エラーを DatabaseError にする', async () => {
     const supabase = createRpcStub({ data: null, error: { message: 'rpc failed' } });
-    const repo = new DailyUploadCountRepository(supabase);
+    const repo = new DailyUploadCountRepository(() => supabase);
     await expect(repo.release('user-1', '2026-05-04')).rejects.toBeInstanceOf(DatabaseError);
   });
 
   it('release が成功したら例外を出さない', async () => {
     const supabase = createRpcStub({ data: 3, error: null });
-    const repo = new DailyUploadCountRepository(supabase);
+    const repo = new DailyUploadCountRepository(() => supabase);
     await expect(repo.release('user-1', '2026-05-04')).resolves.toBeUndefined();
   });
 
@@ -95,7 +61,46 @@ describe('DailyUploadCountRepository.increment', () => {
       data: null,
       error: { message: 'something else', code: 'P0001' },
     });
-    const repo = new DailyUploadCountRepository(supabase);
+    const repo = new DailyUploadCountRepository(() => supabase);
     await expect(repo.increment('user-1', '2026-05-04')).rejects.toBeInstanceOf(DatabaseError);
+  });
+});
+
+describe('DailyUploadCountRepository のクライアント生成', () => {
+  it('クライアントは最初の呼び出しで 1 度だけ生成する', async () => {
+    const supabase = createRpcStub({ data: 1, error: null });
+    const createClient = vi.fn(() => supabase);
+    const repo = new DailyUploadCountRepository(createClient);
+    expect(createClient).not.toHaveBeenCalled();
+
+    await repo.increment('user-1', '2026-05-04');
+    await repo.release('user-1', '2026-05-04');
+    expect(createClient).toHaveBeenCalledTimes(1);
+  });
+
+  it('クライアントを生成できない (キー未設定) ときは increment が失敗する', async () => {
+    const repo = new DailyUploadCountRepository(() => {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY が未設定です');
+    });
+    await expect(repo.increment('user-1', '2026-05-04')).rejects.toThrow(
+      'SUPABASE_SERVICE_ROLE_KEY が未設定です',
+    );
+  });
+
+  it('increment / release は渡されたユーザー ID・日付・上限を RPC に渡す', async () => {
+    const supabase = createRpcStub({ data: 1, error: null });
+    const repo = new DailyUploadCountRepository(() => supabase);
+
+    await repo.increment('user-1', '2026-05-04', 10);
+    await repo.release('user-1', '2026-05-04');
+    expect(supabase.rpc).toHaveBeenNthCalledWith(1, 'increment_daily_upload_count', {
+      p_user_id: 'user-1',
+      p_date: '2026-05-04',
+      p_max: 10,
+    });
+    expect(supabase.rpc).toHaveBeenNthCalledWith(2, 'release_daily_upload_count', {
+      p_user_id: 'user-1',
+      p_date: '2026-05-04',
+    });
   });
 });

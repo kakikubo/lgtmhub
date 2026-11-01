@@ -5,19 +5,21 @@ import type { Database } from '@/src/types/database.types';
 const DAILY_LIMIT_EXCEEDED_PG_CODE = 'P0001';
 const DAILY_LIMIT_EXCEEDED_MESSAGE = 'daily_limit_exceeded';
 
+/**
+ * 日次登録カウンタの Repository。
+ *
+ * increment / release の RPC は service_role だけが実行できる。引数のユーザー ID・日付・上限は
+ * そのまま信頼されるため、呼び出し側はセッションで検証済みの値だけを渡すこと。
+ * クライアントは最初の呼び出しで生成し、キー未設定なら登録だけを失敗させる。
+ */
 export class DailyUploadCountRepository {
-  constructor(private readonly supabase: SupabaseClient<Database>) {}
+  private client: SupabaseClient<Database> | null = null;
 
-  async getCount(userId: string, date: string): Promise<number> {
-    const { data, error } = await this.supabase
-      .from('daily_upload_counts')
-      .select('count')
-      .eq('user_id', userId)
-      .eq('date', date)
-      .maybeSingle();
+  constructor(private readonly createClient: () => SupabaseClient<Database>) {}
 
-    if (error) throw new DatabaseError(error.message);
-    return data?.count ?? 0;
+  private get supabase(): SupabaseClient<Database> {
+    this.client ??= this.createClient();
+    return this.client;
   }
 
   /**
