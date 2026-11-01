@@ -1,6 +1,8 @@
 type BuildContentSecurityPolicyOptions = {
   /** OAuth の遷移先。ビルド時の NEXT_PUBLIC_SUPABASE_URL (Preview と本番で別プロジェクト) */
   supabaseUrl: string | undefined;
+  /** Sentry の送信先。本番だけ設定される NEXT_PUBLIC_SENTRY_DSN (Issue #175) */
+  sentryDsn: string | undefined;
   isDev: boolean;
 };
 
@@ -14,6 +16,7 @@ type BuildContentSecurityPolicyOptions = {
  */
 export function buildContentSecurityPolicy({
   supabaseUrl,
+  sentryDsn,
   isDev,
 }: BuildContentSecurityPolicyOptions): string {
   const directives: Record<string, string[]> = {
@@ -33,8 +36,9 @@ export function buildContentSecurityPolicy({
       'https://avatars.githubusercontent.com',
     ],
     'font-src': ["'self'"],
-    // クライアントの fetch はすべて同一オリジンの /api/*。dev は HMR の WebSocket を足す
-    'connect-src': ["'self'", ...(isDev ? ['ws:'] : [])],
+    // クライアントの fetch は同一オリジンの /api/* と Sentry へのエラー送信。dev は HMR の WebSocket を足す。
+    // DSN の公開鍵は userinfo 部にあるため origin に含まれない
+    'connect-src': ["'self'", ...originOf(sentryDsn), ...(isDev ? ['ws:'] : [])],
     // JS 無効時の Server Action は form POST → Supabase → GitHub とリダイレクトし、
     // Chrome は form-action をリダイレクト先にも適用する
     'form-action': ["'self'", ...originOf(supabaseUrl), 'https://github.com'],
