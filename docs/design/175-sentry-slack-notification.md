@@ -26,7 +26,7 @@ Sentry Alert Rule（A new issue is created / env=production）
   → zod で data.event（title / culprit / web_url / environment）を取り出し、Slack Block Kit に整形
   → SLACK_WEBHOOK_URL へ POST
 ```
-- `event_alert` 以外のリソース（installation 等）は 200 で無視する。Sentry の再送を招かないため
+- `event_alert` 以外のリソース（installation 等）は 2xx で無視する。Sentry に配信失敗として扱わせないため
 - 初回のみ通知・連打防止は Sentry のアラート条件（new issue）に任せ、中継側では重複排除しない
 
 ### 環境変数
