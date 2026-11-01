@@ -4,7 +4,8 @@
     "config:recommended",
     ":semanticCommits",
     ":dependencyDashboard",
-    ":timezone(Asia/Tokyo)"
+    ":timezone(Asia/Tokyo)",
+    "helpers:pinGitHubActionDigests"
   ],
   "schedule": ["before 9am on monday"],
   "internalChecksFilter": "strict",
@@ -73,9 +74,14 @@
     },
     {
       "matchManagers": ["github-actions"],
-      "groupName": "github-actions",
-      "automerge": true,
-      "platformAutomerge": true
+      "matchPackageNames": ["actions/**"],
+      "groupName": "github-actions (official)"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["!actions/**"],
+      "groupName": "github-actions (third-party)",
+      "automerge": false
     },
     {
       "matchManagers": ["npm"],
