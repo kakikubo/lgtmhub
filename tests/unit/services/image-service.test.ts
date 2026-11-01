@@ -81,7 +81,6 @@ interface Mocks {
     findManyActiveByIds: ReturnType<typeof vi.fn>;
   };
   countRepo: {
-    getCount: ReturnType<typeof vi.fn>;
     increment: ReturnType<typeof vi.fn>;
     release: ReturnType<typeof vi.fn>;
   };
@@ -106,7 +105,6 @@ function buildMocks(): Mocks {
       findManyActiveByIds: vi.fn().mockResolvedValue([]),
     },
     countRepo: {
-      getCount: vi.fn().mockResolvedValue(0),
       increment: vi.fn().mockResolvedValue(1),
       release: vi.fn().mockResolvedValue(undefined),
     },
@@ -755,7 +753,7 @@ describe('ImageService.regenerateImage', () => {
     await service.regenerateImage('image-1', 'admin-1', undefined);
 
     expect(mocks.countRepo.increment).not.toHaveBeenCalled();
-    expect(mocks.countRepo.getCount).not.toHaveBeenCalled();
+    expect(mocks.countRepo.release).not.toHaveBeenCalled();
   });
 
   it('別の active 画像と pHash が重複したら DuplicateImageError を throw し、Blob put / DB update は呼ばれない', async () => {

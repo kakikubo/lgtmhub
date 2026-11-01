@@ -397,11 +397,17 @@ export class ImageService {
 }
 
 export function buildImageService(supabase: SupabaseClient<Database>): ImageService {
+  // lgtm_images への書き込みと日次カウンタの増減は service_role 専用 RPC のみ。
+  // service_role クライアントは最初に使われたときに 1 つだけ作り、両方の Repository で共有する。
+  let serviceClient: SupabaseClient<Database> | null = null;
+  const getServiceClient = () => {
+    serviceClient ??= createServiceRoleClient();
+    return serviceClient;
+  };
+
   return new ImageService({
     imageRepo: new ImageRepository(supabase),
-    // lgtm_images への書き込みは service_role 専用 RPC のみ。日次カウンタの RPC は
-    // auth.uid() で本人確認するため、countRepo は呼び出し元のクライアントのまま。
-    imageWriteRepo: new ImageWriteRepository(createServiceRoleClient),
-    countRepo: new DailyUploadCountRepository(supabase),
+    imageWriteRepo: new ImageWriteRepository(getServiceClient),
+    countRepo: new DailyUploadCountRepository(getServiceClient),
   });
 }
