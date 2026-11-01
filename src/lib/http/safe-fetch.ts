@@ -1,17 +1,9 @@
+import { lookup as dnsLookupCallback } from 'node:dns';
 import { lookup as dnsLookup } from 'node:dns/promises';
-import net from 'node:net';
+import type { LookupFunction } from 'node:net';
+import ipaddr from 'ipaddr.js';
+import { Agent, fetch } from 'undici';
 import { BadRequestError } from '@/src/lib/errors';
-
-const PRIVATE_IPV4_RANGES: RegExp[] = [
-  /^10\./,
-  /^172\.(1[6-9]|2[0-9]|3[01])\./,
-  /^192\.168\./,
-  /^127\./,
-  /^169\.254\./,
-  /^0\./,
-];
-
-const PRIVATE_IPV6_PREFIXES: string[] = ['::1', 'fc', 'fd', 'fe80', '::ffff:'];
 
 export const DEFAULT_MAX_FETCH_BYTES = 10 * 1024 * 1024;
 export const DEFAULT_FETCH_TIMEOUT_MS = 8_000;
@@ -33,17 +25,35 @@ export interface SafeFetchResult {
   contentType: string;
 }
 
+// 公開ユニキャスト以外 (プライベート・ループバック・リンクローカル・CGNAT・マルチキャスト・
+// 予約・IPv4 埋め込み IPv6 など) はすべて拒否する許可リスト方式。パースできない値も拒否する
 export function isPrivateIp(ip: string): boolean {
-  if (net.isIPv4(ip)) {
-    return PRIVATE_IPV4_RANGES.some((re) => re.test(ip));
-  }
-  if (net.isIPv6(ip)) {
-    const lower = ip.toLowerCase();
-    if (lower === '::1' || lower === '::') return true;
-    return PRIVATE_IPV6_PREFIXES.some((prefix) => lower.startsWith(prefix));
-  }
-  return false;
+  if (!ipaddr.isValid(ip)) return true;
+  return ipaddr.parse(ip).range() !== 'unicast';
 }
+
+// 接続時の名前解決で使う lookup。解決結果を検証してから返すため、
+// 事前チェックの後に DNS の応答が変わっても検証済みでない IP には接続しない
+export const guardedLookup: LookupFunction = (hostname, options, callback) => {
+  dnsLookupCallback(hostname, { ...options, all: true }, (err, addresses) => {
+    if (err) {
+      callback(err, '');
+      return;
+    }
+    const [first] = addresses;
+    if (!first || addresses.some(({ address }) => isPrivateIp(address))) {
+      callback(new BadRequestError('このURLは使用できません'), '');
+      return;
+    }
+    if (options.all) {
+      callback(null, addresses);
+      return;
+    }
+    callback(null, first.address, first.family);
+  });
+};
+
+const pinnedAgent = new Agent({ connect: { lookup: guardedLookup } });
 
 function normalizeContentType(raw: string | null): string {
   if (!raw) return '';
@@ -69,10 +79,11 @@ export async function safeFetch(
     throw new BadRequestError('HTTPS の URL を入力してください');
   }
 
-  // DNS チェックと fetch の間で DNS エントリが書き換わる DNS rebinding は
-  // アプリレイヤーで完全には防げない。Vercel Functions の実行環境では同一リクエスト内に
-  // 該当攻撃を成立させる手段が現実的でないため、本実装ではここまでの緩和に留める。
-  const lookups = await dnsLookup(parsed.hostname, { all: true }).catch(() => {
+  // 利用者向けのエラーを出し分けるための事前チェック。IP リテラルの URL は接続時に
+  // 名前解決されないため、ここで判定する。ホスト名の場合は接続時にも guardedLookup で再検証する
+  // IPv6 リテラルの hostname は [::1] のように角括弧つきで返るため外してから解決する
+  const hostname = parsed.hostname.replace(/^\[(.*)\]$/, '$1');
+  const lookups = await dnsLookup(hostname, { all: true }).catch(() => {
     throw new BadRequestError('画像を取得できませんでした。URL を確認してください');
   });
   if (lookups.some(({ address }) => isPrivateIp(address))) {
@@ -83,6 +94,7 @@ export async function safeFetch(
   const response = await fetch(parsed.toString(), {
     redirect: 'error',
     signal: AbortSignal.timeout(timeoutMs),
+    dispatcher: pinnedAgent,
   }).catch((err: unknown) => {
     if (err instanceof Error && err.name === 'TimeoutError') {
       throw new BadRequestError('画像の取得がタイムアウトしました');
