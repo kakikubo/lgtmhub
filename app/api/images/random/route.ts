@@ -1,7 +1,7 @@
 import { connection, type NextRequest, NextResponse } from 'next/server';
 import { RateLimitExceededError } from '@/src/lib/errors';
 import { clientIp } from '@/src/lib/http/client-ip';
-import { createClient } from '@/src/lib/supabase/server';
+import { createAnonClient } from '@/src/lib/supabase/anon';
 import { buildImageService } from '@/src/services/image-service';
 import { buildRateLimitService } from '@/src/services/rate-limit-service';
 
@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
 
     // ログイン不要。RLS ポリシー (anyone can view active images) 経由で
     // anon ロールでも status='active' を SELECT できる (GET /api/images と同方針)。
-    const supabase = await createClient();
+    // Cookie 連携の createClient() は Auth の往復と Set-Cookie を足すだけなので使わない (Issue #381)。
+    const supabase = createAnonClient();
     const service = buildImageService(supabase);
     const result = await service.listRandomImages();
 

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DatabaseError, RateLimitExceededError } from '@/src/lib/errors';
 import { randomImagesResponseSchema } from '@/src/lib/validation/image';
 
-const createClient = vi.fn();
+const createAnonClient = vi.fn();
 const buildImageService = vi.fn();
 const consumeRandom = vi.fn();
 
@@ -16,8 +16,15 @@ vi.mock('next/server', async (importOriginal) => {
   };
 });
 
+vi.mock('@/src/lib/supabase/anon', () => ({
+  createAnonClient: () => createAnonClient(),
+}));
+
+// Cookie 連携クライアントを呼んだら失敗させ、anon クライアントだけで読むことを保証する
 vi.mock('@/src/lib/supabase/server', () => ({
-  createClient: () => createClient(),
+  createClient: () => {
+    throw new Error('random route must not use the cookie-bound client');
+  },
 }));
 
 vi.mock('@/src/services/image-service', () => ({
@@ -39,7 +46,7 @@ const IMAGE = {
 };
 
 beforeEach(() => {
-  createClient.mockReset();
+  createAnonClient.mockReset();
   buildImageService.mockReset();
   consumeRandom.mockReset();
   consumeRandom.mockResolvedValue(undefined);
@@ -59,7 +66,7 @@ async function callGet() {
 
 describe('GET /api/images/random', () => {
   it('成功時は randomImagesResponseSchema 準拠の JSON を返す', async () => {
-    createClient.mockResolvedValue({});
+    createAnonClient.mockReturnValue({});
     buildImageService.mockReturnValue({
       listRandomImages: vi.fn().mockResolvedValue({ images: [IMAGE] }),
     });
@@ -80,7 +87,7 @@ describe('GET /api/images/random', () => {
   });
 
   it('listRandomImages が想定外のエラーを投げたら 500 を返す', async () => {
-    createClient.mockResolvedValue({});
+    createAnonClient.mockReturnValue({});
     buildImageService.mockReturnValue({
       listRandomImages: vi.fn().mockRejectedValue(new DatabaseError('list boom')),
     });
