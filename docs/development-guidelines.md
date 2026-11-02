@@ -383,6 +383,8 @@ const image = await imageRepository.findById(id);
 
 `biome.json` を正とする。コード（JS / TS / JSON / CSS）の Linter / Formatter は Biome 1 本に統一している（Prettier / ESLint からの移行は Issue #16 で実施済み）。Biome は Markdown を扱わないため、Markdown のみ markdownlint-cli2 で補完する（後述）。
 
+`biome.json` の `$schema` は URL ではなく `./node_modules/@biomejs/biome/configuration_schema.json` を指す。Renovate は lockfile だけを更新するため、URL のバージョンを書くと CLI とずれて `biome check` のたびに info が出る（Issue #402）。
+
 **Biome formatter 基本方針**(`biome.json` の `formatter` / `javascript.formatter`):
 
 | 項目 | 値 | 理由 |
