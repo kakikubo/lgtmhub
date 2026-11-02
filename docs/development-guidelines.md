@@ -879,6 +879,8 @@ CI の Supabase Local は空 DB で起動するため **全テストが何もア
 
 全ジョブ共通で `pnpm install --frozen-lockfile` を使い、トリガーは `push: [main]` と `pull_request`。
 
+`pnpm install` は依存のスクリプトを実行するため、`ci.yml` の GITHUB_TOKEN はトップレベルで `permissions: contents: read` に絞る。`concurrency` は PR を ref 単位でまとめて古い run をキャンセルし、main への push は `run_id` で run ごとに別グループにする（連続マージで中間コミットの run が取り消され、Codecov の main ベースラインが欠けるのを防ぐ）。
+
 ハングしたジョブが GitHub Actions のデフォルト上限（6 時間）まで走り続けないよう、各ジョブに `timeout-minutes` を設定する。目安は実測の 2〜3 倍（lint / test / security ほか 10 分、e2e 20 分）。`ci.yml` 以外（Danger、Release Drafter、Supabase Push）も同じ方針で 10 分とする。
 
 e2e ジョブの Playwright ブラウザ本体（`~/.cache/ms-playwright`）は `actions/cache` でキャッシュする。OS パッケージ（`--with-deps`）は apt 側でキャッシュできないため、ヒット時は `playwright install-deps chromium` のみ実行する。
