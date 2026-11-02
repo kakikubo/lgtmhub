@@ -10,13 +10,13 @@
 
 - [x] actionlint で `ci.yml` を検証（新規指摘なし。既存 `run` の SC2129 style 指摘のみで本件の範囲外）
 - [x] lint:md / check / typecheck / test をローカルで実行（lint:md 0 issues、biome 473 files、tsc エラーなし、vitest 512 passed）
-- [ ] PR 上で CI の全ジョブが成功することを確認（push 前に PR 計画の承認が必要なため、承認後に実施）
+- [x] PR 上で CI の全ジョブが成功することを確認（PR #413: lint-and-typecheck / test / e2e / security と codecov/patch・project がすべて pass）
 
 ## 実装後の振り返り
 
 ### 実装完了日
 
-2026-11-03（ローカル検証まで。PR 上の CI 確認は push 承認待ち）
+2026-11-03
 
 ### 計画と実績の差分
 
