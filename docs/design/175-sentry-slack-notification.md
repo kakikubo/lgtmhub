@@ -12,13 +12,14 @@ Slack 通知は Sentry Internal Integration の Alert Rule Action（署名付き
   - `dsn: NEXT_PUBLIC_SENTRY_DSN`、`enabled: NEXT_PUBLIC_VERCEL_ENV === 'production'`
   - `sendDefaultPii: false`、`tracesSampleRate: 0`、Replay は integrations に入れない
 - `instrumentation.ts`（nodejs のみ init、`onRequestError = captureRequestError`）と `instrumentation-client.ts` を置く
+- Next.js の `notFound()` / `redirect()` 等の制御フロー例外は SDK が既に除外するため、`ignoreErrors` / `beforeSend` は足さない
 - `app/global-error.tsx` と `app/(site)/error.tsx` で `captureException(error)` を呼ぶ。クライアントのエラー境界で止まった例外は SDK が拾わないため
 - CSP の `connect-src` に DSN のオリジンを足す（Supabase URL と同じく `originOf` で導出）
 - `next.config.ts` を `withSentryConfig` で包む。`SENTRY_AUTH_TOKEN` があるビルド（= Vercel Production）だけ source map をアップロードし、アップロード後に削除する
 - 検証用の `/api/debug-sentry` は管理者（`requireAdmin`）だけが例外を発生させられる。DoD の「アクセス制限」を満たすため、検証後も残す
 
 ### 通知（Slack 中継）
-```
+```text
 Sentry Alert Rule（A new issue is created / env=production）
   → POST /api/sentry-webhook  (Sentry-Hook-Resource: event_alert, Sentry-Hook-Signature)
   → HMAC-SHA256(raw body, SENTRY_WEBHOOK_SECRET) を timingSafeEqual で検証。不一致は 401

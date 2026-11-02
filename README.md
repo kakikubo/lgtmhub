@@ -148,6 +148,22 @@ Biome は `./node_modules/.bin/biome` を直接実行するため、Corepack や
 
 既存フック(`core.hooksPath` を独自設定している場合など)との競合解消手順は [`docs/development-guidelines.md`](./docs/development-guidelines.md#フォーマット規約) を参照してください。
 
+### エラー監視 (Sentry)
+
+本番(Vercel Production)のエラーだけを Sentry に送ります。設計は [`docs/design/175-sentry-slack-notification.md`](./docs/design/175-sentry-slack-notification.md) を参照してください。
+
+1. Sentry(Developer プラン)で Next.js プロジェクトを作り、DSN を控える。Settings → Subscription で Spike Protection が有効なことを確認する
+2. Sentry の Settings → Auth Tokens で source map アップロード用の Organization Token を作る
+3. Vercel の **Production スコープだけ**に環境変数を登録する(Preview / ローカルには入れない)
+
+   | 変数 | 値 |
+   |---|---|
+   | `NEXT_PUBLIC_SENTRY_DSN` | 手順 1 の DSN |
+   | `SENTRY_ORG` / `SENTRY_PROJECT` | Sentry の organization / project の slug |
+   | `SENTRY_AUTH_TOKEN` | 手順 2 のトークン |
+
+4. 本番を再デプロイし、管理者アカウントでログインして `https://<本番ドメイン>/api/debug-sentry` を開く。Sentry にエラーが記録され、スタックトレースが元の関数名・行番号で表示されることを確認する。このエンドポイントは管理者以外には 401 / 403 を返す
+
 ---
 
 ## トラブルシュート
