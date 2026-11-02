@@ -8,6 +8,66 @@
 
 ```text
 lgtmhub/
+├── apps/
+│   └── web/                    # Next.js アプリ（@lgtmhub/web）。中身は次のツリー
+├── supabase/                   # Supabase設定・マイグレーション
+│   ├── CLAUDE.md               # マイグレーション運用の規約
+│   ├── migrations/             # SQLマイグレーションファイル
+│   │   ├── 20260503000000_create_user_profiles.sql
+│   │   ├── 20260504000000_create_lgtm_images.sql
+│   │   ├── 20260504000001_create_daily_upload_counts.sql
+│   │   ├── 20260506000000_extend_lgtm_images_select_policy.sql
+│   │   ├── 20260512000000_bootstrap_admin_kakikubo.sql
+│   │   ├── 20260626000000_add_lgtm_images_is_animated.sql
+│   │   ├── 20260720000000_restrict_user_profiles_column_grants.sql
+│   │   └── 20260820000000_create_favorites.sql
+│   ├── seed.sql                # 開発用シードデータ
+│   ├── config.toml             # Supabase Local設定
+│   └── .env.example            # Supabase CLI 用環境変数テンプレート
+├── scripts/                    # 運用スクリプト
+│   └── supabase-migrate-to-tokyo.sh # Supabase リージョン移設の補助
+├── docs/                       # プロジェクトドキュメント
+│   ├── ideas/                  # 壁打ち・アイデアメモ
+│   ├── product-requirements.md
+│   ├── functional-design.md
+│   ├── architecture.md
+│   ├── repository-structure.md
+│   ├── development-guidelines.md
+│   └── glossary.md
+├── .github/                    # GitHub設定
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   ├── release-drafter.yml     # リリースノート生成ルール
+│   └── workflows/
+│       ├── ci.yml              # Lint/型チェック/テスト/E2E（development-guidelines.md参照）
+│       ├── danger.yml          # PR サイズ警告（dangerfile.js を実行）
+│       ├── release-drafter.yml # リリースドラフトの更新
+│       ├── supabase-deploy.yml # 本番へのマイグレーション適用
+│       ├── supabase-preview-migrate.yml # Preview 環境へのマイグレーション適用
+│       └── _supabase-push.yml  # 上記2つから呼ばれる再利用ワークフロー
+├── .claude/                    # Claude Code設定（agents / commands / steering）
+├── .cursor/                    # Cursor Cloud Agent 環境（environment.json / install / start）
+├── .devcontainer/              # devcontainer 設定
+├── .steering/                  # 作業単位のタスク管理
+├── .gitignore
+├── .npmrc                      # pnpm の挙動設定
+├── .coderabbit.yaml            # CodeRabbit レビュー設定
+├── .markdownlint-cli2.jsonc    # markdownlint 設定（docs/ の Markdown lint）
+├── biome.json                  # Biome (Linter + Formatter) 設定（リポジトリ全体）
+├── codecov.yml                 # Codecov のカバレッジ設定
+├── dangerfile.js               # Danger スクリプト（PRの大きさの目安チェック）
+├── lefthook.yml                # Git hooks（コミット時の Biome 実行）
+├── package.json                # workspace ルート（共通ツールと apps/web への委譲スクリプト）
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml         # workspace の範囲、allowBuilds / minimumReleaseAge / overrides
+├── renovate.json               # 依存更新の自動 PR 設定
+├── AGENTS.md
+├── CLAUDE.md
+├── LICENSE
+└── README.md
+```
+
+```text
+apps/web/
 ├── app/                        # Next.js App Router（Presentation + API Layer）
 │   ├── (site)/                 # 画面グループ（レイアウト共有）
 │   │   ├── layout.tsx          # 共通レイアウト（ヘッダー・お気に入り Provider）
@@ -105,20 +165,6 @@ lgtmhub/
 │   ├── favorite-images.tsx     # お気に入り一覧の描画（空状態 / グリッド）
 │   ├── load-more-button.tsx    # カーソルページネーションの追加読み込み
 │   └── uploader-profile-row.tsx # 投稿者プロフィールの表示行
-├── supabase/                   # Supabase設定・マイグレーション
-│   ├── CLAUDE.md               # マイグレーション運用の規約
-│   ├── migrations/             # SQLマイグレーションファイル
-│   │   ├── 20260503000000_create_user_profiles.sql
-│   │   ├── 20260504000000_create_lgtm_images.sql
-│   │   ├── 20260504000001_create_daily_upload_counts.sql
-│   │   ├── 20260506000000_extend_lgtm_images_select_policy.sql
-│   │   ├── 20260512000000_bootstrap_admin_kakikubo.sql
-│   │   ├── 20260626000000_add_lgtm_images_is_animated.sql
-│   │   ├── 20260720000000_restrict_user_profiles_column_grants.sql
-│   │   └── 20260820000000_create_favorites.sql
-│   ├── seed.sql                # 開発用シードデータ
-│   ├── config.toml             # Supabase Local設定
-│   └── .env.example            # Supabase CLI 用環境変数テンプレート
 ├── tests/                      # テストコード
 │   ├── unit/                   # ユニットテスト（Vitest）
 │   │   ├── api/                # Route Handler のテスト
@@ -148,62 +194,27 @@ lgtmhub/
 ├── public/                     # 静的アセット
 │   ├── default-avatar.svg
 │   └── fonts/                  # LGTM合成用フォント（比較検討用の _preview/ を含む）
-├── scripts/                    # 開発・運用スクリプト
-│   ├── preview-lgtm-fonts.ts   # LGTM合成フォントの比較プレビュー生成
-│   └── supabase-migrate-to-tokyo.sh # Supabase リージョン移設の補助
-├── docs/                       # プロジェクトドキュメント
-│   ├── ideas/                  # 壁打ち・アイデアメモ
-│   ├── product-requirements.md
-│   ├── functional-design.md
-│   ├── architecture.md
-│   ├── repository-structure.md
-│   ├── development-guidelines.md
-│   └── glossary.md
-├── .github/                    # GitHub設定
-│   ├── PULL_REQUEST_TEMPLATE.md
-│   ├── release-drafter.yml     # リリースノート生成ルール
-│   └── workflows/
-│       ├── ci.yml              # Lint/型チェック/テスト/E2E（development-guidelines.md参照）
-│       ├── danger.yml          # PR サイズ警告（dangerfile.js を実行）
-│       ├── release-drafter.yml # リリースドラフトの更新
-│       ├── supabase-deploy.yml # 本番へのマイグレーション適用
-│       ├── supabase-preview-migrate.yml # Preview 環境へのマイグレーション適用
-│       └── _supabase-push.yml  # 上記2つから呼ばれる再利用ワークフロー
-├── .claude/                    # Claude Code設定（agents / commands / steering）
-├── .cursor/                    # Cursor Cloud Agent 環境（environment.json / install / start）
-├── .devcontainer/              # devcontainer 設定
-├── .steering/                  # 作業単位のタスク管理
-├── .env.example                # 環境変数テンプレート（git管理）
-├── .gitignore
-├── .npmrc                      # pnpm の挙動設定
-├── .coderabbit.yaml            # CodeRabbit レビュー設定
-├── .markdownlint-cli2.jsonc    # markdownlint 設定（docs/ の Markdown lint）
-├── biome.json                  # Biome (Linter + Formatter) 設定
-├── codecov.yml                 # Codecov のカバレッジ設定
+├── scripts/                    # 開発スクリプト
+│   └── preview-lgtm-fonts.ts   # LGTM合成フォントの比較プレビュー生成
+├── .env.example                # 環境変数テンプレート（git管理。.env.local はこの隣に置く）
 ├── components.json             # UIプリミティブ生成ツールの設定
-├── dangerfile.js               # Danger スクリプト（PRの大きさの目安チェック）
-├── global.d.ts                 # プロジェクト全体の型宣言
-├── lefthook.yml                # Git hooks（コミット時の Biome 実行）
+├── global.d.ts                 # アプリ全体の型宣言
 ├── next-env.d.ts               # Next.js が自動生成する型参照（編集禁止）
 ├── next.config.ts
-├── package.json
+├── package.json                # @lgtmhub/web
 ├── playwright.config.ts
-├── pnpm-lock.yaml
-├── pnpm-workspace.yaml         # pnpm の allowBuilds / minimumReleaseAge 等の設定
 ├── postcss.config.mjs          # Tailwind CSS の PostCSS プラグイン設定
 ├── proxy.ts                    # Supabase セッションリフレッシュ（cookies 伝播、旧 middleware.ts）
-├── renovate.json               # 依存更新の自動 PR 設定
 ├── tsconfig.json
-├── vercel.json                 # Vercel のビルド・関数設定
-├── vitest.config.ts
-├── CLAUDE.md
-├── LICENSE
-└── README.md
+├── vercel.json                 # Vercel のビルド・関数設定（Root Directory = apps/web）
+└── vitest.config.ts
 ```
 
 ---
 
 ## ディレクトリ詳細
+
+`supabase/` 以外の節（`app/` `src/` `components/` `tests/`）は `apps/web/` 配下のパスを指す。本書の以降のパスも同様に、ルートにあるもの（`supabase/` `docs/` `.github/` 等）以外は `apps/web/` 起点で書く。
 
 ### `app/` (Presentation Layer + API Layer)
 
@@ -440,9 +451,13 @@ tests/
 
 ### 設定ファイル
 
+`apps/web/` に置くもの: `next.config.ts` `next-env.d.ts` `global.d.ts` `tsconfig.json` `vitest.config.ts` `playwright.config.ts` `postcss.config.mjs` `components.json` `vercel.json` `.env.example` `.env.local`。それ以外はリポジトリルートに置く。
+
 | ファイル | 役割 |
 |---------|------|
-| `next.config.ts` | Next.js設定（画像ドメイン許可、`outputFileTracingRoot` 等） |
+| `package.json`（ルート） | workspace ルート。biome / lefthook / danger / markdownlint / supabase CLI と、`pnpm --filter @lgtmhub/web` への委譲スクリプトを持つ |
+| `apps/web/package.json` | `@lgtmhub/web`。アプリの依存と next / vitest / playwright のスクリプト |
+| `next.config.ts` | Next.js設定（画像ドメイン許可、`outputFileTracingRoot` は monorepo ルート 等） |
 | `next-env.d.ts` | Next.js が自動生成する型参照ファイル（編集禁止、コミット対象） |
 | `global.d.ts` | プロジェクト全体の型宣言（CSS module 等の side-effect import 用） |
 | `tsconfig.json` | TypeScript設定（`@/*` パスエイリアス、`strict`、`noUncheckedIndexedAccess`） |
@@ -453,7 +468,7 @@ tests/
 | `postcss.config.mjs` | Tailwind CSS 4.x の PostCSS プラグイン設定 |
 | `components.json` | shadcn/ui CLI の生成設定（`components/ui/` の出力先・エイリアス） |
 | `lefthook.yml` | Git hooks 設定（コミット時に Biome を実行） |
-| `pnpm-workspace.yaml` | pnpm の `allowBuilds` / `minimumReleaseAge`（24h）等の設定 |
+| `pnpm-workspace.yaml` | workspace の範囲（`apps/*`）、pnpm の `allowBuilds` / `minimumReleaseAge`（24h）/ `overrides` 等の設定 |
 | `vercel.json` | Vercel のビルド・関数設定 |
 | `codecov.yml` | Codecov のカバレッジ集計・ステータス設定 |
 | `renovate.json` | 依存更新の自動 PR 設定 |
@@ -534,6 +549,7 @@ src/types/   →  依存なし（末端）
 }
 ```
 
+- `@/*` は `apps/web/` を起点とする（`apps/web/tsconfig.json`）
 - `@/src/services/image-service` のように絶対パスで import する
 - 相対パス `../../` の多用を禁止
 
@@ -645,7 +661,7 @@ Node.js 標準テンプレートをベースに、本プロジェクト固有の
 # Playwright
 playwright-report/
 test-results/
-tests/e2e/.auth/
+apps/web/tests/e2e/.auth/
 
 # Supabase
 supabase/.temp/
@@ -653,7 +669,7 @@ supabase/.branches/
 supabase/snippets/
 
 # Generated database types（コミット対象だが、再生成中の中間状態は無視）
-src/types/database.types.ts.tmp
+apps/web/src/types/database.types.ts.tmp
 
 # プレビュースクリプト等の作業用出力
 tmp/
@@ -680,8 +696,8 @@ tmp/
       "!**/playwright-report/",
       "!**/test-results/",
       "!**/.claude/worktrees",
-      "!src/types/database.types.ts",
-      "!next-env.d.ts"
+      "!apps/web/src/types/database.types.ts",
+      "!apps/web/next-env.d.ts"
     ]
   }
 }

@@ -1,5 +1,5 @@
 packages:
-  - "."
+  - "apps/*"
 
 # pnpm 12 のデフォルトと同じ 24h。Renovate の npm minimumReleaseAge と揃える。
 minimumReleaseAge: 1440

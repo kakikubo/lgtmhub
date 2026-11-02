@@ -39,6 +39,8 @@
 
 ### レイヤードアーキテクチャ（Next.js App Router）
 
+アプリは pnpm workspace の `apps/web`（`@lgtmhub/web`）に置く。以下のパスは `apps/web/` 起点。
+
 ```text
 ┌──────────────────────────────────────────────┐
 │  Presentation Layer                          │
@@ -355,7 +357,7 @@ Next.js 16 の **Cache Components**（Next.js 15 までの実験的 PPR を安�
 ### セキュリティ制約
 
 - `SUPABASE_SERVICE_ROLE_KEY` は絶対にクライアントに露出しない
-- 環境変数は Vercel Dashboard で管理し、リポジトリには `.env.example` のみ配置
+- 環境変数は Vercel Dashboard で管理し、リポジトリには `apps/web/.env.example` のみ配置
 - `.env.local` は `.gitignore` で除外
 
 ---

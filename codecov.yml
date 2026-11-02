@@ -23,6 +23,6 @@ comment:
 # vitest.config.ts の coverage.exclude (src/types/**, src/**/*.test.ts) と整合させ、
 # Codecov 側の集計でも型定義・テストコードを母数から外す。
 ignore:
-  - "src/types/**"
-  - "tests/**"
+  - "apps/web/src/types/**"
+  - "apps/web/tests/**"
   - "**/*.test.ts"

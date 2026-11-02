@@ -34,8 +34,8 @@ LGTM 画像を GitHub 上のコードレビューに気軽に貼り付けられ�
 pnpm install
 
 # 2. 環境変数の設定
-cp .env.example .env.local
-# .env.local を編集(Supabase / Vercel Blob の値を記入)
+cp apps/web/.env.example apps/web/.env.local
+# apps/web/.env.local を編集(Supabase / Vercel Blob の値を記入)
 # ※ GitHub OAuth は Supabase CLI 専用のため、後述「GitHub OAuth セットアップ」で
 #    supabase/.env を別途用意します。
 
@@ -100,10 +100,10 @@ pnpm run db:reset
 `pnpm run test:e2e` 実行時には Playwright の `globalSetup` が「ログイン済み storageState」を生成するため、Supabase Local の `service_role` キーと、テスト専用 sign-in エンドポイント (`/api/auth/test-signin`) を有効化する `E2E_TEST_MODE=true` の 2 点を環境変数として渡す必要があります。
 
 1. `pnpm run db:start` で Supabase Local を起動
-2. キーを取得して `.env.local` に追記:
+2. キーを取得して `apps/web/.env.local` に追記:
    ```bash
-   supabase status -o json | jq -r '"SUPABASE_SERVICE_ROLE_KEY=\(.SERVICE_ROLE_KEY)"' >> .env.local
-   echo "E2E_TEST_MODE=true" >> .env.local
+   supabase status -o json | jq -r '"SUPABASE_SERVICE_ROLE_KEY=\(.SERVICE_ROLE_KEY)"' >> apps/web/.env.local
+   echo "E2E_TEST_MODE=true" >> apps/web/.env.local
    ```
 3. シードデータの適用 (一覧系の E2E が前提にする決定的なフィクスチャ):
    ```bash
@@ -124,7 +124,7 @@ Cloud Agent 向けの環境はリポジトリの `.cursor/environment.json` で�
 | フェーズ | スクリプト | 内容 |
 |----------|------------|------|
 | install | `.cursor/install.sh` | Node 24 を PATH 先頭に置き、`pnpm install --frozen-lockfile --ignore-scripts` → `pnpm rebuild` |
-| start | `.cursor/start.sh` | Docker（`fuse-overlayfs`）起動、ネスト Docker 向け `FORWARD` 修正、`supabase start`、`.env.local` 生成 |
+| start | `.cursor/start.sh` | Docker（`fuse-overlayfs`）起動、ネスト Docker 向け `FORWARD` 修正、`supabase start`、`apps/web/.env.local` 生成 |
 
 `--ignore-scripts` は `prepare`（`lefthook install`）が Cursor 管理の `core.hooksPath` と競合するため。ネイティブモジュールは `pnpm rebuild` で復元する。
 
@@ -133,12 +133,12 @@ Cloud Agent 向けの環境はリポジトリの `.cursor/environment.json` で�
 Cloud 上での e2e:
 
 ```bash
-set -a; source .env.local; set +a
+set -a; source apps/web/.env.local; set +a
 export E2E_TEST_MODE=true
 pnpm run test:e2e
 ```
 
-（`start` が書く `.env.local` には `E2E_TEST_MODE` を含めない。）
+（`start` が書く `apps/web/.env.local` には `E2E_TEST_MODE` を含めない。）
 
 ### コミット時の自動チェック (lefthook + Biome)
 

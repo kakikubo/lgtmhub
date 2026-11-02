@@ -10,12 +10,12 @@ const { danger, fail, warn } = require('danger');
 const LINE_THRESHOLD = 500;
 const FILE_THRESHOLD = 10;
 
-const INCLUDE_PREFIXES = ['app/', 'src/', 'components/'];
+const INCLUDE_PREFIXES = ['apps/web/app/', 'apps/web/src/', 'apps/web/components/'];
 
 /** @type {ReadonlyArray<RegExp>} */
 const EXCLUDE_PATTERNS = [
-  /^tests\//,
-  /^src\/types\/database\.types\.ts$/,
+  /^apps\/web\/tests\//,
+  /^apps\/web\/src\/types\/database\.types\.ts$/,
   /^pnpm-lock\.yaml$/,
   /^supabase\/migrations\//,
   // markdown ファイルは行数・ファイル数の集計対象外（Issue #114）。
@@ -64,7 +64,7 @@ const run = async () => {
   if (totalChangedLines > LINE_THRESHOLD) {
     fail(
       [
-        `プロダクションコード（\`app/\` \`src/\` \`components/\`、markdown は除く）の追加・変更行数が **${totalChangedLines} 行** で、上限 ${LINE_THRESHOLD} 行を超えています。`,
+        `プロダクションコード（\`apps/web\` の \`app/\` \`src/\` \`components/\`、markdown は除く）の追加・変更行数が **${totalChangedLines} 行** で、上限 ${LINE_THRESHOLD} 行を超えています。`,
         'PR を関心事ごとに分割してください。',
         `詳細: ${guidelineLink}。`,
       ].join(' '),
