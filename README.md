@@ -152,17 +152,28 @@ Biome は `./node_modules/.bin/biome` を直接実行するため、Corepack や
 
 本番(Vercel Production)のエラーだけを Sentry に送ります。設計は [`docs/design/175-sentry-slack-notification.md`](./docs/design/175-sentry-slack-notification.md) を参照してください。
 
-1. Sentry(Developer プラン)で Next.js プロジェクトを作り、DSN を控える。Settings → Subscription で Spike Protection が有効なことを確認する
-2. Sentry の Settings → Auth Tokens で source map アップロード用の Organization Token を作る
-3. Vercel の **Production スコープだけ**に環境変数を登録する(Preview / ローカルには入れない)
+Sentry の設定はすべて個人リポジトリ用の Organization `kakikubo` の中で行います。Auth Token は org ごとの設定のため、別の org で作ったものは使えません。
 
-   | 変数 | 値 |
-   |---|---|
-   | `NEXT_PUBLIC_SENTRY_DSN` | 手順 1 の DSN |
-   | `SENTRY_ORG` / `SENTRY_PROJECT` | Sentry の organization / project の slug |
-   | `SENTRY_AUTH_TOKEN` | 手順 2 のトークン |
+1. Sentry の org 切り替えメニュー(画面左上)→ **Create a new organization** で org `kakikubo` を作る(Developer プラン)。Settings → Spike Protection が有効なことを確認する
+2. **Projects → Create Project → Set up manually** で Next.js プロジェクト `lgtmhub` を作る
+   - 計装する機能は Error Monitoring だけにし、アラートは「I'll create my own alerts later」を選ぶ
+   - コーディングエージェント連携や `npx @sentry/wizard` は使わない。SDK の設定はリポジトリに入っており、ウィザードは `next.config.ts` の書き換えや、トレースを有効にした設定ファイル・認証のないサンプルページを追加してしまう
+   - Settings → Projects → lgtmhub → **Client Keys (DSN)** で DSN を控える
+3. Settings → **Organization Tokens** で source map アップロード用のトークンを作る
+4. Vercel の Settings → **Environment Variables** で、Environment を **Production だけ**にして登録する(Preview / Development には入れない)
 
-4. 本番を再デプロイし、管理者アカウントでログインして `https://<本番ドメイン>/api/debug-sentry` を開く。Sentry にエラーが記録され、スタックトレースが元の関数名・行番号で表示されることを確認する。このエンドポイントは管理者以外には 401 / 403 を返す
+   | 変数 | 値 | Type |
+   |---|---|---|
+   | `NEXT_PUBLIC_SENTRY_DSN` | 手順 2 の DSN | Config(`NEXT_PUBLIC_` はブラウザに配信される値のため Secret にできない) |
+   | `SENTRY_ORG` | `kakikubo` | Config |
+   | `SENTRY_PROJECT` | `lgtmhub` | Config |
+   | `SENTRY_AUTH_TOKEN` | 手順 3 のトークン | Secret |
+
+   - Sentry の有効化は `NEXT_PUBLIC_VERCEL_ENV` で判定するため、「Automatically expose System Environment Variables」を ON のままにする
+   - 値はビルド時に読み込まれる。登録後に初めて本番デプロイされるまで反映されない
+
+5. 本番デプロイ後、管理者アカウントでログインして `https://<本番ドメイン>/api/debug-sentry` を開く。Sentry にエラーが記録され、Environment が `production`、スタックトレースが元の関数名・行番号で表示されることを確認する。このエンドポイントは管理者以外には 401 / 403 を返す
+   - スタックトレースが minify されたままなら、`SENTRY_AUTH_TOKEN` / `SENTRY_ORG` の値を確認する(Vercel のビルドログにアップロードのエラーが出る)
 
 ---
 
