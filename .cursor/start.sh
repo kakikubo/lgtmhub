@@ -67,13 +67,13 @@ for _ in $(seq 1 30); do
   anon="$(read_key "$status" ANON_KEY)"
   srk="$(read_key "$status" SERVICE_ROLE_KEY)"
   if [ -n "$api" ] && [ -n "$anon" ] && [ -n "$srk" ]; then
-    cat >"$ROOT/.env.local" <<EOF
+    cat >"$ROOT/apps/web/.env.local" <<EOF
 NEXT_PUBLIC_SUPABASE_URL=$api
 NEXT_PUBLIC_SUPABASE_ANON_KEY=$anon
 SUPABASE_SERVICE_ROLE_KEY=$srk
 BLOB_READ_WRITE_TOKEN=
 EOF
-    echo "cloud-start: wrote $ROOT/.env.local"
+    echo "cloud-start: wrote $ROOT/apps/web/.env.local"
     echo "cloud-start: done"
     exit 0
   fi
