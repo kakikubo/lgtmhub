@@ -148,11 +148,11 @@ Biome は `./node_modules/.bin/biome` を直接実行するため、Corepack や
 
 既存フック(`core.hooksPath` を独自設定している場合など)との競合解消手順は [`docs/development-guidelines.md`](./docs/development-guidelines.md#フォーマット規約) を参照してください。
 
-### エラー監視 (Sentry)
+### エラー監視 (Sentry + Slack 通知)
 
-本番(Vercel Production)のエラーだけを Sentry に送ります。設計は [`docs/design/175-sentry-slack-notification.md`](./docs/design/175-sentry-slack-notification.md) を参照してください。
+本番(Vercel Production)のエラーだけを Sentry に送り、新規エラーの初回発生時に Slack へ通知します。Sentry 無料プランでは公式 Slack 連携が使えないため、Sentry の Webhook を `/api/sentry-webhook` で受けて Slack Incoming Webhook に転送します。設計は [`docs/design/175-sentry-slack-notification.md`](./docs/design/175-sentry-slack-notification.md) を参照してください。
 
-Sentry の設定はすべて個人リポジトリ用の Organization `kakikubo` の中で行います。Auth Token は org ごとの設定のため、別の org で作ったものは使えません。
+Sentry の設定はすべて個人リポジトリ用の Organization `kakikubo` の中で行います。Auth Token・Internal Integration・Alert Rule は org ごとの設定のため、別の org で作ったものは使えません。
 
 1. Sentry の org 切り替えメニュー(画面左上)→ **Create a new organization** で org `kakikubo` を作る(Developer プラン)。Settings → Spike Protection が有効なことを確認する
 2. **Projects → Create Project → Set up manually** で Next.js プロジェクト `lgtmhub` を作る
@@ -160,7 +160,15 @@ Sentry の設定はすべて個人リポジトリ用の Organization `kakikubo` 
    - コーディングエージェント連携や `npx @sentry/wizard` は使わない。SDK の設定はリポジトリに入っており、ウィザードは `next.config.ts` の書き換えや、トレースを有効にした設定ファイル・認証のないサンプルページを追加してしまう
    - Settings → Projects → lgtmhub → **Client Keys (DSN)** で DSN を控える
 3. Settings → **Organization Tokens** で source map アップロード用のトークンを作る
-4. Vercel の Settings → **Environment Variables** で、Environment を **Production だけ**にして登録する(Preview / Development には入れない)
+4. Settings → Developer Settings → **Custom Integrations → Create New Integration → Internal Integration** を作る
+   - Webhook URL: `https://<本番ドメイン>/api/sentry-webhook`
+   - **Alert Rule Action** を ON にする(Webhook URL を入れた後で切り替えられる)
+   - Permissions はすべて No Access、Webhooks の購読はチェックしない
+   - 保存後に表示される **Client Secret** を控える
+5. Slack で通知用の Incoming Webhook URL を発行する
+   - https://api.slack.com/apps → **Create New App → From scratch**。scope とイベントは追加しない
+   - **Incoming Webhooks** を On にし、**Add New Webhook** で通知先チャンネルを選ぶ
+6. Vercel の Settings → **Environment Variables** で、Environment を **Production だけ**にして登録する(Preview / Development には入れない)
 
    | 変数 | 値 | Type |
    |---|---|---|
@@ -168,12 +176,22 @@ Sentry の設定はすべて個人リポジトリ用の Organization `kakikubo` 
    | `SENTRY_ORG` | `kakikubo` | Config |
    | `SENTRY_PROJECT` | `lgtmhub` | Config |
    | `SENTRY_AUTH_TOKEN` | 手順 3 のトークン | Secret |
+   | `SENTRY_WEBHOOK_SECRET` | 手順 4 の Client Secret | Secret |
+   | `SLACK_WEBHOOK_URL` | 手順 5 の Webhook URL | Secret(知っていれば誰でもチャンネルに投稿できるため) |
 
    - Sentry の有効化は `NEXT_PUBLIC_VERCEL_ENV` で判定するため、「Automatically expose System Environment Variables」を ON のままにする
    - 値はビルド時に読み込まれる。登録後に初めて本番デプロイされるまで反映されない
 
-5. 本番デプロイ後、管理者アカウントでログインして `https://<本番ドメイン>/api/debug-sentry` を開く。Sentry にエラーが記録され、Environment が `production`、スタックトレースが元の関数名・行番号で表示されることを確認する。このエンドポイントは管理者以外には 401 / 403 を返す
+7. 本番デプロイ後、管理者アカウントでログインして `https://<本番ドメイン>/api/debug-sentry` を開く。Sentry にエラーが記録され、Environment が `production`、スタックトレースが元の関数名・行番号で表示されることを確認する。このエンドポイントは管理者以外には 401 / 403 を返す
    - スタックトレースが minify されたままなら、`SENTRY_AUTH_TOKEN` / `SENTRY_ORG` の値を確認する(Vercel のビルドログにアップロードのエラーが出る)
+8. 手順 7 で記録された Issue を **Delete** する(Discard ではない)
+   - 同じエラーは同じ Issue にまとめられるため、残したままだと手順 10 で「新規 Issue」にならず通知されない
+9. **Alerts → Create Alert** で Issue Alert を作る
+   - Environment: `production`(本番からイベントが届いた後でないと選択肢に出ないため、手順 7 の後に作る)
+   - When: `A new issue is created`
+   - Then: `Send a notification via <手順 4 の Integration 名>`
+10. もう一度 `/api/debug-sentry` を開き、Slack に「新規エラー (production)」が届くことを確認する
+    - 届かない場合は、Sentry の Internal Integration の Request Log でステータスを見る。401 は `SENTRY_WEBHOOK_SECRET` の不一致、503 は環境変数の未設定、502 は Slack が送信を拒否している
 
 ---
 
