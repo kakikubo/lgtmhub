@@ -186,12 +186,21 @@ Sentry の設定はすべて個人リポジトリ用の Organization `kakikubo` 
    - スタックトレースが minify されたままなら、`SENTRY_AUTH_TOKEN` / `SENTRY_ORG` の値を確認する(Vercel のビルドログにアップロードのエラーが出る)
 8. 手順 7 で記録された Issue を **Delete** する(Discard ではない)
    - 同じエラーは同じ Issue にまとめられるため、残したままだと手順 10 で「新規 Issue」にならず通知されない
-9. **Alerts → Create Alert** で Issue Alert を作る
+9. **Monitors → Alerts → Create Alert** で Alert を作る(旧画面の Alert Rule にあたる)
+   - Source: Alert on all issues in selected projects → `lgtmhub`
    - Environment: `production`(本番からイベントが届いた後でないと選択肢に出ないため、手順 7 の後に作る)
-   - When: `A new issue is created`
-   - Then: `Send a notification via <手順 4 の Integration 名>`
-10. もう一度 `/api/debug-sentry` を開き、Slack に「新規エラー (production)」が届くことを確認する
-    - 届かない場合は、Sentry の Internal Integration の Request Log でステータスを見る。401 は `SENTRY_WEBHOOK_SECRET` の不一致、503 は環境変数の未設定、502 は Slack が送信を拒否している
+   - When: `A new issue is created`、If: 追加しない
+   - Then: `Send a notification via <手順 4 の Integration 名>`。選択肢に出ない場合は Integration の Alert Rule Action が OFF
+   - Throttling: 既定(Get notified on every trigger)のまま
+10. もう一度 `/api/debug-sentry` を **1 回だけ**開き、Slack に「新規エラー (production)」が届くことを確認する
+    - 届かない場合は、中継の応答を本番のログで確認する。Hobby プランはログを 30 分しか保持しないため、確認はアクセス直後に行う
+
+      ```bash
+      vercel logs --scope kakikubos-projects --project lgtmhub -e production --json | grep sentry-webhook
+      ```
+
+    - ログが無ければ Alert が発火していない(手順 8 の Issue 削除漏れ、Environment の不一致など)。401 は `SENTRY_WEBHOOK_SECRET` の不一致、503 は環境変数の未設定、502 は Slack が送信を拒否している
+    - 環境変数を直したら本番を再デプロイし、手順 8 から繰り返す(Alert は同じ Issue に対して再送しない)
 
 ---
 
