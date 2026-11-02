@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { withSentryConfig } from '@sentry/nextjs/config';
 import type { NextConfig } from 'next';
 import {
   buildContentSecurityPolicy,
@@ -52,6 +53,7 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy-Report-Only',
             value: buildContentSecurityPolicy({
               supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+              sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
               isDev: process.env.NODE_ENV === 'development',
             }),
           },
@@ -74,4 +76,11 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// org / project / authToken は SENTRY_ORG / SENTRY_PROJECT / SENTRY_AUTH_TOKEN から読まれる。
+// トークンは Vercel の Production スコープにだけ置くため、source map のアップロードは本番ビルドだけで行う。
+// アップロード後の .map はデフォルトで削除され、本番に配信されない (Issue #175)
+export default withSentryConfig(nextConfig, {
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  telemetry: false,
+});
