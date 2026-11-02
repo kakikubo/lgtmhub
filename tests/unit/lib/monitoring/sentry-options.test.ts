@@ -18,7 +18,14 @@ describe('buildSentryOptions', () => {
 
   it('PII を送らず、トレースを無効にする', () => {
     const options = buildSentryOptions({ dsn: DSN, vercelEnv: 'production' });
-    expect(options.sendDefaultPii).toBe(false);
+    expect(options.dataCollection).toEqual({
+      userInfo: false,
+      cookies: false,
+      httpHeaders: false,
+      httpBodies: [],
+      urlQueryParams: false,
+      stackFrameVariables: false,
+    });
     expect(options.tracesSampleRate).toBe(0);
   });
 });

@@ -10,7 +10,7 @@ Slack 通知は Sentry Internal Integration の Alert Rule Action（署名付き
 ### 捕捉（SDK）
 - `src/lib/monitoring/sentry-options.ts` に `init` の共通オプションを置き、client / server の両方から使う
   - `dsn: NEXT_PUBLIC_SENTRY_DSN`、`enabled: NEXT_PUBLIC_VERCEL_ENV === 'production'`
-  - `sendDefaultPii: false`、`tracesSampleRate: 0`、Replay は integrations に入れない
+  - `dataCollection` で IP・Cookie・ヘッダー・リクエスト本文・クエリ・ローカル変数の収集を止める（SDK 11 は `sendDefaultPii` を参照しない）。`tracesSampleRate: 0`、Replay は integrations に入れない
 - `instrumentation.ts`（nodejs のみ init、`onRequestError = captureRequestError`）と `instrumentation-client.ts` を置く
 - Next.js の `notFound()` / `redirect()` 等の制御フロー例外は SDK が既に除外するため、`ignoreErrors` / `beforeSend` は足さない
 - `app/global-error.tsx` と `app/(site)/error.tsx` で `captureException(error)` を呼ぶ。クライアントのエラー境界で止まった例外は SDK が拾わないため
