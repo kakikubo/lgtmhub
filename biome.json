@@ -12,8 +12,8 @@
       "!**/playwright-report/",
       "!**/test-results/",
       "!**/.claude/worktrees",
-      "!src/types/database.types.ts",
-      "!next-env.d.ts"
+      "!apps/web/src/types/database.types.ts",
+      "!apps/web/next-env.d.ts"
     ]
   },
   "formatter": {
@@ -40,7 +40,7 @@
   },
   "overrides": [
     {
-      "includes": ["tests/**"],
+      "includes": ["apps/web/tests/**"],
       "linter": {
         "rules": {
           "suspicious": {
@@ -50,7 +50,7 @@
       }
     },
     {
-      "includes": ["components/ui/**"],
+      "includes": ["apps/web/components/ui/**"],
       "linter": { "enabled": false },
       "formatter": { "enabled": false },
       "assist": { "enabled": false }
