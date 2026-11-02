@@ -3,6 +3,7 @@
 ## 技術スタック
 
 - Next.js App Router (cacheComponents 有効) + Supabase + Vercel
+- pnpm workspace の monorepo。Next.js アプリは `apps/web` (`@lgtmhub/web`)、`supabase/` はルート。ルートの `pnpm run <script>` は apps/web へ委譲する
 - 開発環境: devcontainer / Node.js v24 / TypeScript 7.x
 - パッケージマネージャー: pnpm (Corepack 経由、`package.json` の `packageManager` でバージョン固定)。npm・yarn は使わない
 - lint/format は Biome、unit は Vitest、e2e は Playwright
@@ -10,18 +11,18 @@
 ## 検証コマンド
 
 - `pnpm run check` (biome) / `pnpm run typecheck` / `pnpm run test`
-- e2e はローカルでは .env.local を読み込んで実行する:
-  `set -a; source .env.local; set +a; pnpm run test:e2e`
+- e2e はローカルでは apps/web/.env.local を読み込んで実行する:
+  `set -a; source apps/web/.env.local; set +a; pnpm run test:e2e`
 - コミット時は lefthook が biome を自動実行し、修正不能エラーがあると失敗する
 
 ## 全域の規約
 
-- パスエイリアス `@/*` はリポジトリルート起点 (例: `@/src/lib/errors`, `@/components/ui/button`)
+- パスエイリアス `@/*` は apps/web 起点 (例: `@/src/lib/errors`, `@/components/ui/button`)
 - as キャストと any は使わない。unknown + 型ガードで絞り込む。例外は
   database.types.ts 由来の型の絞り込みとテストのモック値のみ
   (詳細: docs/development-guidelines.md)
 - レイヤー依存は app → src/services → src/repositories, src/lib の単方向。
-  route handler の書き方は app/api/CLAUDE.md、src 内の規約は src/CLAUDE.md を参照
+  route handler の書き方は apps/web/app/api/CLAUDE.md、src 内の規約は apps/web/src/CLAUDE.md を参照
 
 ## スペック駆動開発
 
