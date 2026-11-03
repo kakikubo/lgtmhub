@@ -17,7 +17,8 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
     export PATH="$_node_bin:$PATH"
   fi
 fi
-corepack enable >/dev/null 2>&1 || true
+# pnpm itself switches to the version pinned in package.json#packageManager.
+command -v pnpm >/dev/null 2>&1 || npm install -g pnpm >/dev/null
 
 # --- 1. Start Docker daemon if not already running ---
 if ! docker info >/dev/null 2>&1; then

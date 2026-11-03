@@ -18,7 +18,8 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
   fi
 fi
 
-corepack enable >/dev/null 2>&1 || true
+# pnpm itself switches to the version pinned in package.json#packageManager.
+command -v pnpm >/dev/null 2>&1 || npm install -g pnpm >/dev/null
 
 echo "cloud-install: node=$(node -v) pnpm=$(pnpm -v)"
 pnpm install --frozen-lockfile --ignore-scripts
