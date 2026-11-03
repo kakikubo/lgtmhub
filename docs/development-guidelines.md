@@ -722,14 +722,16 @@ coverage: {
   thresholds: {
     'src/services/**': { branches: 90, functions: 85, lines: 90, statements: 90 },
     'src/lib/**': { branches: 80, functions: 80, lines: 80, statements: 80 },
+    'src/repositories/**': { branches: 90, functions: 95, lines: 95, statements: 95 },
     'app/api/images/**': { branches: 80, functions: 95, lines: 90, statements: 90 },
+    'app/api/favorites/**': { branches: 80, functions: 95, lines: 90, statements: 90 },
   }
 }
 ```
 
-glob 閾値は**マッチしたファイル群の集計**に対して効く（ファイル単位ではない）。グローバル閾値は設定していないため、上記 3 つの glob にマッチしないファイルはゲート対象外になる。
+glob 閾値は**マッチしたファイル群の集計**に対して効く（ファイル単位ではない）。グローバル閾値は設定していないため、上記 5 つの glob にマッチしないファイルはゲート対象外になる。
 
-`app/api/images/**` の値は CI 実測（statements 95.49% / branches 85% / functions 100% / lines 95.41%）の下にバッファを取ったもの（Issue #259）。
+`app/api/images/**` の値は CI 実測（statements 95.49% / branches 85% / functions 100% / lines 95.41%）の下にバッファを取ったもの（Issue #259）。`src/repositories/**`（実測 statements 100% / branches 92.93% / functions 100% / lines 100%）と `app/api/favorites/**`（実測 statements 92.77% / branches 85.42% / functions 100% / lines 92.68%）も同じ考え方で決めた（Issue #385）。`app/api/favorites/**` は関数が 5 個しかないため、未テスト関数が 1 つ増えるだけで functions 95% を割る。
 
 一方 `app/api/auth/**` に閾値を置いていないのは意図的。`app/api/auth/callback/route.ts` と `app/api/auth/test-signin/route.ts` の未カバー関数は `createServerClient` に渡す cookie アダプタ（`getAll` / `setAll`）で、unit テストでは `@supabase/ssr` をモックするため呼ばれようがなく、集計 functions が 36.36% に沈む。ここを閾値化しても到達不能コードに引きずられた数値を固定するだけでゲートとして機能しない（実際に呼ばれる経路は e2e が担保する）。
 
@@ -899,7 +901,7 @@ Markdown lint（`pnpm run lint:md`）は独立ジョブにせず `lint-and-typec
 
 `ci.yml` の `test` ジョブで `pnpm run test:coverage` を実行し、生成された `apps/web/coverage/lcov.info` を `codecov/codecov-action` で Codecov にアップロードする（action のバージョンは `ci.yml` を正とする）。`test` ジョブは `push: [main]` と `pull_request` 両方で走るため、**PR と main マージ後の双方**でカバレッジが Codecov に記録され、PR には差分コメントが付く。README のカバレッジバッジも Codecov を参照する。
 
-- **可視化が責務（ゲートは vitest 側）**: カバレッジ閾値は `vitest.config.ts` の `thresholds` で **CI を含め常時ゲート**（`src/services/**` は branches/lines/statements 90% ・ functions 85%、`src/lib/**` は 4 指標とも 80%）。Issue #113 で `functions` のみ CI の下振れ分を引き下げていたが、下振れが観測されなくなったため `src/lib/**` の `functions` を 75 → 80 に戻した（Issue #266）。Codecov は閾値ゲートを持たず可視化に専念し、`codecov.yml` の project / patch ステータスも `informational: true`（二重ゲートにしない）。なお**閾値未達・テスト失敗いずれも `vitest` が非 0 終了するため、`test` ジョブのゲートとして機能する**。
+- **可視化が責務（ゲートは vitest 側）**: カバレッジ閾値は `vitest.config.ts` の `thresholds` で **CI を含め常時ゲート**（`src/services/**` は branches/lines/statements 90% ・ functions 85%、`src/lib/**` は 4 指標とも 80%。`src/repositories/**` / `app/api/images/**` / `app/api/favorites/**` の値は「カバレッジ目標」を参照）。Issue #113 で `functions` のみ CI の下振れ分を引き下げていたが、下振れが観測されなくなったため `src/lib/**` の `functions` を 75 → 80 に戻した（Issue #266）。Codecov は閾値ゲートを持たず可視化に専念し、`codecov.yml` の project / patch ステータスも `informational: true`（二重ゲートにしない）。なお**閾値未達・テスト失敗いずれも `vitest` が非 0 終了するため、`test` ジョブのゲートとして機能する**。
 - **token は任意**: public リポジトリのため `CODECOV_TOKEN` 未設定でも tokenless でアップロードできる。レート制限回避のため設定する場合は GitHub Secrets に `CODECOV_TOKEN` を登録する。アップロード失敗で `test` ジョブを落とさないよう `fail_ci_if_error: false`。
 - **集計対象**: 計測範囲は `vitest.config.ts` の `coverage.include`（`src/**` + `app/api/**` + `components/**`）で決まる。`codecov.yml` の `ignore` は `coverage.exclude`（`src/types/**` / `*.test.ts`）と整合させ、型定義とテストコードを Codecov 側でも母数から外す。`app/(site)/**` は計測対象に含めていない — RSC のページ/レイアウトは `environment: 'node'` の unit テストから import されず、実際には e2e (Playwright) がカバーしているため、e2e カバレッジを収集していない現状で include に加えるとテスト済みのコードが恒久的に 0% と表示されてしまう（Issue #255）。
 - **バージョン管理**: `codecov/codecov-action` は `renovate.json` の `github-actions` グループで自動更新対象（固定運用ではない）。
