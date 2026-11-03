@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { withSentryConfig } from '@sentry/nextjs/config';
 import type { NextConfig } from 'next';
 import {
   buildContentSecurityPolicy,
@@ -13,9 +14,10 @@ import {
 // pnpm は `node_modules/@img/...` を `.pnpm/...` への symlink にするため、
 // symlink 経由のパスで trace すると Vercel が「invalid deployment package
 // (files in symlinked directories)」で reject する。.pnpm 配下の実体パスを直接指す。
+// pnpm workspace では .pnpm の実体が monorepo ルートの node_modules に置かれる。
 const SHARP_LINUX_X64_TRACE = [
-  './node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/**/*',
-  './node_modules/.pnpm/@img+sharp-linux-x64@*/node_modules/@img/sharp-linux-x64/**/*',
+  '../../node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/**/*',
+  '../../node_modules/.pnpm/@img+sharp-linux-x64@*/node_modules/@img/sharp-linux-x64/**/*',
 ];
 
 const nextConfig: NextConfig = {
@@ -29,7 +31,9 @@ const nextConfig: NextConfig = {
   experimental: {
     useTypeScriptCli: true,
   },
-  outputFileTracingRoot: path.resolve(__dirname),
+  // monorepo ルート。依存の実体 (node_modules/.pnpm) がアプリ外にあるため、
+  // ここを apps/web にすると関数バンドルへ依存がトレースされない。
+  outputFileTracingRoot: path.resolve(__dirname, '../..'),
   // Vercel サーバレス関数のバンドルに LGTM 画像合成で参照するフォントを明示的に含める。
   // public/ 配下は静的配信用にデプロイされるが、関数側のファイルシステムからの読み出しは
   // file tracing で検出されたファイルしか保証されないため、文字列パス参照分を補う。
@@ -52,6 +56,7 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy-Report-Only',
             value: buildContentSecurityPolicy({
               supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+              sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
               isDev: process.env.NODE_ENV === 'development',
             }),
           },
@@ -74,4 +79,11 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// org / project / authToken は SENTRY_ORG / SENTRY_PROJECT / SENTRY_AUTH_TOKEN から読まれる。
+// トークンは Vercel の Production スコープにだけ置くため、source map のアップロードは本番ビルドだけで行う。
+// アップロード後の .map はデフォルトで削除され、本番に配信されない (Issue #175)
+export default withSentryConfig(nextConfig, {
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  telemetry: false,
+});

@@ -142,7 +142,7 @@ vite.config.ts.timestamp-*
 # Playwright
 playwright-report/
 test-results/
-tests/e2e/.auth/
+apps/web/tests/e2e/.auth/
 
 # Supabase
 supabase/.temp/
@@ -150,7 +150,7 @@ supabase/.branches/
 supabase/snippets/
 
 # Generated database types(コミット対象だが、再生成中の中間状態は無視)
-src/types/database.types.ts.tmp
+apps/web/src/types/database.types.ts.tmp
 
 # プレビュースクリプト等の作業用出力
 tmp/

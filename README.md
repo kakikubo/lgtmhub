@@ -34,8 +34,8 @@ LGTM 画像を GitHub 上のコードレビューに気軽に貼り付けられ�
 pnpm install
 
 # 2. 環境変数の設定
-cp .env.example .env.local
-# .env.local を編集(Supabase / Vercel Blob の値を記入)
+cp apps/web/.env.example apps/web/.env.local
+# apps/web/.env.local を編集(Supabase / Vercel Blob の値を記入)
 # ※ GitHub OAuth は Supabase CLI 専用のため、後述「GitHub OAuth セットアップ」で
 #    supabase/.env を別途用意します。
 
@@ -100,10 +100,10 @@ pnpm run db:reset
 `pnpm run test:e2e` 実行時には Playwright の `globalSetup` が「ログイン済み storageState」を生成するため、Supabase Local の `service_role` キーと、テスト専用 sign-in エンドポイント (`/api/auth/test-signin`) を有効化する `E2E_TEST_MODE=true` の 2 点を環境変数として渡す必要があります。
 
 1. `pnpm run db:start` で Supabase Local を起動
-2. キーを取得して `.env.local` に追記:
+2. キーを取得して `apps/web/.env.local` に追記:
    ```bash
-   supabase status -o json | jq -r '"SUPABASE_SERVICE_ROLE_KEY=\(.SERVICE_ROLE_KEY)"' >> .env.local
-   echo "E2E_TEST_MODE=true" >> .env.local
+   supabase status -o json | jq -r '"SUPABASE_SERVICE_ROLE_KEY=\(.SERVICE_ROLE_KEY)"' >> apps/web/.env.local
+   echo "E2E_TEST_MODE=true" >> apps/web/.env.local
    ```
 3. シードデータの適用 (一覧系の E2E が前提にする決定的なフィクスチャ):
    ```bash
@@ -124,7 +124,7 @@ Cloud Agent 向けの環境はリポジトリの `.cursor/environment.json` で�
 | フェーズ | スクリプト | 内容 |
 |----------|------------|------|
 | install | `.cursor/install.sh` | Node 24 を PATH 先頭に置き、`pnpm install --frozen-lockfile --ignore-scripts` → `pnpm rebuild` |
-| start | `.cursor/start.sh` | Docker（`fuse-overlayfs`）起動、ネスト Docker 向け `FORWARD` 修正、`supabase start`、`.env.local` 生成 |
+| start | `.cursor/start.sh` | Docker（`fuse-overlayfs`）起動、ネスト Docker 向け `FORWARD` 修正、`supabase start`、`apps/web/.env.local` 生成 |
 
 `--ignore-scripts` は `prepare`（`lefthook install`）が Cursor 管理の `core.hooksPath` と競合するため。ネイティブモジュールは `pnpm rebuild` で復元する。
 
@@ -133,12 +133,12 @@ Cloud Agent 向けの環境はリポジトリの `.cursor/environment.json` で�
 Cloud 上での e2e:
 
 ```bash
-set -a; source .env.local; set +a
+set -a; source apps/web/.env.local; set +a
 export E2E_TEST_MODE=true
 pnpm run test:e2e
 ```
 
-（`start` が書く `.env.local` には `E2E_TEST_MODE` を含めない。）
+（`start` が書く `apps/web/.env.local` には `E2E_TEST_MODE` を含めない。）
 
 ### コミット時の自動チェック (lefthook + Biome)
 
@@ -147,6 +147,60 @@ pnpm run test:e2e
 Biome は `./node_modules/.bin/biome` を直接実行するため、Corepack や Node.js のバージョンに左右されません。事前に `pnpm install` で依存関係を入れておいてください。
 
 既存フック(`core.hooksPath` を独自設定している場合など)との競合解消手順は [`docs/development-guidelines.md`](./docs/development-guidelines.md#フォーマット規約) を参照してください。
+
+### エラー監視 (Sentry + Slack 通知)
+
+本番(Vercel Production)のエラーだけを Sentry に送り、新規エラーの初回発生時に Slack へ通知します。Sentry 無料プランでは公式 Slack 連携が使えないため、Sentry の Webhook を `/api/sentry-webhook` で受けて Slack Incoming Webhook に転送します。設計は [`docs/design/175-sentry-slack-notification.md`](./docs/design/175-sentry-slack-notification.md) を参照してください。
+
+Sentry の設定はすべて個人リポジトリ用の Organization `kakikubo` の中で行います。Auth Token・Internal Integration・Alert Rule は org ごとの設定のため、別の org で作ったものは使えません。
+
+1. Sentry の org 切り替えメニュー(画面左上)→ **Create a new organization** で org `kakikubo` を作る(Developer プラン)。Settings → Spike Protection が有効なことを確認する
+2. **Projects → Create Project → Set up manually** で Next.js プロジェクト `lgtmhub` を作る
+   - 計装する機能は Error Monitoring だけにし、アラートは「I'll create my own alerts later」を選ぶ
+   - コーディングエージェント連携や `npx @sentry/wizard` は使わない。SDK の設定はリポジトリに入っており、ウィザードは `next.config.ts` の書き換えや、トレースを有効にした設定ファイル・認証のないサンプルページを追加してしまう
+   - Settings → Projects → lgtmhub → **Client Keys (DSN)** で DSN を控える
+3. Settings → **Organization Tokens** で source map アップロード用のトークンを作る
+4. Settings → Developer Settings → **Custom Integrations → Create New Integration → Internal Integration** を作る
+   - Webhook URL: `https://<本番ドメイン>/api/sentry-webhook`
+   - **Alert Rule Action** を ON にする(Webhook URL を入れた後で切り替えられる)
+   - Permissions はすべて No Access、Webhooks の購読はチェックしない
+   - 保存後に表示される **Client Secret** を控える
+5. Slack で通知用の Incoming Webhook URL を発行する
+   - https://api.slack.com/apps → **Create New App → From scratch**。scope とイベントは追加しない
+   - **Incoming Webhooks** を On にし、**Add New Webhook** で通知先チャンネルを選ぶ
+6. Vercel の Settings → **Environment Variables** で、Environment を **Production だけ**にして登録する(Preview / Development には入れない)
+
+   | 変数 | 値 | Type |
+   |---|---|---|
+   | `NEXT_PUBLIC_SENTRY_DSN` | 手順 2 の DSN | Config(`NEXT_PUBLIC_` はブラウザに配信される値のため Secret にできない) |
+   | `SENTRY_ORG` | `kakikubo` | Config |
+   | `SENTRY_PROJECT` | `lgtmhub` | Config |
+   | `SENTRY_AUTH_TOKEN` | 手順 3 のトークン | Secret |
+   | `SENTRY_WEBHOOK_SECRET` | 手順 4 の Client Secret | Secret |
+   | `SLACK_WEBHOOK_URL` | 手順 5 の Webhook URL | Secret(知っていれば誰でもチャンネルに投稿できるため) |
+
+   - Sentry の有効化は `NEXT_PUBLIC_VERCEL_ENV` で判定するため、「Automatically expose System Environment Variables」を ON のままにする
+   - 値はビルド時に読み込まれる。登録後に初めて本番デプロイされるまで反映されない
+
+7. 本番デプロイ後、管理者アカウントでログインして `https://<本番ドメイン>/api/debug-sentry` を開く。Sentry にエラーが記録され、Environment が `production`、スタックトレースが元の関数名・行番号で表示されることを確認する。このエンドポイントは管理者以外には 401 / 403 を返す
+   - スタックトレースが minify されたままなら、`SENTRY_AUTH_TOKEN` / `SENTRY_ORG` の値を確認する(Vercel のビルドログにアップロードのエラーが出る)
+8. 手順 7 で記録された Issue を **Delete** する(Discard ではない)
+   - 同じエラーは同じ Issue にまとめられるため、残したままだと手順 10 で「新規 Issue」にならず通知されない
+9. **Monitors → Alerts → Create Alert** で Alert を作る(旧画面の Alert Rule にあたる)
+   - Source: Alert on all issues in selected projects → `lgtmhub`
+   - Environment: `production`(本番からイベントが届いた後でないと選択肢に出ないため、手順 7 の後に作る)
+   - When: `A new issue is created`、If: 追加しない
+   - Then: `Send a notification via <手順 4 の Integration 名>`。選択肢に出ない場合は Integration の Alert Rule Action が OFF
+   - Throttling: 既定(Get notified on every trigger)のまま
+10. もう一度 `/api/debug-sentry` を **1 回だけ**開き、Slack に「新規エラー (production)」が届くことを確認する
+    - 届かない場合は、中継の応答を本番のログで確認する。Hobby プランはログを 30 分しか保持しないため、確認はアクセス直後に行う
+
+      ```bash
+      vercel logs --scope kakikubos-projects --project lgtmhub -e production --json | grep sentry-webhook
+      ```
+
+    - ログが無ければ Alert が発火していない(手順 8 の Issue 削除漏れ、Environment の不一致など)。401 は `SENTRY_WEBHOOK_SECRET` の不一致、503 は環境変数の未設定、502 は Slack が送信を拒否している
+    - 環境変数を直したら本番を再デプロイし、手順 8 から繰り返す(Alert は同じ Issue に対して再送しない)
 
 ---
 

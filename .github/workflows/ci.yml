@@ -5,6 +5,19 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
 
+# pnpm install が依存のスクリプトを実行するため、GITHUB_TOKEN は checkout に要る
+# 読み取りだけに絞る。actions/cache と upload-artifact は GITHUB_TOKEN ではなく
+# runner の ACTIONS_RUNTIME_TOKEN を使うので contents: read で足りる。
+permissions:
+  contents: read
+
+# PR は同一 ref の古い run をキャンセルする。push (main) は run_id で run ごとに
+# 別グループにし、連続マージ時に中間コミットの run が pending のまま
+# キャンセルされて Codecov の main ベースラインが欠けるのを防ぐ。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-typecheck:
     runs-on: ubuntu-latest
@@ -72,7 +85,7 @@ jobs:
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/lcov.info
+          files: ./apps/web/coverage/lcov.info
           fail_ci_if_error: false
 
   e2e:
@@ -124,10 +137,10 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install Playwright Chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm --filter @lgtmhub/web exec playwright install --with-deps chromium
       - name: Install Playwright OS dependencies
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm --filter @lgtmhub/web exec playwright install-deps chromium
       - run: pnpm run build
       # E2E_TEST_MODE は playwright.config.ts の webServer.env で webServer プロセスにのみ渡る。
       # 本番デプロイ環境変数には絶対に追加しないこと
@@ -140,8 +153,8 @@ jobs:
         with:
           name: playwright-report
           path: |
-            playwright-report/
-            test-results/
+            apps/web/playwright-report/
+            apps/web/test-results/
           retention-days: 7
           if-no-files-found: ignore
       - name: Stop Supabase Local

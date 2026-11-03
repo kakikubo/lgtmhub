@@ -12,7 +12,11 @@ function parse(policy: string): Map<string, string[]> {
 
 describe('buildContentSecurityPolicy', () => {
   const production = parse(
-    buildContentSecurityPolicy({ supabaseUrl: 'https://example.supabase.co/', isDev: false }),
+    buildContentSecurityPolicy({
+      supabaseUrl: 'https://example.supabase.co/',
+      sentryDsn: undefined,
+      isDev: false,
+    }),
   );
 
   it('画像は self と Blob / GitHub アバターだけを許可する', () => {
@@ -36,13 +40,26 @@ describe('buildContentSecurityPolicy', () => {
     ]);
   });
 
+  it('Sentry の DSN があれば connect-src に送信先のオリジン (公開鍵・パスなし) を足す', () => {
+    const policy = parse(
+      buildContentSecurityPolicy({
+        supabaseUrl: undefined,
+        sentryDsn: 'https://publickey@o123.ingest.us.sentry.io/456',
+        isDev: false,
+      }),
+    );
+    expect(policy.get('connect-src')).toEqual(["'self'", 'https://o123.ingest.us.sentry.io']);
+  });
+
   it('埋め込みとプラグインを禁止する', () => {
     expect(production.get('frame-ancestors')).toEqual(["'none'"]);
     expect(production.get('object-src')).toEqual(["'none'"]);
   });
 
   it('dev では eval・Vercel Analytics のデバッグスクリプト・HMR の WebSocket を許可する', () => {
-    const dev = parse(buildContentSecurityPolicy({ supabaseUrl: undefined, isDev: true }));
+    const dev = parse(
+      buildContentSecurityPolicy({ supabaseUrl: undefined, sentryDsn: undefined, isDev: true }),
+    );
     expect(dev.get('script-src')).toEqual([
       "'self'",
       "'unsafe-inline'",
@@ -55,7 +72,9 @@ describe('buildContentSecurityPolicy', () => {
   it.each([undefined, 'not a url'])(
     'Supabase URL が %s なら form-action に足さない',
     (supabaseUrl) => {
-      const policy = parse(buildContentSecurityPolicy({ supabaseUrl, isDev: false }));
+      const policy = parse(
+        buildContentSecurityPolicy({ supabaseUrl, sentryDsn: undefined, isDev: false }),
+      );
       expect(policy.get('form-action')).toEqual(["'self'", 'https://github.com']);
     },
   );

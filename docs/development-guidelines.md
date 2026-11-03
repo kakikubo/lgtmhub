@@ -383,6 +383,8 @@ const image = await imageRepository.findById(id);
 
 `biome.json` を正とする。コード（JS / TS / JSON / CSS）の Linter / Formatter は Biome 1 本に統一している（Prettier / ESLint からの移行は Issue #16 で実施済み）。Biome は Markdown を扱わないため、Markdown のみ markdownlint-cli2 で補完する（後述）。
 
+`biome.json` の `$schema` は URL ではなく `./node_modules/@biomejs/biome/configuration_schema.json` を指す。Renovate は lockfile だけを更新するため、URL のバージョンを書くと CLI とずれて `biome check` のたびに info が出る（Issue #402）。
+
 **Biome formatter 基本方針**(`biome.json` の `formatter` / `javascript.formatter`):
 
 | 項目 | 値 | 理由 |
@@ -857,7 +859,7 @@ CI の Supabase Local は空 DB で起動するため **全テストが何もア
 
 - `/api/auth/test-signin` は `process.env.E2E_TEST_MODE === 'true'` かつ `process.env.VERCEL_ENV !== 'production'` のときのみ動く。本番では未設定にする (Vercel の本番デプロイ環境変数に絶対に追加しないこと)。Vercel 本番では `E2E_TEST_MODE=true` が混入しても 403 を返す。CI e2e の `pnpm start` (`NODE_ENV=production`) は `VERCEL_ENV` 未設定のため引き続き利用できる
 - `tests/e2e/.auth/` は `.gitignore` 済み。CI では globalSetup が毎回再生成する
-- ローカル実行には `.env.local` に `SUPABASE_SERVICE_ROLE_KEY` と `E2E_TEST_MODE=true` を追加する必要がある (詳しくは README 参照)
+- ローカル実行には `apps/web/.env.local` に `SUPABASE_SERVICE_ROLE_KEY` と `E2E_TEST_MODE=true` を追加する必要がある (詳しくは README 参照)
 - ローカルでシードデータが入っていないと一覧系のテストが落ちる。`pnpm run db:reset` で `supabase/seed.sql` を適用してから実行する
 
 ---
@@ -877,11 +879,13 @@ CI の Supabase Local は空 DB で起動するため **全テストが何もア
 
 全ジョブ共通で `pnpm install --frozen-lockfile` を使い、トリガーは `push: [main]` と `pull_request`。
 
+`pnpm install` は依存のスクリプトを実行するため、`ci.yml` の GITHUB_TOKEN はトップレベルで `permissions: contents: read` に絞る。`concurrency` は PR を ref 単位でまとめて古い run をキャンセルし、main への push は `run_id` で run ごとに別グループにする（連続マージで中間コミットの run が取り消され、Codecov の main ベースラインが欠けるのを防ぐ）。
+
 ハングしたジョブが GitHub Actions のデフォルト上限（6 時間）まで走り続けないよう、各ジョブに `timeout-minutes` を設定する。目安は実測の 2〜3 倍（lint / test / security ほか 10 分、e2e 20 分）。`ci.yml` 以外（Danger、Release Drafter、Supabase Push）も同じ方針で 10 分とする。
 
 e2e ジョブの Playwright ブラウザ本体（`~/.cache/ms-playwright`）は `actions/cache` でキャッシュする。OS パッケージ（`--with-deps`）は apt 側でキャッシュできないため、ヒット時は `playwright install-deps chromium` のみ実行する。
 
-e2e の `playwright-report/`（HTML レポート）と `test-results/`（`trace: 'on-first-retry'` の成果物）は、成否にかかわらず `actions/upload-artifact` で 7 日保存する。失敗時に stdout 以外の調査材料を残すため `if: always()` とする。対象パスはこの 2 ディレクトリに限定する。
+e2e の `apps/web/playwright-report/`（HTML レポート）と `apps/web/test-results/`（`trace: 'on-first-retry'` の成果物）は、成否にかかわらず `actions/upload-artifact` で 7 日保存する。失敗時に stdout 以外の調査材料を残すため `if: always()` とする。対象パスはこの 2 ディレクトリに限定する。
 
 Markdown lint（`pnpm run lint:md`）は独立ジョブにせず `lint-and-typecheck` ジョブのステップとして実行する。別ジョブにすると checkout / pnpm setup / `pnpm install --frozen-lockfile` の固定コストを丸ごともう一度払うことになり、1 秒未満の検査に対して割に合わないため。lint 系のゲートという意味づけも `pnpm run check` と同じ。
 
@@ -893,7 +897,7 @@ Markdown lint（`pnpm run lint:md`）は独立ジョブにせず `lint-and-typec
 
 #### Codecov（カバレッジ可視化）
 
-`ci.yml` の `test` ジョブで `pnpm run test:coverage` を実行し、生成された `coverage/lcov.info` を `codecov/codecov-action` で Codecov にアップロードする（action のバージョンは `ci.yml` を正とする）。`test` ジョブは `push: [main]` と `pull_request` 両方で走るため、**PR と main マージ後の双方**でカバレッジが Codecov に記録され、PR には差分コメントが付く。README のカバレッジバッジも Codecov を参照する。
+`ci.yml` の `test` ジョブで `pnpm run test:coverage` を実行し、生成された `apps/web/coverage/lcov.info` を `codecov/codecov-action` で Codecov にアップロードする（action のバージョンは `ci.yml` を正とする）。`test` ジョブは `push: [main]` と `pull_request` 両方で走るため、**PR と main マージ後の双方**でカバレッジが Codecov に記録され、PR には差分コメントが付く。README のカバレッジバッジも Codecov を参照する。
 
 - **可視化が責務（ゲートは vitest 側）**: カバレッジ閾値は `vitest.config.ts` の `thresholds` で **CI を含め常時ゲート**（`src/services/**` は branches/lines/statements 90% ・ functions 85%、`src/lib/**` は 4 指標とも 80%）。Issue #113 で `functions` のみ CI の下振れ分を引き下げていたが、下振れが観測されなくなったため `src/lib/**` の `functions` を 75 → 80 に戻した（Issue #266）。Codecov は閾値ゲートを持たず可視化に専念し、`codecov.yml` の project / patch ステータスも `informational: true`（二重ゲートにしない）。なお**閾値未達・テスト失敗いずれも `vitest` が非 0 終了するため、`test` ジョブのゲートとして機能する**。
 - **token は任意**: public リポジトリのため `CODECOV_TOKEN` 未設定でも tokenless でアップロードできる。レート制限回避のため設定する場合は GitHub Secrets に `CODECOV_TOKEN` を登録する。アップロード失敗で `test` ジョブを落とさないよう `fail_ci_if_error: false`。
@@ -1036,8 +1040,8 @@ Node.js のメジャーは、`package.json` の `engines.node`、`actions/setup-
 pnpm install
 
 # 2. 環境変数の設定
-cp .env.example .env.local
-# .env.local を編集（Supabase / Vercel Blob / GitHub OAuth の設定を記入）
+cp apps/web/.env.example apps/web/.env.local
+# apps/web/.env.local を編集（Supabase / Vercel Blob / GitHub OAuth の設定を記入）
 
 # 3. Supabase Localの起動
 pnpm run db:start
@@ -1088,7 +1092,7 @@ pnpm run db:types
 
 ### 環境変数一覧
 
-`.env.example` に全変数のテンプレートを配置する。
+`apps/web/.env.example` に全変数のテンプレートを配置する。
 
 | 変数名 | 用途 | 公開範囲 |
 |--------|------|---------|
