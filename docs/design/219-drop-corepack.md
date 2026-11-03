@@ -8,6 +8,7 @@ Corepack をやめ、pnpm 本体のバージョン自動切替（`pmOnFail` の�
 
 - `pmOnFail: ignore` を削除する。この設定は Corepack にバージョン管理を任せる前提で入れたもので（d3df159）、Corepack をやめれば不要になる
   - 実測: mise で入れた pnpm 11.13.0 で `pnpm_config_pm_on_fail=download pnpm -v` を実行すると `12.16.1` が返る
+  - 副作用として、`pnpm-lock.yaml` の先頭に pnpm 本体の版と integrity を記録する boot document（`packageManagerDependencies`）が追加される。pnpm 12 以上を `packageManager` で固定していて `ignore` でない場合の[公式の挙動](https://pnpm.io/lockfile)なので、そのままコミットする
 - pnpm の入れ方は自由にする（npm / mise / Homebrew / 公式インストーラ）。手順書では `npm i -g pnpm` を例に挙げる。どのバージョンを入れても、実行時に `packageManager` のバージョンへ切り替わる
 - 置き換えるのは devcontainer の `postCreateCommand` と `.cursor/{install,start}.sh` の `corepack enable`。後者は「`pnpm` が無いときだけ `npm i -g pnpm`」にする
 - ドキュメント（README / AGENTS.md / CLAUDE.md / docs/architecture.md / docs/development-guidelines.md）から Corepack 前提の記述を外す。README の Corepack 用トラブルシュートは削除し、「`corepack enable` 済みの環境では `corepack disable pnpm` を実行する」の 1 行に置き換える
@@ -18,7 +19,7 @@ Corepack をやめ、pnpm 本体のバージョン自動切替（`pmOnFail` の�
 | 案 | 却下理由 |
 |---|---|
 | `pmOnFail: ignore` を残し、入れる pnpm のバージョンを各環境で `packageManager` に合わせる | devcontainer・Cursor・各開発者のマシンでバージョンを手で揃え続けることになり、Renovate が更新するたびにずれる |
-| `npm i -g corepack` で Corepack を使い続ける | Node 本体から外れたツールに依存し続けることになる。過去に Corepack 0.34.4 以下と pnpm 12 の組み合わせで壊れた（README のトラブルシュート） |
+| `npm i -g corepack` で Corepack を使い続ける | Node 本体から外れたツールに依存し続けることになる。過去に Corepack 0.34.4 以下と pnpm 12 の組み合わせで壊れた（pnpm 12 の `bin/pnpm.mjs` を解決できず lefthook が失敗） |
 | `pmOnFail: error` にして、バージョンが違えば失敗させる | 自動で切り替えれば済むので、失敗させる理由がない |
 
 ## Non-goals
