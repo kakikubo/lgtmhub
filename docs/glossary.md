@@ -418,7 +418,7 @@ export const createImageSchema = z.object({
 
 **本プロジェクトでの使用**:
 画像URL登録機能で外部URLを取得する際、攻撃者がプライベートIP（`10.0.0.0/8` など）を指定することで内部リソースを侵害できる可能性がある。
-対策として `src/lib/http/safe-fetch.ts` でDNS解決後にIPを検証し、プライベートIPへのアクセスをブロックする。
+対策として `src/lib/http/safe-fetch.ts` で名前解決した IP を検証し、公開ユニキャスト以外への接続をブロックする。検証は接続時の名前解決にも適用し、接続先を検証済みの IP に固定する。
 
 **実装箇所**: `src/lib/http/safe-fetch.ts`
 

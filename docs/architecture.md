@@ -199,30 +199,15 @@ Presentation → API → Service → Data
 
 ### SSRF対策（外部URLからの画像取得）
 
-```typescript
-// プライベートIPレンジへのアクセスを禁止
-const PRIVATE_IP_RANGES = [
-  /^10\./,
-  /^172\.(1[6-9]|2[0-9]|3[01])\./,
-  /^192\.168\./,
-  /^127\./,
-  /^169\.254\./,        // link-local
-  /^::1$/, /^fc00:/, /^fe80:/, // IPv6
-];
+実装は `src/lib/http/safe-fetch.ts`。
 
-async function safeImageFetch(url: string): Promise<Response> {
-  const parsed = new URL(url);
-  if (parsed.protocol !== 'https:') {
-    throw new BadRequestError('HTTPS URLのみ許可されています');
-  }
-  // DNS解決後にIPをチェック
-  const ips = await dns.resolve(parsed.hostname);
-  if (ips.some(ip => PRIVATE_IP_RANGES.some(re => re.test(ip)))) {
-    throw new BadRequestError('このURLは使用できません');
-  }
-  return fetch(url, { redirect: 'error' }); // リダイレクト禁止
-}
-```
+- HTTPS の URL のみ受け付ける
+- 宛先 IP は許可リスト方式で判定する。`ipaddr.js` の `range()` が `unicast`（公開ユニキャスト）のときだけ許可し、それ以外はすべて拒否する
+  - 拒否する例: プライベート、ループバック、リンクローカル、CGNAT、マルチキャスト、予約、IPv4 を埋め込んだ IPv6
+- 判定は 2 段で行う
+  - 事前チェック: URL のホスト名を名前解決して判定する。IP リテラルの URL もここで判定する
+  - 接続時: `undici` の `Agent({ connect: { lookup } })` で、実際に接続するときの名前解決結果も同じ基準で検証する。接続先は検証済みの IP に固定され、事前チェックの後に DNS の応答が変わっても許可されない IP には接続しない
+- リダイレクトは禁止する（`redirect: 'error'`）。タイムアウトとサイズの上限を設ける
 
 ### エラーハンドリング
 
