@@ -5,7 +5,7 @@
 - Next.js App Router (cacheComponents 有効) + Supabase + Vercel
 - pnpm workspace の monorepo。Next.js アプリは `apps/web` (`@lgtmhub/web`)、`supabase/` はルート。ルートの `pnpm run <script>` は apps/web へ委譲する
 - 開発環境: devcontainer / Node.js v24 / TypeScript 7.x
-- パッケージマネージャー: pnpm (Corepack 経由、`package.json` の `packageManager` でバージョン固定)。npm・yarn は使わない
+- パッケージマネージャー: pnpm (`package.json` の `packageManager` でバージョン固定、pnpm 自身が切り替える。Corepack は使わない)。npm・yarn は使わない
 - lint/format は Biome、unit は Vitest、e2e は Playwright
 
 ## 検証コマンド

@@ -17,7 +17,13 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
     export PATH="$_node_bin:$PATH"
   fi
 fi
-corepack enable >/dev/null 2>&1 || true
+# Install exactly the pnpm pinned in package.json#packageManager (already past the
+# Renovate cooldown). Check the version outside the repo: inside it, pnpm >=10
+# self-switches and would always report the pinned version.
+_pm="$(node -p "require('./package.json').packageManager")"
+if [ "$(cd / && pnpm -v 2>/dev/null)" != "${_pm#pnpm@}" ]; then
+  npm install -g "$_pm" >/dev/null
+fi
 
 # --- 1. Start Docker daemon if not already running ---
 if ! docker info >/dev/null 2>&1; then
