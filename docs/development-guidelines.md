@@ -4,9 +4,9 @@
 
 | ツール | バージョン | 備考 |
 |--------|-----------|------|
-| Node.js | 24.x | CLAUDE.mdで指定。`package.json` の `engines` で 24.x に固定。Corepack で pnpm 12 を使うには 24.12.0 以上が必要（README 参照） |
+| Node.js | 24.x | CLAUDE.mdで指定。`package.json` の `engines` で 24.x に固定 |
 | TypeScript | 7.x | バージョン詳細は `docs/architecture.md`「依存関係管理 > バージョン管理方針」を参照 |
-| pnpm | 12.x | Corepack 経由(`corepack enable`)。バージョンは `package.json` の `packageManager` で固定 |
+| pnpm | 12.x | 入手経路は任意。バージョンは `package.json` の `packageManager` で固定し、pnpm 自身が切り替える(`pmOnFail` は既定の `download`) |
 
 開発環境は devcontainer での起動を前提とする（CLAUDE.md 参照）。
 
@@ -431,7 +431,7 @@ CI で `pnpm run check`（lint + format）を実行し、エラー検出時は�
 - 修正不能な lint エラーが残った場合、コミットは失敗する(`biome.json` のルール設定は CI の `pnpm run check` と同一)
 - lefthook は staged ファイルのみを見る。Biome のバージョン更新に伴う未ステージファイルの format ドリフトは、CI の `pnpm run check` がリポジトリ全体を検査して検出する
 - 上記対象外の拡張子のみのコミットでは、`biome-check` ジョブはスキップされコミットがそのまま成立する
-- Biome は `./node_modules/.bin/biome` を直接実行し、Corepack(`corepack pnpm exec`)を経由しない。Corepack 0.34.4 以下は pnpm 12 の実行ファイルを存在しない `bin/pnpm.cjs` と解決するため、Node.js 24.12.0 未満の環境ではコミットのたびに失敗していた。Node.js 25 以降は Corepack が同梱されないこともあり、コミット経路を Node.js / Corepack のバージョンから切り離している。実行される Biome は lockfile で固定されたもので、`pnpm exec` と同一。Corepack 側の復旧手順は [README のトラブルシュート](../README.md#corepack-pnpm-が-cannot-find-module-binpnpmcjs-で失敗する) を参照する
+- Biome は `./node_modules/.bin/biome` を直接実行し、pnpm を経由しない。コミット経路を pnpm / Node.js のバージョンから切り離すため。実行される Biome は lockfile で固定されたもので、`pnpm exec` と同一
 - 緊急回避が必要な場合のみ `git commit --no-verify` でフックをバイパスできる。通常運用では使用しない
 
 **既存フックとの競合**:

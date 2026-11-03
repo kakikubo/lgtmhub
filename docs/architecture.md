@@ -6,9 +6,9 @@
 
 | 技術 | バージョン | 選定理由 |
 |------|-----------|----------|
-| Node.js | 24.x | CLAUDE.mdで指定。Next.js 16のサポート対象、非同期I/Oに優れSharpの画像処理を高速に実行可能。`package.json` の `engines` で 24.x に固定。Corepack で pnpm 12 を使うには 24.12.0 以上が必要（README 参照） |
+| Node.js | 24.x | CLAUDE.mdで指定。Next.js 16のサポート対象、非同期I/Oに優れSharpの画像処理を高速に実行可能。`package.json` の `engines` で 24.x に固定 |
 | TypeScript | 7.x | CLAUDE.mdで指定。静的型付けでバグを早期検出、Supabase / Next.jsの型生成が充実 |
-| pnpm | 12.x | CLAUDE.mdで指定。Corepack 経由で利用し、`package.json` の `packageManager` でバージョンを固定 |
+| pnpm | 12.x | CLAUDE.mdで指定。`package.json` の `packageManager` でバージョンを固定し、pnpm 自身が実行時にその版へ切り替える（Corepack は Node.js 25 以降同梱されないため使わない） |
 
 ### フレームワーク・ライブラリ
 
