@@ -5,6 +5,19 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
 
+# pnpm install が依存のスクリプトを実行するため、GITHUB_TOKEN は checkout に要る
+# 読み取りだけに絞る。actions/cache と upload-artifact は GITHUB_TOKEN ではなく
+# runner の ACTIONS_RUNTIME_TOKEN を使うので contents: read で足りる。
+permissions:
+  contents: read
+
+# PR は同一 ref の古い run をキャンセルする。push (main) は run_id で run ごとに
+# 別グループにし、連続マージ時に中間コミットの run が pending のまま
+# キャンセルされて Codecov の main ベースラインが欠けるのを防ぐ。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-typecheck:
     runs-on: ubuntu-latest
