@@ -54,6 +54,11 @@ export default defineConfig({
       // モックされる src/lib/supabase/* のクライアント生成関数。
       // app/api/images/** の閾値は CI 実測 (statements 95.49 / branches 85 /
       // functions 100 / lines 95.41) の下にバッファを取った値 (Issue #259)。
+      // src/repositories/** と app/api/favorites/** も同様に実測の下にバッファを取る
+      // (Issue #385)。repositories は実測 statements 100 / branches 92.93 (92/99) /
+      // functions 100 (37/37) / lines 100、favorites は statements 92.77 (77/83) /
+      // branches 85.42 (41/48) / functions 100 (5/5) / lines 92.68 (76/82)。
+      // favorites は関数が 5 個しかないため、functions 95 は未テスト関数 1 つで落ちる。
       // glob 閾値はマッチしたファイル群の「集計」に対して効く (ファイル単位ではない)。
       // app/api/auth/** に閾値を置かないのは意図的。両 route の未カバー関数は
       // createServerClient に渡す cookie アダプタ (getAll/setAll) で、unit テストでは
@@ -63,7 +68,9 @@ export default defineConfig({
       thresholds: {
         'src/services/**': { branches: 90, functions: 85, lines: 90, statements: 90 },
         'src/lib/**': { branches: 80, functions: 80, lines: 80, statements: 80 },
+        'src/repositories/**': { branches: 90, functions: 95, lines: 95, statements: 95 },
         'app/api/images/**': { branches: 80, functions: 95, lines: 90, statements: 90 },
+        'app/api/favorites/**': { branches: 80, functions: 95, lines: 90, statements: 90 },
       },
     },
   },

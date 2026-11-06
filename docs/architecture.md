@@ -298,7 +298,7 @@ Next.js 16 の **Cache Components**（Next.js 15 までの実験的 PPR を安�
   - `src/services/**` のビジネスロジック
   - `src/lib/image/**` のpHash計算・LGTM合成・SSRF検証
   - `src/lib/validation/**` のzodスキーマ
-- **カバレッジ目標**: `src/services/**` 90% / `src/lib/**` 80%
+- **カバレッジ目標**: `src/services/**` 90% / `src/lib/**` 80% / `src/repositories/**` 95% / `app/api/images/**` 90% / `app/api/favorites/**` 90%（lines 基準）
   - 詳細な閾値設定は `docs/development-guidelines.md` の `vitest.config.ts` を参照
 
 ### 統合テスト
